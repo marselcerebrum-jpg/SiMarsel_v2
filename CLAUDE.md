@@ -8,19 +8,32 @@ The primary objective is to build a structured, maintainable web application for
 
 ## Tech Stack
 
+### Backend
+
 - PHP 8.3+
 - Laravel 13
-- Blade templating
-- Vite for frontend assets
 - PHPUnit for testing
 - Composer for dependency management
-- NPM for frontend assets
+
+### Frontend
+
+- Blade templating (server-rendered views)
+- Tailwind CSS v4 (via `@tailwindcss/vite`)
+- Alpine.js for client-side interactivity
+- Chart.js for charts and dashboard visualizations
+- Native `fetch()` for AJAX/API calls
+- Vite for asset bundling
+- NPM for frontend dependencies
 
 ## Important Project Structure
 
 - `app/` — application logic, models, controllers, providers, services
 - `routes/` — HTTP route definitions
 - `resources/views/` — Blade templates
+- `resources/views/components/` — reusable Blade components
+- `resources/css/app.css` — Tailwind entrypoint
+- `resources/js/app.js` — JS entrypoint (Alpine.js bootstrap, shared helpers)
+- `resources/js/` — Alpine components, Chart.js setup, fetch helpers
 - `database/migrations/` — database schema migrations
 - `database/seeders/` — seed data
 - `config/` — application configuration
@@ -86,6 +99,7 @@ When a feature is small and simple, a service alone is often enough. Add a repos
 ### 5. Security
 
 - Use `@csrf` in HTML forms.
+- Send the `X-CSRF-TOKEN` header on every non-GET `fetch()` request.
 - Use authentication and authorization policies for protected features.
 - Prevent SQL injection by using Eloquent or query builder methods.
 - Use `Hash` for passwords.
@@ -99,6 +113,21 @@ When a feature is small and simple, a service alone is often enough. Add a repos
 - Examples:
     - `php artisan test`
     - `php artisan test --filter=SomeTestName`
+
+### 7. Frontend
+
+The frontend stack is **Blade + Tailwind CSS + Alpine.js + Vite + Chart.js**, with native `fetch()` for AJAX/API calls.
+
+- Render pages server-side with Blade. Do not introduce an SPA framework (Vue, React, Inertia, Livewire) without explicit approval.
+- Style with Tailwind utility classes. Avoid custom CSS unless a utility cannot express it; put shared tokens in `@theme` in `resources/css/app.css`.
+- Use Alpine.js (`x-data`, `x-show`, `x-on`, `x-model`) for interactivity such as modals, dropdowns, tabs, and inline forms. Move non-trivial logic out of inline attributes into `Alpine.data()` components registered in `resources/js/`.
+- Use Chart.js for charts. Fetch chart data as JSON from a dedicated endpoint, or pass it from the controller with `Js::from()`/`@json`. Do not build chart datasets in Blade.
+- Use native `fetch()` for AJAX. Do not add jQuery or Axios.
+- Keep fetch logic in a shared helper in `resources/js/` that sets `Accept: application/json`, `X-Requested-With: XMLHttpRequest`, and the `X-CSRF-TOKEN` header read from `<meta name="csrf-token">`.
+- Handle `422` responses by showing Laravel validation errors next to the fields, and handle other non-2xx responses with a user-facing error message.
+- AJAX endpoints return JSON from controllers (use API Resources for model data). Validation still goes through Form Requests.
+- Load assets only through `@vite(['resources/css/app.css', 'resources/js/app.js'])` in the layout.
+- Import Alpine.js and Chart.js through Vite from NPM; do not load them from a CDN.
 
 ## Local Setup
 
@@ -135,7 +164,9 @@ php artisan migrate
 
 ```bash
 npm install
-npm run build
+npm install alpinejs chart.js   # first-time only, if not yet in package.json
+npm run build                   # production build
+npm run dev                     # Vite dev server with hot reload
 ```
 
 ### Run the app
@@ -203,6 +234,92 @@ public function store(StoreUserRequest $request)
 - Use reusable components for repeated UI.
 - Do not put business logic in Blade templates.
 - Use native Blade structures such as `@foreach`, `@if`, and `@csrf`.
+- Include `<meta name="csrf-token" content="{{ csrf_token() }}">` in the base layout.
+
+### Alpine.js + fetch()
+
+```js
+// resources/js/http.js
+const token = document.querySelector('meta[name="csrf-token"]').content;
+
+export async function http(url, { method = 'GET', body } = {}) {
+    const response = await fetch(url, {
+        method,
+        headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
+            'X-CSRF-TOKEN': token,
+        },
+        body: body ? JSON.stringify(body) : undefined,
+    });
+
+    const data = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+        throw { status: response.status, data };
+    }
+
+    return data;
+}
+```
+
+```js
+// resources/js/app.js
+import Alpine from 'alpinejs';
+import { http } from './http';
+
+Alpine.data('taskForm', () => ({
+    form: { title: '' },
+    errors: {},
+    loading: false,
+
+    async submit() {
+        this.loading = true;
+        this.errors = {};
+
+        try {
+            await http('/tasks', { method: 'POST', body: this.form });
+            this.form.title = '';
+        } catch ({ status, data }) {
+            if (status === 422) this.errors = data.errors;
+        } finally {
+            this.loading = false;
+        }
+    },
+}));
+
+window.Alpine = Alpine;
+Alpine.start();
+```
+
+```blade
+<div x-data="taskForm">
+    <input x-model="form.title" class="rounded-md border px-3 py-2">
+    <p x-show="errors.title" x-text="errors.title?.[0]" class="text-sm text-red-600"></p>
+    <button @click="submit" :disabled="loading" class="rounded-md bg-blue-600 px-4 py-2 text-white">Save</button>
+</div>
+```
+
+### Chart.js
+
+```js
+// resources/js/app.js (register before Alpine.start())
+import Chart from 'chart.js/auto';
+
+Alpine.data('chart', (url, type = 'line') => ({
+    async init() {
+        const { labels, datasets } = await http(url);
+        new Chart(this.$refs.canvas, { type, data: { labels, datasets } });
+    },
+}));
+```
+
+```blade
+<div x-data="chart('{{ route('reports.progress') }}')">
+    <canvas x-ref="canvas"></canvas>
+</div>
+```
 
 ## AI / Agent Workflow
 
@@ -263,6 +380,7 @@ npm install
 cp .env.example .env
 php artisan key:generate
 php artisan migrate
+npm run dev
 php artisan serve
 ```
 
