@@ -12,6 +12,7 @@ The primary objective is to build a structured, maintainable web application for
 
 - PHP 8.3+
 - Laravel 13
+- Eloquent ORM for database access
 - PHPUnit for testing
 - Composer for dependency management
 
