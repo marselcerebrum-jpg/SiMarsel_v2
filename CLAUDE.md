@@ -130,6 +130,32 @@ The frontend stack is **Blade + Tailwind CSS + Alpine.js + Vite + Chart.js**, wi
 - Load assets only through `@vite(['resources/css/app.css', 'resources/js/app.js'])` in the layout.
 - Import Alpine.js and Chart.js through Vite from NPM; do not load them from a CDN.
 
+### 8. Error handling
+
+- Use exceptions with a specific meaning. Do not use `throw new Exception(...)` for business conditions or HTTP errors.
+- Create business exceptions in `app/Exceptions/`, named after the condition they represent (for example, `TaskAlreadyCompletedException`).
+- Do not set the HTTP status code through the second argument of `Exception`. `new Exception('...', 404)` does **not** produce an HTTP 404.
+- Services may throw a specific exception when a business rule is violated or a meaningful application-level condition cannot be fulfilled.
+- Controllers do not use `try`/`catch` just to pass on or reshape errors from services. Let Laravel's exception handling mechanism deal with them.
+- Validate request input (required, type, format, length, etc.) with Form Requests. Handle business rules (duplicate data, invalid status, process conditions) in services or domain logic.
+- Do not catch unexpected errors (database, programming, or infrastructure failures) just to change the response message. Let Laravel return a 500 and keep the technical details in the log, not in the response.
+- Return the response that fits the request type: HTML for web requests, JSON for JSON/API requests. Do not force every exception into JSON in this Blade application.
+- Never expose stack traces, database queries, credentials, or other internal details to the user. Keep `APP_DEBUG=false` outside local development.
+
+#### Before introducing a new exception
+
+1. Check whether an existing Laravel or framework exception already represents the condition.
+2. Reuse that exception when its meaning matches the situation.
+3. Create a custom exception only when the condition is a distinct business or domain case.
+4. Do not create custom exceptions merely to wrap generic errors.
+
+| Condition | Use |
+|---|---|
+| Resource not found | Laravel's not-found mechanisms, such as `findOrFail()` or route model binding |
+| Invalid request data | Form Request validation |
+| Business rule violation | A custom business exception, when needed |
+| Unexpected database or system failure | Do not convert it into a business exception |
+
 ## Local Setup
 
 ### Initial install
