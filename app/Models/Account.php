@@ -11,6 +11,8 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 #[Hidden(['password'])]
 class Account extends Authenticatable
 {
+    public const USERNAME_FORMAT = '/^[a-zA-Z0-9._]{4,25}$/';
+
     /**
      * The accounts table has no remember_token column.
      */
@@ -36,5 +38,10 @@ class Account extends Authenticatable
     public function division(): BelongsTo
     {
         return $this->belongsTo(Division::class);
+    }
+
+    public function isManager(): bool
+    {
+        return $this->role?->code_role === Role::MANAGER;
     }
 }
