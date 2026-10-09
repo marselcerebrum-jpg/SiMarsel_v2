@@ -98,5 +98,6 @@ Menghapus akun berdasarkan ID. Session milik akun tersebut ikut terhapus, sehing
 
 ## Catatan untuk frontend
 
-- Belum ada endpoint untuk daftar role dan divisi. Saat ini ID role dari seeder adalah `1` = Manager (`MGR`) dan `2` = Employee (`EMP`).
+- Daftar divisi untuk pilihan `division_id` diambil dari `GET /api/divisions` ([divisions.md](divisions.md)).
+- Belum ada endpoint untuk daftar role. Saat ini ID role dari seeder adalah `1` = Manager (`MGR`) dan `2` = Employee (`EMP`).
 - Tampilkan `errors.<field>[0]` di bawah field yang sesuai jika mendapat 422.
