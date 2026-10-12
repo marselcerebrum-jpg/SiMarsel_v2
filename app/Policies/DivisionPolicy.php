@@ -8,19 +8,19 @@ use App\Models\Division;
 class DivisionPolicy
 {
     /**
-     * Determine whether the user can view any divisions.
+     * Every logged-in role can view divisions.
      */
     public function viewAny(Account $user): bool
     {
-        return $user->isManager();
+        return true;
     }
 
     /**
-     * Determine whether the user can view the division.
+     * Every logged-in role can view a division.
      */
     public function view(Account $user, Division $division): bool
     {
-        return $user->isManager();
+        return true;
     }
 
     /**
