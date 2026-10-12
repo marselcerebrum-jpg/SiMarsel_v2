@@ -2,12 +2,17 @@
 
 Data divisi disimpan di tabel master `divisions` dan dipakai oleh entitas lain, misalnya `accounts.division_id`.
 
-Semua endpoint di halaman ini **wajib login** dan **hanya untuk role Manager** (`MGR`). Aturan header, CSRF, dan kode error umum ada di [authentication.md](authentication.md).
+Semua endpoint di halaman ini **wajib login**. Aturan header, CSRF, dan kode error umum ada di [authentication.md](authentication.md).
+
+| Endpoint | Role yang boleh |
+|---|---|
+| `GET /api/divisions`, `GET /api/divisions/{id}` | Semua role (Manager dan Employee) |
+| `POST`, `PUT`/`PATCH`, `DELETE` | Hanya Manager (`MGR`) |
 
 | Kondisi | Respons |
 |---|---|
 | Belum login | `401` `Silakan login terlebih dahulu.` |
-| Login sebagai Employee | `403` `Anda tidak memiliki akses untuk melakukan aksi ini.` |
+| Employee mencoba membuat, mengubah, atau menghapus divisi | `403` `Anda tidak memiliki akses untuk melakukan aksi ini.` |
 | ID divisi tidak ada | `404` `Data tidak ditemukan.` |
 
 ## Objek Division
@@ -16,14 +21,13 @@ Semua endpoint di halaman ini **wajib login** dan **hanya untuk role Manager** (
 {
     "id": 1,
     "code_division": "IT",
-    "name": "Information Tech",
-    "is_active": true
+    "name": "Information Tech"
 }
 ```
 
 ## `GET /api/divisions`
 
-Mengambil seluruh divisi (aktif dan nonaktif), diurutkan berdasarkan `id`.
+Mengambil seluruh divisi, diurutkan berdasarkan `id`.
 
 **200 OK**
 
@@ -39,7 +43,7 @@ Mengambil satu divisi berdasarkan ID.
 
 ## `POST /api/divisions`
 
-Membuat divisi baru. Divisi yang baru dibuat langsung berstatus **aktif** (`is_active: true`). Status tidak bisa diatur dari request.
+Membuat divisi baru. Divisi langsung tersimpan di tabel master dan bisa langsung dipakai, misalnya sebagai `division_id` akun.
 
 **Body**
 
@@ -58,7 +62,7 @@ Isian yang hanya berisi spasi dianggap kosong.
 
 ```json
 {
-    "data": { "id": 1, "code_division": "IT", "name": "Information Tech", "is_active": true },
+    "data": { "id": 1, "code_division": "IT", "name": "Information Tech" },
     "message": "Divisi berhasil dibuat."
 }
 ```
@@ -77,23 +81,17 @@ Isian yang hanya berisi spasi dianggap kosong.
 
 ## `PUT /api/divisions/{id}` atau `PATCH /api/divisions/{id}`
 
-Memperbarui divisi berdasarkan ID. **Kirim hanya field yang ingin diubah**, karena field yang tidak dikirim tetap sama.
-
-| Field | Tipe | Aturan |
-|---|---|---|
-| `code_division` | string | Tidak boleh kosong, unik, maksimal 50 karakter. Boleh sama dengan kode divisi itu sendiri |
-| `name` | string | Tidak boleh kosong, unik, maksimal 25 karakter. Boleh sama dengan nama divisi itu sendiri |
-| `is_active` | boolean | `true` untuk mengaktifkan, `false` untuk menonaktifkan |
+Memperbarui divisi berdasarkan ID. **Kirim hanya field yang ingin diubah**, karena field yang tidak dikirim tetap sama. Aturannya sama dengan `POST`, tetapi `code_division` dan `name` boleh tetap sama dengan milik divisi itu sendiri.
 
 ```json
-{ "name": "IT Support", "is_active": false }
+{ "name": "IT Support" }
 ```
 
 **200 OK**: objek Division terbaru di `data`, dengan `"message": "Divisi berhasil diperbarui."`
 
 ## `DELETE /api/divisions/{id}`
 
-Menghapus divisi secara permanen. Akun yang berada di divisi tersebut **tidak ikut terhapus**, hanya `division` akun itu menjadi `null`. Untuk menyembunyikan divisi tanpa menghapusnya, gunakan `is_active: false`.
+Menghapus divisi secara permanen. Akun yang berada di divisi tersebut **tidak ikut terhapus**, hanya `division` akun itu menjadi `null`.
 
 **200 OK**
 
@@ -103,5 +101,6 @@ Menghapus divisi secara permanen. Akun yang berada di divisi tersebut **tidak ik
 
 ## Catatan untuk frontend
 
+- Daftar divisi (`GET /api/divisions`) bisa dipakai di halaman mana pun untuk semua role, misalnya untuk pilihan divisi.
 - Halaman/form pembuatan divisi hanya ditampilkan untuk Manager. Kolom input: **Nama divisi** (`name`) dan **Kode divisi** (`code_division`).
 - Tampilkan `errors.<field>[0]` di bawah field yang sesuai jika mendapat 422.
