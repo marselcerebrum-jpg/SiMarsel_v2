@@ -31,7 +31,21 @@ Route::middleware('auth')->group(function () {
             ->name('destroy');
     });
 
-    Route::post('/divisions', [DivisionController::class, 'store'])
-        ->can('create', Division::class)
-        ->name('api.divisions.store');
+    Route::prefix('divisions')->name('api.divisions.')->group(function () {
+        Route::get('/', [DivisionController::class, 'index'])
+            ->can('viewAny', Division::class)
+            ->name('index');
+        Route::post('/', [DivisionController::class, 'store'])
+            ->can('create', Division::class)
+            ->name('store');
+        Route::get('/{division}', [DivisionController::class, 'show'])
+            ->can('view', 'division')
+            ->name('show');
+        Route::match(['put', 'patch'], '/{division}', [DivisionController::class, 'update'])
+            ->can('update', 'division')
+            ->name('update');
+        Route::delete('/{division}', [DivisionController::class, 'destroy'])
+            ->can('delete', 'division')
+            ->name('destroy');
+    });
 });
