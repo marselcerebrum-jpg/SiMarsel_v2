@@ -52,16 +52,28 @@ class DivisionCrudTest extends TestCase
         $this->assertDatabaseCount('divisions', 1);
     }
 
-    public function test_employee_cannot_access_division_endpoints(): void
+    public function test_employee_can_list_and_view_divisions(): void
+    {
+        $this->actingAs($this->employee);
+
+        $this->getJson('/api/divisions')
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.code_division', 'IT');
+        $this->getJson("/api/divisions/{$this->division->id}")
+            ->assertOk()
+            ->assertJsonPath('data.name', 'Information Tech');
+    }
+
+    public function test_employee_cannot_create_update_or_delete_divisions(): void
     {
         $id = $this->division->id;
         $this->actingAs($this->employee);
 
-        $this->getJson('/api/divisions')
+        $this->postJson('/api/divisions', ['code_division' => 'FIN', 'name' => 'Finance'])
             ->assertForbidden()
             ->assertExactJson(['message' => 'Anda tidak memiliki akses untuk melakukan aksi ini.']);
-        $this->postJson('/api/divisions', ['code_division' => 'FIN', 'name' => 'Finance'])->assertForbidden();
-        $this->getJson("/api/divisions/{$id}")->assertForbidden();
+        $this->putJson("/api/divisions/{$id}", ['code_division' => 'X', 'name' => 'X'])->assertForbidden();
         $this->patchJson("/api/divisions/{$id}", ['name' => 'X'])->assertForbidden();
         $this->deleteJson("/api/divisions/{$id}")->assertForbidden();
 
@@ -71,25 +83,16 @@ class DivisionCrudTest extends TestCase
 
     // Create
 
-    public function test_manager_can_create_an_active_division(): void
+    public function test_manager_can_create_a_division(): void
     {
         $this->actingAs($this->manager)
             ->postJson('/api/divisions', ['code_division' => 'FIN', 'name' => 'Finance'])
             ->assertCreated()
             ->assertJsonPath('message', 'Divisi berhasil dibuat.')
             ->assertJsonPath('data.code_division', 'FIN')
-            ->assertJsonPath('data.name', 'Finance')
-            ->assertJsonPath('data.is_active', true);
+            ->assertJsonPath('data.name', 'Finance');
 
-        $this->assertDatabaseHas('divisions', ['code_division' => 'FIN', 'name' => 'Finance', 'is_active' => true]);
-    }
-
-    public function test_create_ignores_is_active_from_request(): void
-    {
-        $this->actingAs($this->manager)
-            ->postJson('/api/divisions', ['code_division' => 'FIN', 'name' => 'Finance', 'is_active' => false])
-            ->assertCreated()
-            ->assertJsonPath('data.is_active', true);
+        $this->assertDatabaseHas('divisions', ['code_division' => 'FIN', 'name' => 'Finance']);
     }
 
     public function test_create_requires_code_and_name(): void
@@ -154,7 +157,6 @@ class DivisionCrudTest extends TestCase
                 'id' => $this->division->id,
                 'code_division' => 'IT',
                 'name' => 'Information Tech',
-                'is_active' => true,
             ])
             ->assertJsonPath('data.1.code_division', 'FIN');
     }
@@ -165,8 +167,7 @@ class DivisionCrudTest extends TestCase
             ->getJson("/api/divisions/{$this->division->id}")
             ->assertOk()
             ->assertJsonPath('data.code_division', 'IT')
-            ->assertJsonPath('data.name', 'Information Tech')
-            ->assertJsonPath('data.is_active', true);
+            ->assertJsonPath('data.name', 'Information Tech');
     }
 
     // Update
@@ -181,20 +182,6 @@ class DivisionCrudTest extends TestCase
             ->assertJsonPath('data.name', 'IT Support');
 
         $this->assertDatabaseHas('divisions', ['id' => $this->division->id, 'code_division' => 'IT', 'name' => 'IT Support']);
-    }
-
-    public function test_manager_can_deactivate_and_reactivate_a_division(): void
-    {
-        $this->actingAs($this->manager);
-
-        $this->patchJson("/api/divisions/{$this->division->id}", ['is_active' => false])
-            ->assertOk()
-            ->assertJsonPath('data.is_active', false);
-        $this->assertDatabaseHas('divisions', ['id' => $this->division->id, 'is_active' => false]);
-
-        $this->patchJson("/api/divisions/{$this->division->id}", ['is_active' => true])
-            ->assertOk()
-            ->assertJsonPath('data.is_active', true);
     }
 
     public function test_update_allows_keeping_own_code_and_name(): void
@@ -217,15 +204,14 @@ class DivisionCrudTest extends TestCase
             ]);
     }
 
-    public function test_update_rejects_empty_values_and_invalid_status(): void
+    public function test_update_rejects_empty_values(): void
     {
         $this->actingAs($this->manager)
-            ->patchJson("/api/divisions/{$this->division->id}", ['code_division' => '', 'name' => '', 'is_active' => 'ya'])
+            ->patchJson("/api/divisions/{$this->division->id}", ['code_division' => '', 'name' => ''])
             ->assertUnprocessable()
             ->assertJsonValidationErrors([
                 'code_division' => 'Kode divisi wajib diisi.',
                 'name' => 'Nama divisi wajib diisi.',
-                'is_active' => 'Status harus bernilai true atau false.',
             ]);
 
         $this->assertDatabaseHas('divisions', ['id' => $this->division->id, 'code_division' => 'IT', 'name' => 'Information Tech']);
