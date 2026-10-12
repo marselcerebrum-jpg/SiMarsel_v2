@@ -18,7 +18,6 @@ class DivisionResource extends JsonResource
             'id' => $this->id,
             'code_division' => $this->code_division,
             'name' => $this->name,
-            'is_active' => $this->is_active,
         ];
     }
 }

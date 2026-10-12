@@ -29,7 +29,6 @@ class UpdateDivisionRequest extends StoreDivisionRequest
                 'max:25',
                 Rule::unique('divisions', 'name')->ignore($this->route('division')),
             ],
-            'is_active' => ['sometimes', 'required', 'boolean'],
         ];
     }
 }

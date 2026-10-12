@@ -41,7 +41,6 @@ class StoreDivisionRequest extends FormRequest
             'string' => ':attribute harus berupa teks.',
             'max' => ':attribute maksimal :max karakter.',
             'unique' => ':attribute sudah digunakan.',
-            'boolean' => ':attribute harus bernilai true atau false.',
         ];
     }
 
@@ -55,7 +54,6 @@ class StoreDivisionRequest extends FormRequest
         return [
             'code_division' => 'Kode divisi',
             'name' => 'Nama divisi',
-            'is_active' => 'Status',
         ];
     }
 }
