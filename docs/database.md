@@ -45,10 +45,13 @@ php artisan migrate --seed
 - Manager tidak bisa menghapus akunnya sendiri.
 - Password disimpan dalam bentuk hash (bcrypt) dan tidak pernah dikembalikan oleh API.
 - Username: 4-25 karakter, hanya huruf, angka, titik, dan underscore.
+- Transaksi dihitung **berhasil** jika `status_message` = `Success`. Transaksi lain diabaikan di semua KPI.
 - Hanya transaksi Markaz dengan `status_message` = `Success` yang diambil dan disimpan ke `transactions`.
 - `transactions.trx_id` unik, sehingga satu transaksi Markaz hanya tersimpan sekali.
 - `downloaders` unik per kombinasi `platform_id` + `date`: satu platform pada satu tanggal hanya punya satu baris, dan sinkronisasi memakai upsert.
 - `markaz_api_tokens.token` disimpan terenkripsi dan tidak pernah dikembalikan oleh API. Hanya boleh ada 1 token aktif; token lama diganti saat token baru disimpan.
+- Satu user diidentifikasi dari `customer_email` (huruf kecil, tanpa spasi di awal atau akhir). Transaksi tanpa email tetap dihitung di revenue dan jumlah transaksi, tapi tidak dihitung sebagai user.
+- Rumus KPI Ringkasan Performa ada di [api/performance.md](api/performance.md).
 - Data `transactions` dan `downloaders` diisi dari sinkronisasi API Markaz, tidak dari seeder. Daftar platform yang disinkronkan diambil dari tabel `platforms` (master platform).
 
 ## Data awal (seeder)
