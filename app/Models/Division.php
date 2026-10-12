@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-#[Fillable(['code_division', 'name'])]
+#[Fillable(['code_division', 'name', 'is_active'])]
 class Division extends Model
 {
     /**
