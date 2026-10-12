@@ -2,7 +2,9 @@
 
 use App\Http\Controllers\Account\AccountController;
 use App\Http\Controllers\Auth\AuthController;
+use App\Http\Controllers\Division\DivisionController;
 use App\Models\Account;
+use App\Models\Division;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/csrf-cookie', fn () => response()->noContent())->name('api.csrf-cookie');
@@ -28,4 +30,8 @@ Route::middleware('auth')->group(function () {
             ->can('delete', 'account')
             ->name('destroy');
     });
+
+    Route::post('/divisions', [DivisionController::class, 'store'])
+        ->can('create', Division::class)
+        ->name('api.divisions.store');
 });
