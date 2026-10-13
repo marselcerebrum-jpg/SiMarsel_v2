@@ -33,7 +33,7 @@ class AccountController extends Controller
 
     public function update(UpdateAccountRequest $request, Account $account): AccountResource
     {
-        $account = $this->accountService->update($account, $request->validated());
+        $account = $this->accountService->update($account, $request->validated(), $request->user());
 
         return AccountResource::make($account)->additional([
             'message' => 'Akun berhasil diperbarui.',

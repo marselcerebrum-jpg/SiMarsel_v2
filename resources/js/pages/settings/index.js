@@ -6,12 +6,14 @@ const ENDPOINT = '/api/accounts';
 
 const emptyForm = () => ({ fullname: '', username: '', password: '', role_id: '', division_id: '' });
 
-Alpine.data('accountSettings', (roles = [], divisions = []) => ({
+Alpine.data('accountSettings', (roles = [], divisions = [], canManage = false) => ({
     roles,
     divisions,
+    canManage,
     users: [],
 
-    tab: 'create',
+    // Employee only has the list, so it opens there directly.
+    tab: canManage ? 'create' : 'list',
 
     draft: emptyForm(),
     draftErrors: {},

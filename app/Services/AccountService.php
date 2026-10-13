@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Exceptions\CannotChangeOwnRoleException;
 use App\Exceptions\CannotDeleteOwnAccountException;
 use App\Models\Account;
 use App\Repositories\AccountRepository;
@@ -29,9 +30,15 @@ class AccountService
 
     /**
      * @param  array<string, mixed>  $data
+     *
+     * @throws CannotChangeOwnRoleException
      */
-    public function update(Account $account, array $data): Account
+    public function update(Account $account, array $data, Account $actor): Account
     {
+        if ($account->is($actor) && array_key_exists('role_id', $data) && (int) $data['role_id'] !== (int) $account->role_id) {
+            throw new CannotChangeOwnRoleException;
+        }
+
         return $this->accountRepository->update($account, $data);
     }
 

@@ -62,9 +62,6 @@
                             </svg>
                         </button>
                     </div>
-                    <div class="auth-row">
-                        <a href="#" class="auth-link">Lupa password?</a>
-                    </div>
                 </div>
 
                 <button type="submit" id="login-button" class="auth-button" disabled>
