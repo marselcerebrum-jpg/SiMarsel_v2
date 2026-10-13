@@ -7,6 +7,7 @@ use App\Models\Platform;
 use App\Models\Transaction;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 class PerformanceRepository
@@ -86,6 +87,72 @@ class PerformanceRepository
             ->when($platformId, fn (Builder $query) => $query->where('platform_id', $platformId))
             ->whereBetween('date', $this->range($from, $to))
             ->sum('total');
+    }
+
+    /**
+     * Revenue and transaction count per day.
+     *
+     * @return Collection<int, object{day: string, revenue: string|float, transactions: int}>
+     */
+    public function dailyTransactionTotals(CarbonInterface $from, CarbonInterface $to, ?int $platformId): Collection
+    {
+        return $this->successfulTransactions($platformId)
+            ->whereBetween('paid_date', $this->range($from, $to))
+            ->toBase()
+            ->selectRaw('DATE(paid_date) as day, SUM(nominal) as revenue, COUNT(*) as transactions')
+            ->groupByRaw('DATE(paid_date)')
+            ->get();
+    }
+
+    /**
+     * Downloader total per day.
+     *
+     * @return Collection<int, object{day: string, total: int}>
+     */
+    public function dailyDownloaderTotals(CarbonInterface $from, CarbonInterface $to, ?int $platformId): Collection
+    {
+        return Downloader::query()
+            ->when($platformId, fn (Builder $query) => $query->where('platform_id', $platformId))
+            ->whereBetween('date', $this->range($from, $to))
+            ->toBase()
+            ->selectRaw('DATE(date) as day, SUM(total) as total')
+            ->groupByRaw('DATE(date)')
+            ->get();
+    }
+
+    /**
+     * Number of successful transactions per customer email per day.
+     *
+     * @return Collection<int, object{day: string, email: string, transactions: int}>
+     */
+    public function dailyCustomerTransactions(CarbonInterface $from, CarbonInterface $to, ?int $platformId): Collection
+    {
+        return $this->successfulTransactions($platformId)
+            ->withCustomerEmail()
+            ->whereBetween('paid_date', $this->range($from, $to))
+            ->toBase()
+            ->selectRaw('DATE(paid_date) as day, '.self::NORMALIZED_EMAIL.' as email, COUNT(*) as transactions')
+            ->groupByRaw('DATE(paid_date), '.self::NORMALIZED_EMAIL)
+            ->get();
+    }
+
+    /**
+     * First successful purchase day of every customer whose first purchase falls in the period.
+     *
+     * @return Collection<int, object{email: string, first_day: string}>
+     */
+    public function firstPurchaseDays(CarbonInterface $from, CarbonInterface $to, ?int $platformId): Collection
+    {
+        [$start, $end] = $this->range($from, $to);
+
+        return $this->successfulTransactions($platformId)
+            ->withCustomerEmail()
+            ->where('paid_date', '<=', $end)
+            ->toBase()
+            ->selectRaw(self::NORMALIZED_EMAIL.' as email, DATE(MIN(paid_date)) as first_day')
+            ->groupByRaw(self::NORMALIZED_EMAIL)
+            ->havingRaw('MIN(paid_date) >= ?', [$start])
+            ->get();
     }
 
     /**
