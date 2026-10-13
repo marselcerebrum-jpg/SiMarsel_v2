@@ -35,10 +35,14 @@ Semua KPI hanya memakai transaksi dengan `status_message` = `Success`.
 | `total_transactions` | Total Transaksi | `transactions` | Jumlah transaksi |
 | `total_downloaders` | Total Downloader | `downloaders` | Jumlah `total` |
 | `unique_users` | User Unik | `transactions` | Jumlah email berbeda. Email disamakan huruf kecilnya dan spasinya dibuang, jadi `Alice@x.com` dan ` alice@x.com ` dihitung satu user. Transaksi tanpa email tidak dihitung. |
-| `new_users` | User Baru | `transactions` | Jumlah email yang transaksi berhasil **pertamanya sepanjang sejarah** terjadi di periode ini. Jika filter platform dipakai, sejarahnya hanya di platform itu. |
-| `repeat_order_users` | Repeat Order | `transactions` | Jumlah email dengan **lebih dari 1** transaksi berhasil di periode ini |
+| `new_users` | User Baru | `transactions` | Jumlah transaksi berhasil dengan `product_type` = `Perdana` |
+| `repeat_orders` | Repeat Order | `transactions` | Jumlah transaksi berhasil dengan `product_type` = `Perpanjangan` |
 | `average_order_value` | AOV | `transactions` | `total_revenue ÷ total_transactions`, dibulatkan 2 desimal. `null` jika tidak ada transaksi. |
-| `conversion_rate` | Konversi (%) | keduanya | `unique_users ÷ total_downloaders × 100`, dibulatkan 2 desimal. `null` jika downloader = 0. |
+| `conversion_rate` | Konversi (%) | keduanya | `total_transactions ÷ total_downloaders × 100`, dibulatkan 2 desimal. `null` jika downloader = 0. |
+
+`new_users` dan `repeat_orders` menghitung **transaksi**, bukan orang. Satu email yang melakukan dua kali `Perpanjangan` dihitung 2.
+
+> **Perubahan untuk frontend:** key `repeat_order_users` diganti menjadi `repeat_orders`.
 
 ### Bentuk setiap KPI
 
@@ -63,10 +67,10 @@ Semua KPI hanya memakai transaksi dengan `status_message` = `Success`.
             "total_transactions": { "value": 4, "previous_value": 1, "change_percentage": 300, "trend": "up" },
             "total_downloaders": { "value": 100, "previous_value": 50, "change_percentage": 100, "trend": "up" },
             "unique_users": { "value": 2, "previous_value": 1, "change_percentage": 100, "trend": "up" },
-            "new_users": { "value": 1, "previous_value": 1, "change_percentage": 0, "trend": "same" },
-            "repeat_order_users": { "value": 1, "previous_value": 0, "change_percentage": null, "trend": "up" },
+            "new_users": { "value": 2, "previous_value": 1, "change_percentage": 100, "trend": "up" },
+            "repeat_orders": { "value": 2, "previous_value": 0, "change_percentage": null, "trend": "up" },
             "average_order_value": { "value": 250000, "previous_value": 500000, "change_percentage": -50, "trend": "down" },
-            "conversion_rate": { "value": 2, "previous_value": 2, "change_percentage": 0, "trend": "same" }
+            "conversion_rate": { "value": 4, "previous_value": 2, "change_percentage": 100, "trend": "up" }
         }
     }
 }
