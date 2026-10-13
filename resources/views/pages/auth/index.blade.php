@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('title', 'Masuk')
+@section('title', 'Login')
 @section('body_class', 'auth-body')
 
 @push('scripts')
@@ -18,7 +18,7 @@
 
             <div id="login-alert" class="auth-alert" role="alert" hidden></div>
 
-            <form id="login-form" class="auth-form" method="POST" action="{{ route('api.login') }}" data-redirect="{{ route('dashboard') }}" novalidate>
+            <form id="login-form" class="auth-form" method="POST" action="{{ route('api.login') }}" data-redirect="{{ route('performance.index') }}" novalidate>
                 @csrf
 
                 <div class="auth-field">
@@ -50,7 +50,7 @@
                             autocomplete="current-password"
                             required
                         >
-                        <button type="button" id="toggle-password" class="auth-toggle" aria-label="Tampilkan password" aria-pressed="false">
+                        <button type="button" id="toggle-password" class="auth-toggle" aria-label="Show Password" aria-pressed="false">
                             <svg class="auth-icon-eye" viewBox="0 0 24 24" aria-hidden="true">
                                 <path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z" />
                                 <circle cx="12" cy="12" r="3" />
@@ -66,7 +66,7 @@
 
                 <button type="submit" id="login-button" class="auth-button" disabled>
                     <span class="auth-spinner" aria-hidden="true"></span>
-                    <span class="auth-button-text">Masuk</span>
+                    <span class="auth-button-text">Login</span>
                 </button>
             </form>
         </section>

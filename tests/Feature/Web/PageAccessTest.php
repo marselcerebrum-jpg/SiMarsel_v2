@@ -35,8 +35,8 @@ class PageAccessTest extends TestCase
 
     public function test_guest_is_redirected_to_login(): void
     {
-        $this->get('/')->assertRedirect('/dashboard');
-        $this->get('/dashboard')->assertRedirect(route('login'));
+        $this->get('/')->assertRedirect('/performance');
+        $this->get('/performance')->assertRedirect(route('login'));
         $this->get('/settings')->assertRedirect(route('login'));
     }
 
@@ -45,21 +45,29 @@ class PageAccessTest extends TestCase
         $this->get('/login')
             ->assertOk()
             ->assertSee(route('api.login'), false)
-            ->assertDontSee('Mode demo')
-            ->assertDontSee('Lupa password?');
+            ->assertDontSee('Forgot Password?')
+            ->assertSee('data-redirect="'.route('performance.index').'"', false)
+            ->assertDontSee('Mode demo');
     }
 
     public function test_authenticated_account_is_redirected_away_from_login(): void
     {
         $this->actingAs($this->manager)
             ->get('/login')
-            ->assertRedirect(route('dashboard'));
+            ->assertRedirect(route('performance.index'));
     }
 
-    public function test_dashboard_shows_logged_in_account(): void
+    public function test_old_dashboard_page_no_longer_exists(): void
+    {
+        $this->actingAs($this->manager)
+            ->get('/dashboard')
+            ->assertNotFound();
+    }
+
+    public function test_landing_page_shows_logged_in_account(): void
     {
         $this->actingAs($this->employee)
-            ->get('/dashboard')
+            ->get('/performance')
             ->assertOk()
             ->assertSee('Siti Employee')
             ->assertSee('"username":"employee"', false)
@@ -73,11 +81,11 @@ class PageAccessTest extends TestCase
         $this->actingAs($this->manager)
             ->get('/settings')
             ->assertOk()
-            ->assertSee('Pengaturan')
-            ->assertSeeInOrder(['Total Akun', 'Manager', 'Employee', 'Divisi'])
-            ->assertSeeInOrder(['Buat Akun', 'Daftar Akun'])
+            ->assertSee('Settings')
+            ->assertSeeInOrder(['Total Accounts', 'Manager', 'Employee', 'Divisions'])
+            ->assertSeeInOrder(['Create Account', 'Account List'])
             ->assertSee('Operasional')
-            ->assertSee('>Aksi</th>', false)
+            ->assertSee('>Actions</th>', false)
             ->assertSee('openEdit(user)', false)
             ->assertSee('id="edit-user-title"', false)
             ->assertDontSee('>Status</th>', false);
@@ -86,11 +94,11 @@ class PageAccessTest extends TestCase
     public function test_sidebar_links_settings_directly_for_manager(): void
     {
         $this->actingAs($this->manager)
-            ->get('/dashboard')
+            ->get('/performance')
             ->assertOk()
-            ->assertSeeInOrder(['Manajemen akun', 'Keluar'])
+            ->assertSeeInOrder(['Account Management', 'Logout'])
             ->assertSee('href="'.route('settings.index').'"', false)
-            ->assertDontSee('Manajemen Akun')
+            ->assertDontSee('Manajemen akun')
             ->assertDontSee("soon('Tasklist')", false);
     }
 
@@ -105,10 +113,10 @@ class PageAccessTest extends TestCase
     public function test_sidebar_links_settings_for_employee(): void
     {
         $this->actingAs($this->employee)
-            ->get('/dashboard')
+            ->get('/performance')
             ->assertOk()
             ->assertSee('href="'.route('settings.index').'"', false)
-            ->assertDontSee("locked('Manajemen akun')", false);
+            ->assertDontSee("locked('Account Management')", false);
     }
 
     public function test_employee_can_open_settings_page_as_read_only(): void
@@ -116,14 +124,14 @@ class PageAccessTest extends TestCase
         $this->actingAs($this->employee)
             ->get('/settings')
             ->assertOk()
-            ->assertSee('Daftar Akun')
+            ->assertSee('Account List')
             ->assertSee('Lihat daftar akun anggota tim beserta role dan divisinya.')
             ->assertSee('Cari akun anggota tim dan saring berdasarkan divisi.')
             ->assertSee('accountSettings(', false)
-            ->assertDontSee('Buat Akun')
+            ->assertDontSee('Create Account')
             ->assertDontSee('id="panel-create"', false)
             ->assertDontSee('role="tablist"', false)
-            ->assertDontSee('>Aksi</th>', false)
+            ->assertDontSee('>Actions</th>', false)
             ->assertDontSee('openEdit(user)', false)
             ->assertDontSee('openDelete(user)', false)
             ->assertDontSee('id="edit-user-title"', false)

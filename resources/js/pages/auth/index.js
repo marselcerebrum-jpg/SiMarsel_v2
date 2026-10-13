@@ -58,7 +58,7 @@ function initLoginForm() {
     const setLoading = (loading) => {
         submitting = loading;
         button.classList.toggle('is-loading', loading);
-        button.querySelector('.auth-button-text').textContent = loading ? 'Memproses...' : 'Masuk';
+        button.querySelector('.auth-button-text').textContent = loading ? 'Processing...' : 'Login';
         username.readOnly = loading;
         password.readOnly = loading;
         updateButtonState();
@@ -86,7 +86,7 @@ function initLoginForm() {
         password.type = show ? 'text' : 'password';
         toggle.classList.toggle('is-visible', show);
         toggle.setAttribute('aria-pressed', String(show));
-        toggle.setAttribute('aria-label', show ? 'Sembunyikan kata sandi' : 'Tampilkan kata sandi');
+        toggle.setAttribute('aria-label', show ? 'Hide Password' : 'Show Password');
     });
 
     form.addEventListener('submit', async (event) => {
@@ -104,7 +104,7 @@ function initLoginForm() {
                 body: { username: username.value.trim(), password: password.value },
             });
 
-            showToast({ title: 'Login berhasil', text: 'Mengalihkan ke dashboard…' });
+            showToast({ title: 'Login Successful', text: 'Mengalihkan ke halaman Performance Summary…' });
             setTimeout(() => {
                 window.location.href = form.dataset.redirect;
             }, 800);

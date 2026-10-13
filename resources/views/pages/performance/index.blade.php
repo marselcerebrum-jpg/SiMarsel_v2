@@ -1,0 +1,121 @@
+@extends('layouts.dashboard')
+
+@section('title', 'Performance Summary')
+@push('scripts')
+    @vite('resources/js/pages/performance/index.js')
+@endpush
+
+@php
+    $card = 'rounded-3xl border border-white/60 bg-surface shadow-[0_24px_60px_rgba(30,41,70,0.25)] dark:border-white/25 dark:bg-surface-dim';
+
+    // Display metadata only. Every value, comparison and formula comes from the backend.
+    $rows = [
+        'primary' => [
+            'grid' => 'md:grid-cols-3',
+            'metrics' => [
+                ['key' => 'total_revenue', 'label' => 'Total Revenue', 'format' => 'currency', 'compact' => true, 'hint' => 'Total nilai transaksi berhasil'],
+                ['key' => 'transactions', 'label' => 'Total Transactions', 'format' => 'number', 'hint' => 'Jumlah transaksi berhasil'],
+                ['key' => 'registered_users', 'label' => 'Total Downloader', 'format' => 'number', 'hint' => 'User yang berhasil registrasi'],
+            ],
+        ],
+        'secondary' => [
+            'grid' => 'sm:grid-cols-2 xl:grid-cols-4',
+            'metrics' => [
+                ['key' => 'unique_buyers', 'label' => 'Unique Buyers', 'format' => 'number', 'hint' => 'Email pembeli unik'],
+                ['key' => 'average_order_value', 'label' => 'AOV', 'format' => 'currency', 'hint' => 'Rata-rata nilai per transaksi'],
+                ['key' => 'repeat_order_users', 'label' => 'Repeat Order', 'format' => 'number', 'hint' => 'Email dengan ≥ 2 transaksi'],
+                ['key' => 'conversion_rate', 'label' => 'Conversion', 'format' => 'percent', 'hint' => 'Pembeli dibanding downloader', 'progress' => true],
+            ],
+        ],
+    ];
+
+    $definitions = collect($rows)
+        ->flatMap(fn (array $row) => $row['metrics'])
+        ->map(fn (array $metric) => Arr::only($metric, ['key', 'label', 'format']))
+        ->values();
+
+    $trend = [
+        'metrics' => [
+            ['value' => 'revenue', 'label' => 'Revenue', 'format' => 'currency'],
+            ['value' => 'transactions', 'label' => 'Transactions', 'format' => 'number'],
+            ['value' => 'downloader', 'label' => 'Downloader', 'format' => 'number'],
+            ['value' => 'conversion', 'label' => 'Conversion', 'format' => 'percent'],
+            ['value' => 'new_users', 'label' => 'New Users', 'format' => 'number'],
+            ['value' => 'repeat_order', 'label' => 'Repeat Order', 'format' => 'number'],
+        ],
+        'charts' => [
+            ['value' => 'bar', 'label' => 'Bar'],
+            ['value' => 'line', 'label' => 'Line'],
+            ['value' => 'area', 'label' => 'Area'],
+            ['value' => 'pie', 'label' => 'Pie'],
+            ['value' => 'table', 'label' => 'Table'],
+        ],
+        'granularities' => [
+            ['value' => 'daily', 'label' => 'Daily'],
+            ['value' => 'weekly', 'label' => 'Weekly'],
+            ['value' => 'monthly', 'label' => 'Monthly'],
+        ],
+    ];
+
+    $delay = 120;
+@endphp
+
+@section('page')
+    <div x-data="performanceSummary(@js($definitions))" class="min-w-0">
+        <header class="performance-rise flex flex-col gap-3 text-white sm:flex-row sm:items-center sm:justify-between">
+            <div>
+                <h1 class="text-3xl font-extrabold tracking-tight sm:text-4xl">Performance Summary</h1>
+                <p class="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-white/80">
+                    <span>Data keseluruhan performa perusahaan</span>
+                    <span x-show="loadedLabel" x-cloak class="size-1 rounded-full bg-white/60" aria-hidden="true"></span>
+                    <span x-show="loadedLabel" x-cloak>Dimuat <span x-text="loadedLabel"></span></span>
+                </p>
+            </div>
+
+            <div class="flex items-center gap-2 self-start sm:self-auto">
+                <p class="inline-flex h-11 items-center gap-2 rounded-xl border border-white/30 bg-white/15 px-4 text-xs font-semibold backdrop-blur" aria-live="polite">
+                    <span class="relative flex size-2" aria-hidden="true">
+                        <span x-show="loading" class="absolute inline-flex size-full animate-ping rounded-full bg-white/80"></span>
+                        <span class="relative inline-flex size-2 rounded-full" :class="loading ? 'bg-white' : (summary ? 'bg-emerald-300' : 'bg-white/50')"></span>
+                    </span>
+                    <span x-show="loading">Memuat data…</span>
+                    <span x-show="!loading" x-cloak x-text="summary ? `${periodLabel} · ${platformLabel}` : platformLabel"></span>
+                </p>
+                <button
+                    type="button"
+                    x-show="!loading && loadError"
+                    x-cloak
+                    class="grid size-11 place-items-center rounded-xl border border-white/30 bg-white/15 backdrop-blur transition hover:bg-white/25"
+                    title="Muat ulang data"
+                    aria-label="Reload Data"
+                    @click="load()"
+                >
+                    <x-icon name="repeat" class="size-4" />
+                </button>
+            </div>
+        </header>
+
+        <section class="{{ $card }} performance-rise relative mt-5 overflow-hidden px-5 py-5 sm:px-6" style="--delay: 60ms" aria-labelledby="filter-title">
+            @include('pages.performance.components.performance-filter')
+        </section>
+
+        <section aria-label="Key Performance Indicators" :aria-busy="loading.toString()">
+            @foreach ($rows as $size => $row)
+                <div class="mt-4 grid gap-4 {{ $row['grid'] }}">
+                    @foreach ($row['metrics'] as $metric)
+                        @include('pages.performance.components.performance-card', ['metric' => $metric, 'size' => $size, 'delay' => $delay])
+                        @php($delay += 60)
+                    @endforeach
+                </div>
+            @endforeach
+        </section>
+
+        <section class="{{ $card }} performance-rise relative mt-4 overflow-hidden p-5 sm:p-7" style="--delay: {{ $delay }}ms" aria-labelledby="performance-trend-title">
+            @include('pages.performance.components.performance-trend')
+        </section>
+
+        <section class="{{ $card }} performance-rise mt-4 p-5 sm:p-6" style="--delay: {{ $delay + 60 }}ms" aria-labelledby="performance-comparison-title">
+            @include('pages.performance.components.performance-table')
+        </section>
+    </div>
+@endsection
