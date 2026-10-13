@@ -58,20 +58,19 @@ class PerformanceSummaryService
     {
         $totals = $this->performanceRepository->transactionTotals($from, $to, $platformId);
         $downloaders = $this->performanceRepository->totalDownloaders($from, $to, $platformId);
-        $uniqueUsers = $this->performanceRepository->countUniqueCustomers($from, $to, $platformId);
 
         return [
             'total_revenue' => round($totals['revenue'], 2),
             'total_transactions' => $totals['transactions'],
             'total_downloaders' => $downloaders,
-            'unique_users' => $uniqueUsers,
-            'new_users' => $this->performanceRepository->countNewCustomers($from, $to, $platformId),
-            'repeat_order_users' => $this->performanceRepository->countRepeatCustomers($from, $to, $platformId),
+            'unique_users' => $this->performanceRepository->countUniqueCustomers($from, $to, $platformId),
+            'new_users' => $totals['new_users'],
+            'repeat_orders' => $totals['repeat_orders'],
             'average_order_value' => $totals['transactions'] > 0
                 ? round($totals['revenue'] / $totals['transactions'], 2)
                 : null,
             'conversion_rate' => $downloaders > 0
-                ? round($uniqueUsers / $downloaders * 100, 2)
+                ? round($totals['transactions'] / $downloaders * 100, 2)
                 : null,
         ];
     }
