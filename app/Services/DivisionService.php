@@ -12,7 +12,7 @@ class DivisionService
      */
     public function list(): Collection
     {
-        return Division::orderBy('id')->get();
+        return Division::withCount('accounts')->orderBy('id')->get();
     }
 
     /**
@@ -20,7 +20,7 @@ class DivisionService
      */
     public function create(array $data): Division
     {
-        return Division::create($data);
+        return Division::create($data)->loadCount('accounts');
     }
 
     /**
@@ -30,7 +30,7 @@ class DivisionService
     {
         $division->update($data);
 
-        return $division;
+        return $division->loadCount('accounts');
     }
 
     public function delete(Division $division): void

@@ -11,7 +11,7 @@ class AccountPageController extends Controller
 {
     public function __invoke(): View
     {
-        return view('pages.settings.index', [
+        return view('pages.settings.accounts', [
             'roles' => Role::orderBy('id')->get(['id', 'code_role', 'name']),
             'divisions' => Division::orderBy('name')->get(['id', 'code_division', 'name']),
         ]);

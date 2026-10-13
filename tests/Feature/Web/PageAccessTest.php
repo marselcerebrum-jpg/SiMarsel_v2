@@ -38,6 +38,7 @@ class PageAccessTest extends TestCase
         $this->get('/')->assertRedirect('/dashboard');
         $this->get('/dashboard')->assertRedirect(route('login'));
         $this->get('/settings')->assertRedirect(route('login'));
+        $this->get('/divisions')->assertRedirect(route('login'));
     }
 
     public function test_guest_can_open_login_page_without_demo_hint(): void
@@ -129,5 +130,37 @@ class PageAccessTest extends TestCase
             ->assertDontSee('id="edit-user-title"', false)
             ->assertDontSee('id="delete-user-title"', false)
             ->assertDontSee('>Status</th>', false);
+    }
+
+    public function test_manager_can_open_division_page_with_management_controls(): void
+    {
+        $this->actingAs($this->manager)
+            ->get('/divisions')
+            ->assertOk()
+            ->assertSee('Manajemen Divisi')
+            ->assertSeeInOrder(['Total Divisi', 'Anggota Divisi', 'Divisi Kosong'])
+            ->assertSeeInOrder(['Buat Divisi', 'Daftar Divisi'])
+            ->assertSee('Hapus Divisi?');
+    }
+
+    public function test_employee_can_open_division_page_read_only(): void
+    {
+        $this->actingAs($this->employee)
+            ->get('/divisions')
+            ->assertOk()
+            ->assertSee('Daftar Divisi')
+            ->assertDontSee('Buat Divisi')
+            ->assertDontSee('Hapus Divisi?');
+    }
+
+    public function test_sidebar_links_division_page_for_every_role(): void
+    {
+        foreach ([$this->manager, $this->employee] as $account) {
+            $this->actingAs($account)
+                ->get('/dashboard')
+                ->assertOk()
+                ->assertSee('Manajemen divisi')
+                ->assertSee('href="'.route('divisions.index').'"', false);
+        }
     }
 }
