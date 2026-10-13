@@ -46,7 +46,8 @@ class PageAccessTest extends TestCase
         $this->get('/login')
             ->assertOk()
             ->assertSee(route('api.login'), false)
-            ->assertDontSee('Mode demo');
+            ->assertDontSee('Mode demo')
+            ->assertDontSee('Lupa password?');
     }
 
     public function test_authenticated_account_is_redirected_away_from_login(): void
@@ -63,7 +64,7 @@ class PageAccessTest extends TestCase
             ->assertOk()
             ->assertSee('Siti Employee')
             ->assertSee('"username":"employee"', false)
-            ->assertDontSee(route('settings.index'));
+            ->assertSee(route('settings.index'));
     }
 
     public function test_manager_can_open_settings_page_with_roles_and_divisions(): void
@@ -76,7 +77,11 @@ class PageAccessTest extends TestCase
             ->assertSee('Pengaturan')
             ->assertSeeInOrder(['Total Akun', 'Manager', 'Employee', 'Divisi'])
             ->assertSeeInOrder(['Buat Akun', 'Daftar Akun'])
-            ->assertSee('Operasional');
+            ->assertSee('Operasional')
+            ->assertSee('>Aksi</th>', false)
+            ->assertSee('openEdit(user)', false)
+            ->assertSee('id="edit-user-title"', false)
+            ->assertDontSee('>Status</th>', false);
     }
 
     public function test_sidebar_links_settings_directly_for_manager(): void
@@ -98,20 +103,33 @@ class PageAccessTest extends TestCase
             ->assertSee('aria-current="page"', false);
     }
 
-    public function test_sidebar_locks_settings_for_employee(): void
+    public function test_sidebar_links_settings_for_employee(): void
     {
         $this->actingAs($this->employee)
             ->get('/dashboard')
             ->assertOk()
-            ->assertSee("locked('Manajemen akun')", false)
-            ->assertDontSee(route('settings.index'));
+            ->assertSee('href="'.route('settings.index').'"', false)
+            ->assertDontSee("locked('Manajemen akun')", false);
     }
 
-    public function test_employee_cannot_open_settings_page(): void
+    public function test_employee_can_open_settings_page_as_read_only(): void
     {
         $this->actingAs($this->employee)
             ->get('/settings')
-            ->assertForbidden();
+            ->assertOk()
+            ->assertSee('Daftar Akun')
+            ->assertSee('Lihat daftar akun anggota tim beserta role dan divisinya.')
+            ->assertSee('Cari akun anggota tim dan saring berdasarkan divisi.')
+            ->assertSee('accountSettings(', false)
+            ->assertDontSee('Buat Akun')
+            ->assertDontSee('id="panel-create"', false)
+            ->assertDontSee('role="tablist"', false)
+            ->assertDontSee('>Aksi</th>', false)
+            ->assertDontSee('openEdit(user)', false)
+            ->assertDontSee('openDelete(user)', false)
+            ->assertDontSee('id="edit-user-title"', false)
+            ->assertDontSee('id="delete-user-title"', false)
+            ->assertDontSee('>Status</th>', false);
     }
 
     public function test_manager_can_open_division_page_with_management_controls(): void
