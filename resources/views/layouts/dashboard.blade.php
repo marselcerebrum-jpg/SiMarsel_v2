@@ -14,7 +14,7 @@
             {{-- Header mobile --}}
             <header class="sticky top-0 z-30 flex items-center justify-between border-b border-white/10 bg-sidebar px-4 py-3 text-white lg:hidden">
                 <div class="flex items-center gap-3">
-                    <button type="button" class="rounded-xl bg-white/10 p-2 hover:bg-white/20" aria-label="Buka menu" aria-controls="sidebar" :aria-expanded="open" @click="open = true">
+                    <button type="button" class="rounded-xl bg-white/10 p-2 hover:bg-white/20" aria-label="Open Menu" aria-controls="sidebar" :aria-expanded="open" @click="open = true">
                         <x-icon name="menu" class="size-5" />
                     </button>
                     <span class="text-base font-extrabold tracking-tight">SiMarsel<span class="text-brand-teal">.</span></span>

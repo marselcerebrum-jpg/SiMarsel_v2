@@ -180,7 +180,7 @@ Alpine.data('accountSettings', (roles = [], divisions = [], canManage = false) =
 
             this.users.push(data);
             this.resetDraft();
-            showToast({ title: 'Akun berhasil dibuat', text: `${data.fullname} sudah ditambahkan.` });
+            showToast({ title: 'Account Created', text: `${data.fullname} sudah ditambahkan.` });
         } catch (error) {
             if (error.status === 422 && error.data?.errors) {
                 this.draftErrors = validationErrors(error);
@@ -199,7 +199,7 @@ Alpine.data('accountSettings', (roles = [], divisions = [], canManage = false) =
 
         this.users = this.users.map((user) => (user.id === id ? result.data : user));
         this.closeModal();
-        showToast({ title: 'Perubahan disimpan', text: `Data ${result.data.fullname} sudah diperbarui.` });
+        showToast({ title: 'Changes Saved', text: `Data ${result.data.fullname} sudah diperbarui.` });
 
         if (id === this.currentUserId) {
             setTimeout(() => window.location.reload(), 800);
@@ -215,7 +215,7 @@ Alpine.data('accountSettings', (roles = [], divisions = [], canManage = false) =
 
         this.users = this.users.filter((item) => item.id !== user.id);
         this.closeModal();
-        showToast({ title: 'Akun dihapus', text: `${user.fullname} sudah dihapus.` });
+        showToast({ title: 'Account Deleted', text: `${user.fullname} sudah dihapus.` });
     },
 }));
 

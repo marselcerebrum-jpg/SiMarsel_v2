@@ -19,12 +19,12 @@ export function initLogout(selector = '[data-logout]') {
                 if (error.status !== 401) {
                     leaving = false;
                     link.removeAttribute('aria-disabled');
-                    showToast({ title: 'Gagal keluar', text: errorMessage(error) });
+                    showToast({ title: 'Logout Failed', text: errorMessage(error) });
                     return;
                 }
             }
 
-            showToast({ title: 'Berhasil keluar', text: 'Mengalihkan ke halaman login…', duration: 0 });
+            showToast({ title: 'Logged Out', text: 'Mengalihkan ke halaman login…', duration: 0 });
 
             setTimeout(() => {
                 window.location.href = link.href;

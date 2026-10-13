@@ -22,7 +22,7 @@
             </svg>
         </span>
 
-        <h2 id="delete-user-title" class="mt-4 text-lg font-bold tracking-tight">Hapus Akun?</h2>
+        <h2 id="delete-user-title" class="mt-4 text-lg font-bold tracking-tight">Delete Account?</h2>
         <p id="delete-user-desc" class="mt-1.5 text-sm text-muted">
             Apakah Anda yakin ingin menghapus akun
             <strong class="font-semibold text-ink" x-text="deletingUser?.fullname"></strong>?
@@ -32,8 +32,8 @@
         <p x-show="formError" x-text="formError" class="mt-4 text-xs text-red-600"></p>
 
         <div class="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-center">
-            <button type="button" x-ref="deleteCancel" class="h-11 rounded-xl border border-line bg-soft px-5 text-sm font-medium text-ink hover:border-brand-indigo" @click="closeModal()">Batal</button>
-            <button type="button" class="h-11 rounded-xl bg-red-600 px-5 text-xs font-bold tracking-widest text-white uppercase shadow-[0_8px_18px_rgba(220,38,38,0.25)] hover:bg-red-700 disabled:opacity-60" :disabled="saving" @click="confirmDelete()" x-text="saving ? 'Menghapus…' : 'Ya, Hapus'"></button>
+            <button type="button" x-ref="deleteCancel" class="h-11 rounded-xl border border-line bg-soft px-5 text-sm font-medium text-ink hover:border-brand-indigo" @click="closeModal()">Cancel</button>
+            <button type="button" class="h-11 rounded-xl bg-red-600 px-5 text-xs font-bold tracking-widest text-white uppercase shadow-[0_8px_18px_rgba(220,38,38,0.25)] hover:bg-red-700 disabled:opacity-60" :disabled="saving" @click="confirmDelete()" x-text="saving ? 'Deleting…' : 'Yes, Delete'"></button>
         </div>
     </div>
 </div>

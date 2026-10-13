@@ -6,17 +6,17 @@
 @endphp
 
 <div class="border-l-4 border-brand-indigo pl-4">
-    <p class="text-[11px] font-bold tracking-[.2em] text-label uppercase">Akun Baru</p>
+    <p class="text-[11px] font-bold tracking-[.2em] text-label uppercase">New Account</p>
     <h2 class="mt-1 flex items-center gap-2 text-xl font-bold tracking-tight text-ink">
         <x-icon name="user-plus" class="size-5 text-brand-indigo" />
-        Buat Akun
+        Create Account
     </h2>
     <p class="mt-1 text-sm text-muted">Daftarkan akun baru untuk anggota tim. Hanya manager yang bisa membuat akun.</p>
 </div>
 
 <form class="mt-6 grid gap-5 sm:grid-cols-2" novalidate @submit.prevent="submitCreate()">
     <div>
-        <label for="create-name" class="{{ $labelClass }}">Nama Lengkap {!! $required !!}</label>
+        <label for="create-name" class="{{ $labelClass }}">Full Name {!! $required !!}</label>
         <input id="create-name" type="text" x-model="draft.fullname" @input="draftErrors.fullname = null"
             class="{{ $inputClass }}" :class="draftErrors.fullname && 'border-red-500!'" placeholder="Budi Santoso" autocomplete="off">
         <p x-show="draftErrors.fullname" x-text="draftErrors.fullname" class="{{ $errorClass }}"></p>
@@ -34,10 +34,10 @@
     </div>
 
     <div class="sm:col-span-2">
-        <label for="create-division" class="{{ $labelClass }}">Divisi</label>
+        <label for="create-division" class="{{ $labelClass }}">Division</label>
         <select id="create-division" x-model="draft.division_id" @change="draftErrors.division_id = null"
             class="{{ $inputClass }}" :class="draftErrors.division_id && 'border-red-500!'">
-            <option value="">— Tanpa divisi (lintas divisi) —</option>
+            <option value="">— No Division (Cross-Division) —</option>
             <template x-for="division in divisions" :key="division.id">
                 <option :value="division.id" x-text="division.name" :selected="division.id == draft.division_id"></option>
             </template>
@@ -60,7 +60,7 @@
             <input id="create-password" :type="showDraftPassword ? 'text' : 'password'" x-model="draft.password" @input="draftErrors.password = null"
                 class="{{ $inputClass }} pr-20" :class="draftErrors.password && 'border-red-500!'" placeholder="Minimal 8 karakter" autocomplete="new-password">
             <button type="button" class="absolute top-1/2 right-2 -translate-y-1/2 rounded-md px-2 py-1 text-xs font-medium text-label hover:text-ink"
-                @click="showDraftPassword = !showDraftPassword" x-text="showDraftPassword ? 'Sembunyi' : 'Lihat'" :aria-pressed="showDraftPassword.toString()"></button>
+                @click="showDraftPassword = !showDraftPassword" x-text="showDraftPassword ? 'Hide' : 'Show'" :aria-pressed="showDraftPassword.toString()"></button>
         </div>
         <p x-show="draftErrors.password" x-text="draftErrors.password" class="{{ $errorClass }}"></p>
     </div>
@@ -71,7 +71,7 @@
         <button type="button" class="h-11 rounded-xl border border-line bg-soft px-5 text-sm font-medium text-ink hover:border-brand-indigo disabled:opacity-60" :disabled="creating" @click="resetDraft()">Reset</button>
         <button type="submit" :disabled="creating" class="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-linear-135 from-brand-indigo via-brand-blue to-brand-teal px-6 text-xs font-bold tracking-widest text-white uppercase shadow-[0_8px_18px_rgba(93,96,162,0.3)] [text-shadow:0_1px_2px_rgba(20,30,50,0.35)] hover:brightness-95 disabled:opacity-60">
             <x-icon name="user-plus" class="size-4" />
-            <span x-text="creating ? 'Menyimpan…' : 'Buat Akun'">Buat Akun</span>
+            <span x-text="creating ? 'Saving…' : 'Create Account'">Create Account</span>
         </button>
     </div>
 </form>

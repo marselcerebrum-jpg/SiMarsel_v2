@@ -1,6 +1,6 @@
 @extends('layouts.dashboard')
 
-@section('title', 'Pengaturan')
+@section('title', 'Settings')
 @push('scripts')
     @vite('resources/js/pages/settings/index.js')
 @endpush
@@ -17,8 +17,8 @@
     $canManage = auth()->user()->can('create', App\Models\Account::class);
 
     $tabs = array_filter([
-        'create' => $canManage ? ['label' => 'Buat Akun', 'icon' => 'user-plus'] : null,
-        'list' => ['label' => 'Daftar Akun', 'icon' => 'list'],
+        'create' => $canManage ? ['label' => 'Create Account', 'icon' => 'user-plus'] : null,
+        'list' => ['label' => 'Account List', 'icon' => 'list'],
     ]);
 @endphp
 
@@ -27,19 +27,19 @@
         <header class="text-white">
             <p class="flex items-center gap-2 text-[11px] font-bold tracking-[.2em] text-white/75 uppercase">
                 <span class="size-1.5 rounded-full bg-white/80" aria-hidden="true"></span>
-                Sistem
+                System
             </p>
-            <h1 class="mt-2 text-3xl font-extrabold tracking-tight sm:text-4xl">Pengaturan</h1>
+            <h1 class="mt-2 text-3xl font-extrabold tracking-tight sm:text-4xl">Settings</h1>
             <p class="mt-1.5 text-sm text-white/80">
                 {{ $canManage ? 'Kelola akun anggota tim beserta role dan divisinya.' : 'Lihat daftar akun anggota tim beserta role dan divisinya.' }}
             </p>
         </header>
 
         {{-- Ringkasan --}}
-        <section class="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-label="Ringkasan akun">
+        <section class="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-label="Account Summary">
             <article class="{{ $card }} p-5 sm:p-6">
                 <div class="flex items-start justify-between gap-3">
-                    <p class="text-[11px] font-bold tracking-widest text-label uppercase">Total Akun</p>
+                    <p class="text-[11px] font-bold tracking-widest text-label uppercase">Total Accounts</p>
                     <span class="grid size-10 place-items-center rounded-xl bg-brand-blue/10 text-brand-blue"><x-icon name="users" class="size-5" /></span>
                 </div>
                 <p class="-mt-1 text-3xl font-extrabold text-ink" x-text="loading ? '—' : users.length">—</p>
@@ -62,7 +62,7 @@
 
             <article class="{{ $card }} p-5 sm:p-6">
                 <div class="flex items-start justify-between gap-3">
-                    <p class="text-[11px] font-bold tracking-widest text-label uppercase">Divisi</p>
+                    <p class="text-[11px] font-bold tracking-widest text-label uppercase">Divisions</p>
                     <span class="grid size-10 place-items-center rounded-xl bg-brand-logo/10 text-brand-logo"><x-icon name="building" class="size-5" /></span>
                 </div>
                 <p class="-mt-1 text-3xl font-extrabold text-ink">{{ $divisions->count() }}</p>
@@ -74,7 +74,7 @@
 
         {{-- Tab (hidden when only the list is available) --}}
         @if (count($tabs) > 1)
-            <div class="mt-6 inline-flex max-w-full gap-1 overflow-x-auto rounded-2xl border border-white/30 bg-white/15 p-1.5 backdrop-blur" role="tablist" aria-label="Menu pengaturan">
+            <div class="mt-6 inline-flex max-w-full gap-1 overflow-x-auto rounded-2xl border border-white/30 bg-white/15 p-1.5 backdrop-blur" role="tablist" aria-label="Settings Menu">
                 @foreach ($tabs as $key => $tab)
                     <button
                         type="button"
@@ -105,10 +105,10 @@
             @class([$card, 'p-5 sm:p-8', 'mt-4' => $canManage, 'mt-6' => ! $canManage])
         >
             <div class="border-l-4 border-brand-indigo pl-4">
-                <p class="text-[11px] font-bold tracking-[.2em] text-label uppercase">Akun Terdaftar</p>
+                <p class="text-[11px] font-bold tracking-[.2em] text-label uppercase">Registered Accounts</p>
                 <h2 class="mt-1 flex items-center gap-2 text-xl font-bold tracking-tight text-ink">
                     <x-icon name="list" class="size-5 text-brand-indigo" />
-                    Daftar Akun
+                    Account List
                 </h2>
                 <p class="mt-1 text-sm text-muted">
                     {{ $canManage ? 'Ubah data, role, dan divisi akun, atau hapus akun yang tidak lagi digunakan.' : 'Cari akun anggota tim dan saring berdasarkan divisi.' }}
