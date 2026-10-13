@@ -13,21 +13,26 @@
         'EMP' => ['icon' => 'user', 'hint' => 'Anggota tim', 'tone' => 'bg-brand-teal/15 text-brand-teal'],
     ];
 
-    $tabs = [
-        'create' => ['label' => 'Buat Akun', 'icon' => 'user-plus'],
+    // Every role can read the account list; only Manager can create, edit, and delete.
+    $canManage = auth()->user()->can('create', App\Models\Account::class);
+
+    $tabs = array_filter([
+        'create' => $canManage ? ['label' => 'Buat Akun', 'icon' => 'user-plus'] : null,
         'list' => ['label' => 'Daftar Akun', 'icon' => 'list'],
-    ];
+    ]);
 @endphp
 
 @section('page')
-    <div x-data="accountSettings(@js($roles), @js($divisions))" class="min-w-0">
+    <div x-data="accountSettings(@js($roles), @js($divisions), @js($canManage))" class="min-w-0">
         <header class="text-white">
             <p class="flex items-center gap-2 text-[11px] font-bold tracking-[.2em] text-white/75 uppercase">
                 <span class="size-1.5 rounded-full bg-white/80" aria-hidden="true"></span>
                 Sistem
             </p>
             <h1 class="mt-2 text-3xl font-extrabold tracking-tight sm:text-4xl">Pengaturan</h1>
-            <p class="mt-1.5 text-sm text-white/80">Kelola akun anggota tim beserta role dan divisinya.</p>
+            <p class="mt-1.5 text-sm text-white/80">
+                {{ $canManage ? 'Kelola akun anggota tim beserta role dan divisinya.' : 'Lihat daftar akun anggota tim beserta role dan divisinya.' }}
+            </p>
         </header>
 
         {{-- Ringkasan --}}
@@ -67,44 +72,56 @@
             </article>
         </section>
 
-        {{-- Tab --}}
-        <div class="mt-6 inline-flex max-w-full gap-1 overflow-x-auto rounded-2xl border border-white/30 bg-white/15 p-1.5 backdrop-blur" role="tablist" aria-label="Menu pengaturan">
-            @foreach ($tabs as $key => $tab)
-                <button
-                    type="button"
-                    role="tab"
-                    id="tab-{{ $key }}"
-                    aria-controls="panel-{{ $key }}"
-                    :aria-selected="(tab === @js($key)).toString()"
-                    class="inline-flex h-11 shrink-0 items-center gap-2 rounded-xl px-5 text-xs font-bold tracking-widest uppercase transition"
-                    :class="tab === @js($key) ? 'bg-surface text-brand-indigo shadow-lg' : 'text-white/85 hover:bg-white/10 hover:text-white'"
-                    @click="tab = @js($key)"
-                >
-                    <x-icon :name="$tab['icon']" class="size-4" />
-                    {{ $tab['label'] }}
-                </button>
-            @endforeach
-        </div>
+        {{-- Tab (hidden when only the list is available) --}}
+        @if (count($tabs) > 1)
+            <div class="mt-6 inline-flex max-w-full gap-1 overflow-x-auto rounded-2xl border border-white/30 bg-white/15 p-1.5 backdrop-blur" role="tablist" aria-label="Menu pengaturan">
+                @foreach ($tabs as $key => $tab)
+                    <button
+                        type="button"
+                        role="tab"
+                        id="tab-{{ $key }}"
+                        aria-controls="panel-{{ $key }}"
+                        :aria-selected="(tab === @js($key)).toString()"
+                        class="inline-flex h-11 shrink-0 items-center gap-2 rounded-xl px-5 text-xs font-bold tracking-widest uppercase transition"
+                        :class="tab === @js($key) ? 'bg-surface text-brand-indigo shadow-lg' : 'text-white/85 hover:bg-white/10 hover:text-white'"
+                        @click="tab = @js($key)"
+                    >
+                        <x-icon :name="$tab['icon']" class="size-4" />
+                        {{ $tab['label'] }}
+                    </button>
+                @endforeach
+            </div>
+        @endif
 
-        <section id="panel-create" role="tabpanel" aria-labelledby="tab-create" x-show="tab === 'create'" class="{{ $card }} mt-4 p-5 sm:p-8">
-            @include('pages.settings.components.account-create-form')
-        </section>
+        @if ($canManage)
+            <section id="panel-create" role="tabpanel" aria-labelledby="tab-create" x-show="tab === 'create'" class="{{ $card }} mt-4 p-5 sm:p-8">
+                @include('pages.settings.components.account-create-form')
+            </section>
+        @endif
 
-        <section id="panel-list" role="tabpanel" aria-labelledby="tab-list" x-show="tab === 'list'" x-cloak class="{{ $card }} mt-4 p-5 sm:p-8">
+        <section
+            id="panel-list"
+            @if ($canManage) role="tabpanel" aria-labelledby="tab-list" x-show="tab === 'list'" x-cloak @endif
+            @class([$card, 'p-5 sm:p-8', 'mt-4' => $canManage, 'mt-6' => ! $canManage])
+        >
             <div class="border-l-4 border-brand-indigo pl-4">
                 <p class="text-[11px] font-bold tracking-[.2em] text-label uppercase">Akun Terdaftar</p>
                 <h2 class="mt-1 flex items-center gap-2 text-xl font-bold tracking-tight text-ink">
                     <x-icon name="list" class="size-5 text-brand-indigo" />
                     Daftar Akun
                 </h2>
-                <p class="mt-1 text-sm text-muted">Ubah data, role, dan divisi akun, atau hapus akun yang tidak lagi digunakan.</p>
+                <p class="mt-1 text-sm text-muted">
+                    {{ $canManage ? 'Ubah data, role, dan divisi akun, atau hapus akun yang tidak lagi digunakan.' : 'Cari akun anggota tim dan saring berdasarkan divisi.' }}
+                </p>
             </div>
 
             @include('pages.settings.components.account-filter')
             @include('pages.settings.components.account-table')
         </section>
 
-        @include('pages.settings.components.account-edit-modal')
-        @include('pages.settings.components.account-delete-modal')
+        @if ($canManage)
+            @include('pages.settings.components.account-edit-modal')
+            @include('pages.settings.components.account-delete-modal')
+        @endif
     </div>
 @endsection

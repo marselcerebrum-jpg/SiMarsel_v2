@@ -1,3 +1,7 @@
+@php
+    $columns = $canManage ? 4 : 3;
+@endphp
+
 <div class="mt-5 overflow-hidden rounded-2xl border border-line bg-white/70 dark:bg-white/40">
     <div class="overflow-x-auto">
         <table class="w-full min-w-[640px] text-left text-sm">
@@ -6,8 +10,9 @@
                     <th scope="col" class="px-6 py-4">Nama Lengkap</th>
                     <th scope="col" class="px-6 py-4">Divisi</th>
                     <th scope="col" class="px-6 py-4">Role</th>
-                    <th scope="col" class="px-6 py-4">Status</th>
-                    <th scope="col" class="px-6 py-4 text-right">Aksi</th>
+                    @if ($canManage)
+                        <th scope="col" class="px-6 py-4 text-right">Aksi</th>
+                    @endif
                 </tr>
             </thead>
 
@@ -29,12 +34,7 @@
                             <span x-show="!user.division" class="text-xs text-label">Tanpa divisi</span>
                         </td>
                         <td class="px-6 py-4 text-muted" x-text="user.role.name"></td>
-                        <td class="px-6 py-4">
-                            <span class="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-700">
-                                <span class="size-1.5 rounded-full bg-emerald-500" aria-hidden="true"></span>
-                                Aktif
-                            </span>
-                        </td>
+                        @if ($canManage)
                         <td class="px-6 py-4 text-right whitespace-nowrap">
                             <button
                                 type="button"
@@ -53,22 +53,23 @@
                                 title="Anda tidak dapat menghapus akun sendiri"
                             >—</span>
                         </td>
+                        @endif
                     </tr>
                 </template>
 
                 <tr x-show="loading" x-cloak>
-                    <td colspan="5" class="px-6 py-12 text-center text-sm text-muted">Memuat daftar akun…</td>
+                    <td colspan="{{ $columns }}" class="px-6 py-12 text-center text-sm text-muted">Memuat daftar akun…</td>
                 </tr>
 
                 <tr x-show="!loading && loadError" x-cloak>
-                    <td colspan="5" class="px-6 py-12 text-center">
+                    <td colspan="{{ $columns }}" class="px-6 py-12 text-center">
                         <p class="text-sm font-medium text-red-600" x-text="loadError"></p>
                         <button type="button" class="mt-3 text-xs font-semibold text-brand-indigo hover:underline" @click="fetchUsers()">Coba lagi</button>
                     </td>
                 </tr>
 
                 <tr x-show="!loading && !loadError && filteredUsers.length === 0" x-cloak>
-                    <td colspan="5" class="px-6 py-12 text-center">
+                    <td colspan="{{ $columns }}" class="px-6 py-12 text-center">
                         <p class="text-sm font-medium text-ink">Tidak ada akun yang cocok.</p>
                         <p class="mt-1 text-xs text-muted">Coba ubah kata kunci atau pilih divisi lain.</p>
                         <button type="button" class="mt-3 text-xs font-semibold text-brand-indigo hover:underline" @click="resetFilters()">Reset filter</button>
