@@ -18,6 +18,12 @@ php artisan migrate --seed
 | `divisions` | Divisi (`code_division` dan `name` unik) |
 | `accounts` | Akun yang bisa login (`username` unik) |
 | `sessions` | Session login (token) per akun |
+| `platforms` | Platform sumber data (`slug` unik) |
+| `transactions` | Transaksi pembelian per platform (`trx_id` unik) |
+| `downloaders` | Jumlah downloader per platform per tanggal |
+| `sync_logs` | Riwayat sinkronisasi data per platform |
+| `markaz_api_tokens` | Token API Markaz (hanya 1 token aktif) |
+| `jobs`, `failed_jobs` | Antrian (queue) Laravel untuk sinkronisasi dan backfill |
 | `cache`, `cache_locks` | Dipakai untuk pembatasan percobaan login |
 | `migrations` | Catatan migration milik Laravel |
 
@@ -28,6 +34,9 @@ php artisan migrate --seed
 | `accounts.role_id` → `roles.id` | Ya | **Ditolak** selama role masih dipakai akun |
 | `accounts.division_id` → `divisions.id` | Tidak | Akun tetap ada, `division_id` menjadi **NULL** |
 | `sessions.user_id` → `accounts.id` | Tidak | Session **ikut terhapus**, sehingga akun langsung ter-logout |
+| `transactions.platform_id` → `platforms.id` | Ya | **Ditolak** selama platform masih punya transaksi |
+| `downloaders.platform_id` → `platforms.id` | Ya | **Ditolak** selama platform masih punya data downloader |
+| `sync_logs.platform_id` → `platforms.id` | Ya | **Ditolak** selama platform masih punya log sinkronisasi |
 
 ## Aturan bisnis
 
@@ -36,6 +45,11 @@ php artisan migrate --seed
 - Manager tidak bisa menghapus akunnya sendiri.
 - Password disimpan dalam bentuk hash (bcrypt) dan tidak pernah dikembalikan oleh API.
 - Username: 4-25 karakter, hanya huruf, angka, titik, dan underscore.
+- Hanya transaksi Markaz dengan `status_message` = `Success` yang diambil dan disimpan ke `transactions`.
+- `transactions.trx_id` unik, sehingga satu transaksi Markaz hanya tersimpan sekali.
+- `downloaders` unik per kombinasi `platform_id` + `date`: satu platform pada satu tanggal hanya punya satu baris, dan sinkronisasi memakai upsert.
+- `markaz_api_tokens.token` disimpan terenkripsi dan tidak pernah dikembalikan oleh API. Hanya boleh ada 1 token aktif; token lama diganti saat token baru disimpan.
+- Data `transactions` dan `downloaders` diisi dari sinkronisasi API Markaz, tidak dari seeder. Daftar platform yang disinkronkan diambil dari tabel `platforms` (master platform).
 
 ## Data awal (seeder)
 
@@ -49,6 +63,6 @@ Akun manager default hanya untuk penanda awal bahwa aplikasi berjalan. Ganti pas
 
 ## Perubahan dari bawaan Laravel
 
-- Tabel `users`, `password_reset_tokens`, `jobs`, `job_batches`, dan `failed_jobs` dihapus karena tidak dipakai.
-- `QUEUE_CONNECTION=sync`, karena tabel `jobs` dihapus.
+- Tabel `users`, `password_reset_tokens`, dan `job_batches` tidak dipakai.
+- `QUEUE_CONNECTION=database`: job sinkronisasi dan backfill disimpan di tabel `jobs`, job yang gagal di `failed_jobs`.
 - Login memakai model `App\Models\Account` (`config/auth.php`).
