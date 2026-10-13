@@ -70,3 +70,4 @@ Akun manager default hanya untuk penanda awal bahwa aplikasi berjalan. Ganti pas
 - Tabel `users`, `password_reset_tokens`, dan `job_batches` tidak dipakai.
 - `QUEUE_CONNECTION=database`: job sinkronisasi dan backfill disimpan di tabel `jobs`, job yang gagal di `failed_jobs`.
 - Login memakai model `App\Models\Account` (`config/auth.php`).
+- Timezone aplikasi `Asia/Jakarta` (`APP_TIMEZONE`), sehingga tanggal "hari ini" dan `created_at`/`updated_at` memakai WIB.
