@@ -1,4 +1,4 @@
-# API Ringkasan Performa
+# API Performa
 
 Menyediakan total KPI performa untuk periode dan platform yang dipilih, beserta perbandingannya dengan periode sebelumnya. Semua rumus dihitung di backend, sehingga frontend cukup menampilkan nilainya.
 
@@ -96,3 +96,85 @@ Tampilkan `message` sebagai kondisi kosong di halaman.
 | Format tanggal salah | `Tanggal mulai harus berformat YYYY-MM-DD.` |
 | `date_to` sebelum `date_from` | `Tanggal akhir tidak boleh sebelum tanggal mulai.` |
 | Slug platform tidak ada | `Platform tidak ditemukan.` |
+
+## `GET /api/performance/trend`
+
+Data deret waktu untuk grafik dan tabel Analisa Tren & Performa. Filter-nya sama dengan Ringkasan Performa. Wajib login, dan semua role boleh mengakses.
+
+Backend mengirim data yang sama untuk semua bentuk visualisasi (Bar, Line, Area, Pie, Table). Pilihan bentuk visualisasi diatur di frontend lewat dropdown, tanpa request ulang ke backend.
+
+### Query parameter
+
+| Parameter | Wajib | Nilai |
+|---|---|---|
+| `date_from`, `date_to`, `platform` | Sama seperti `/summary` | |
+| `metric` | Ya | `revenue`, `transactions`, `downloaders`, `conversion`, `new_users`, `repeat_order` |
+| `period` | Ya | `daily`, `weekly`, `monthly` |
+
+Contoh: `GET /api/performance/trend?date_from=2026-09-01&date_to=2026-09-30&platform=app-a&metric=revenue&period=weekly`
+
+### Pembagian periode
+
+| Period | Satu titik data | Label | Batas rentang |
+|---|---|---|---|
+| `daily` | 1 tanggal | `01 Sep 2026` | Maksimal 366 hari |
+| `weekly` | Senin - Minggu | `01 - 06 Sep 2026`, `31 Aug - 03 Sep 2026` | Maksimal 366 hari |
+| `monthly` | 1 bulan kalender | `Sep 2026` | Tanpa batas |
+
+- Minggu dan bulan pertama atau terakhir **dipotong mengikuti rentang filter**. Contohnya, filter mulai Selasa 1 Sep menghasilkan minggu pertama 1 - 6 Sep.
+- Periode tanpa data tetap muncul dengan nilai `0`, supaya grafik tidak bolong.
+- Tanggal mengikuti timezone aplikasi `Asia/Jakarta`.
+
+### Rumus per titik data
+
+Rumusnya sama dengan Ringkasan Performa, tapi dihitung terpisah untuk setiap periode.
+
+| `metric` | Label | `unit` | Nilai per periode |
+|---|---|---|---|
+| `revenue` | Revenue | `currency` | Jumlah `nominal` transaksi `Success` |
+| `transactions` | Transactions | `count` | Jumlah transaksi `Success` |
+| `downloaders` | Downloader | `count` | Jumlah `downloaders.total` |
+| `conversion` | Conversion | `percent` | User unik ÷ downloader × 100. `null` jika periode itu tidak punya downloader. |
+| `new_users` | User Baru | `count` | Email yang pembelian pertamanya jatuh di periode itu |
+| `repeat_order` | Repeat Order | `count` | Email dengan lebih dari 1 pembelian di dalam periode itu |
+
+Untuk `revenue`, `transactions`, dan `downloaders`, jumlah semua titik sama dengan angka di `/summary`. Untuk metric berbasis user (`conversion`, `repeat_order`), jumlah semua titik **tidak selalu sama** dengan angka ringkasan. Contohnya, satu email yang membeli di dua minggu berbeda dihitung sekali di ringkasan, tapi muncul di dua titik mingguan.
+
+### 200 OK
+
+```json
+{
+    "data": {
+        "filter": { "date_from": "2026-09-01", "date_to": "2026-09-30", "platform": "app-a" },
+        "metric": { "key": "revenue", "label": "Revenue", "unit": "currency" },
+        "period": "weekly",
+        "is_empty": false,
+        "message": null,
+        "labels": ["01 - 06 Sep 2026", "07 - 13 Sep 2026", "14 - 20 Sep 2026", "21 - 27 Sep 2026", "28 - 30 Sep 2026"],
+        "datasets": [
+            { "label": "Revenue", "data": [300000, 300000, 50000, 0, 400000] }
+        ],
+        "rows": [
+            { "label": "01 - 06 Sep 2026", "period_start": "2026-09-01", "period_end": "2026-09-06", "value": 300000 }
+        ]
+    }
+}
+```
+
+| Field | Dipakai untuk |
+|---|---|
+| `labels`, `datasets` | Langsung ke Chart.js: `new Chart(canvas, { type, data: { labels, datasets } })` |
+| `rows` | Isi tabel, dan tooltip saat hover (label periode, rentang tanggal, nilai) |
+| `metric.unit` | Format angka: `currency` → Rupiah, `percent` → tambah `%`, `count` → angka biasa |
+
+Jika rentang tidak punya data sama sekali, respons tetap **200** dengan `is_empty: true` dan `message: "Data tidak tersedia untuk filter yang dipilih."`.
+
+### 422 Validasi gagal
+
+Selain validasi filter di `/summary`:
+
+| Kondisi | Pesan |
+|---|---|
+| `metric` atau `period` kosong | `Metric wajib diisi.` / `Periode wajib diisi.` |
+| Nilai di luar pilihan | `Metric tidak valid.` / `Periode tidak valid.` |
+| Rentang lebih dari 366 hari untuk `daily` atau `weekly` | `Rentang tanggal untuk periode daily maksimal 366 hari.` |
