@@ -5,11 +5,14 @@ namespace App\Services;
 use App\Enums\TrendMetric;
 use App\Enums\TrendPeriod;
 use App\Repositories\PerformanceRepository;
+use App\Services\Concerns\ComparesWithPreviousValue;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 
 class PerformanceTrendService
 {
+    use ComparesWithPreviousValue;
+
     public function __construct(private PerformanceRepository $performanceRepository) {}
 
     /**
@@ -47,13 +50,28 @@ class PerformanceTrendService
             'datasets' => [
                 ['label' => $metric->label(), 'data' => $values],
             ],
-            'rows' => array_map(fn (array $bucket, int|float|null $value) => [
-                'label' => $bucket['label'],
-                'period_start' => $bucket['start']->toDateString(),
-                'period_end' => $bucket['end']->toDateString(),
-                'value' => $value,
-            ], $buckets, $values),
+            'rows' => $this->rows($buckets, $values),
         ];
+    }
+
+    /**
+     * Table rows with the change compared to the previous row; the first row has no previous row.
+     *
+     * @param  list<array{start: CarbonImmutable, end: CarbonImmutable, label: string}>  $buckets
+     * @param  list<int|float|null>  $values
+     * @return list<array<string, mixed>>
+     */
+    private function rows(array $buckets, array $values): array
+    {
+        return array_map(fn (int $index) => [
+            'label' => $buckets[$index]['label'],
+            'period_start' => $buckets[$index]['start']->toDateString(),
+            'period_end' => $buckets[$index]['end']->toDateString(),
+            'value' => $values[$index],
+            ...($index === 0
+                ? ['change_percentage' => null, 'trend' => null]
+                : $this->changeFromPrevious($values[$index], $values[$index - 1])),
+        ], array_keys($buckets));
     }
 
     /**
