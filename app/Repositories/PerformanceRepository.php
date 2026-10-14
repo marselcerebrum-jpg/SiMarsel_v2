@@ -16,6 +16,13 @@ class PerformanceRepository
      */
     private const NORMALIZED_EMAIL = 'LOWER(TRIM(customer_email))';
 
+    /**
+     * Counts first purchases (Perdana) as new_users and renewals (Perpanjangan) as repeat_orders.
+     * Bindings: Transaction::TYPE_FIRST, Transaction::TYPE_RENEWAL.
+     */
+    private const PRODUCT_TYPE_COUNTS = 'COALESCE(SUM(CASE WHEN product_type = ? THEN 1 ELSE 0 END), 0) as new_users, '
+        .'COALESCE(SUM(CASE WHEN product_type = ? THEN 1 ELSE 0 END), 0) as repeat_orders';
+
     public function findPlatformIdBySlug(string $slug): ?int
     {
         return Platform::where('slug', $slug)->value('id');
@@ -32,9 +39,7 @@ class PerformanceRepository
             ->whereBetween('paid_date', $this->range($from, $to))
             ->toBase()
             ->selectRaw(
-                'COALESCE(SUM(nominal), 0) as revenue, COUNT(*) as transactions, '
-                .'COALESCE(SUM(CASE WHEN product_type = ? THEN 1 ELSE 0 END), 0) as new_users, '
-                .'COALESCE(SUM(CASE WHEN product_type = ? THEN 1 ELSE 0 END), 0) as repeat_orders',
+                'COALESCE(SUM(nominal), 0) as revenue, COUNT(*) as transactions, '.self::PRODUCT_TYPE_COUNTS,
                 [Transaction::TYPE_FIRST, Transaction::TYPE_RENEWAL],
             )
             ->first();
@@ -66,16 +71,19 @@ class PerformanceRepository
     }
 
     /**
-     * Revenue and transaction count per day.
+     * Revenue, transaction count, first purchases, and renewals per day.
      *
-     * @return Collection<int, object{day: string, revenue: string|float, transactions: int}>
+     * @return Collection<int, object{day: string, revenue: string|float, transactions: int, new_users: int, repeat_orders: int}>
      */
     public function dailyTransactionTotals(CarbonInterface $from, CarbonInterface $to, ?int $platformId): Collection
     {
         return $this->successfulTransactions($platformId)
             ->whereBetween('paid_date', $this->range($from, $to))
             ->toBase()
-            ->selectRaw('DATE(paid_date) as day, SUM(nominal) as revenue, COUNT(*) as transactions')
+            ->selectRaw(
+                'DATE(paid_date) as day, SUM(nominal) as revenue, COUNT(*) as transactions, '.self::PRODUCT_TYPE_COUNTS,
+                [Transaction::TYPE_FIRST, Transaction::TYPE_RENEWAL],
+            )
             ->groupByRaw('DATE(paid_date)')
             ->get();
     }
@@ -93,41 +101,6 @@ class PerformanceRepository
             ->toBase()
             ->selectRaw('DATE(date) as day, SUM(total) as total')
             ->groupByRaw('DATE(date)')
-            ->get();
-    }
-
-    /**
-     * Number of successful transactions per customer email per day.
-     *
-     * @return Collection<int, object{day: string, email: string, transactions: int}>
-     */
-    public function dailyCustomerTransactions(CarbonInterface $from, CarbonInterface $to, ?int $platformId): Collection
-    {
-        return $this->successfulTransactions($platformId)
-            ->withCustomerEmail()
-            ->whereBetween('paid_date', $this->range($from, $to))
-            ->toBase()
-            ->selectRaw('DATE(paid_date) as day, '.self::NORMALIZED_EMAIL.' as email, COUNT(*) as transactions')
-            ->groupByRaw('DATE(paid_date), '.self::NORMALIZED_EMAIL)
-            ->get();
-    }
-
-    /**
-     * First successful purchase day of every customer whose first purchase falls in the period.
-     *
-     * @return Collection<int, object{email: string, first_day: string}>
-     */
-    public function firstPurchaseDays(CarbonInterface $from, CarbonInterface $to, ?int $platformId): Collection
-    {
-        [$start, $end] = $this->range($from, $to);
-
-        return $this->successfulTransactions($platformId)
-            ->withCustomerEmail()
-            ->where('paid_date', '<=', $end)
-            ->toBase()
-            ->selectRaw(self::NORMALIZED_EMAIL.' as email, DATE(MIN(paid_date)) as first_day')
-            ->groupByRaw(self::NORMALIZED_EMAIL)
-            ->havingRaw('MIN(paid_date) >= ?', [$start])
             ->get();
     }
 
