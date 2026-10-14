@@ -8,7 +8,6 @@ use App\Models\Transaction;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\DB;
 
 class PerformanceRepository
 {
@@ -23,19 +22,28 @@ class PerformanceRepository
     }
 
     /**
-     * @return array{revenue: float, transactions: int}
+     * Revenue, transaction count, and the number of first purchases and renewals in one query.
+     *
+     * @return array{revenue: float, transactions: int, new_users: int, repeat_orders: int}
      */
     public function transactionTotals(CarbonInterface $from, CarbonInterface $to, ?int $platformId): array
     {
         $totals = $this->successfulTransactions($platformId)
             ->whereBetween('paid_date', $this->range($from, $to))
             ->toBase()
-            ->selectRaw('COALESCE(SUM(nominal), 0) as revenue, COUNT(*) as transactions')
+            ->selectRaw(
+                'COALESCE(SUM(nominal), 0) as revenue, COUNT(*) as transactions, '
+                .'COALESCE(SUM(CASE WHEN product_type = ? THEN 1 ELSE 0 END), 0) as new_users, '
+                .'COALESCE(SUM(CASE WHEN product_type = ? THEN 1 ELSE 0 END), 0) as repeat_orders',
+                [Transaction::TYPE_FIRST, Transaction::TYPE_RENEWAL],
+            )
             ->first();
 
         return [
             'revenue' => (float) $totals->revenue,
             'transactions' => (int) $totals->transactions,
+            'new_users' => (int) $totals->new_users,
+            'repeat_orders' => (int) $totals->repeat_orders,
         ];
     }
 
@@ -47,38 +55,6 @@ class PerformanceRepository
             ->toBase()
             ->selectRaw('COUNT(DISTINCT '.self::NORMALIZED_EMAIL.') as total')
             ->value('total');
-    }
-
-    /**
-     * Customers with more than one successful transaction in the period.
-     */
-    public function countRepeatCustomers(CarbonInterface $from, CarbonInterface $to, ?int $platformId): int
-    {
-        $customers = $this->successfulTransactions($platformId)
-            ->withCustomerEmail()
-            ->whereBetween('paid_date', $this->range($from, $to))
-            ->selectRaw(self::NORMALIZED_EMAIL.' as email')
-            ->groupByRaw(self::NORMALIZED_EMAIL)
-            ->havingRaw('COUNT(*) > 1');
-
-        return DB::query()->fromSub($customers, 'repeat_customers')->count();
-    }
-
-    /**
-     * Customers whose first successful transaction ever falls in the period.
-     */
-    public function countNewCustomers(CarbonInterface $from, CarbonInterface $to, ?int $platformId): int
-    {
-        [$start, $end] = $this->range($from, $to);
-
-        $customers = $this->successfulTransactions($platformId)
-            ->withCustomerEmail()
-            ->where('paid_date', '<=', $end)
-            ->selectRaw(self::NORMALIZED_EMAIL.' as email')
-            ->groupByRaw(self::NORMALIZED_EMAIL)
-            ->havingRaw('MIN(paid_date) >= ?', [$start]);
-
-        return DB::query()->fromSub($customers, 'new_customers')->count();
     }
 
     public function totalDownloaders(CarbonInterface $from, CarbonInterface $to, ?int $platformId): int

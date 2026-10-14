@@ -28,7 +28,7 @@ class TransactionFactory extends Factory
             'nominal' => fake()->randomFloat(2, 10000, 1000000),
             'promo_code' => null,
             'product' => fake()->words(3, true),
-            'product_type' => fake()->randomElement(['course', 'tryout', 'bundle']),
+            'product_type' => fake()->randomElement([Transaction::TYPE_FIRST, Transaction::TYPE_RENEWAL]),
             'customer_email' => fake()->safeEmail(),
             'status_message' => Transaction::STATUS_SUCCESS,
         ];

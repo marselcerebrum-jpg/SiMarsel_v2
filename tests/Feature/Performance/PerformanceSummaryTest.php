@@ -34,12 +34,19 @@ class PerformanceSummaryTest extends TestCase
         $this->platformB = Platform::factory()->create(['slug' => 'app-b', 'name' => 'App B']);
     }
 
-    private function transaction(Platform $platform, string $date, ?string $email, float $nominal, string $status = Transaction::STATUS_SUCCESS): void
-    {
+    private function transaction(
+        Platform $platform,
+        string $date,
+        ?string $email,
+        float $nominal,
+        string $type = Transaction::TYPE_FIRST,
+        string $status = Transaction::STATUS_SUCCESS,
+    ): void {
         Transaction::factory()->for($platform)->create([
             'paid_date' => $date,
             'customer_email' => $email,
             'nominal' => $nominal,
+            'product_type' => $type,
             'status_message' => $status,
         ]);
     }
@@ -59,11 +66,11 @@ class PerformanceSummaryTest extends TestCase
         $this->transaction($this->platformA, '2026-08-20', 'dave@example.com', 500000);
         $this->downloader($this->platformA, '2026-08-31', 50);
 
-        $this->transaction($this->platformA, '2026-09-05', 'alice@example.com', 200000);
-        $this->transaction($this->platformA, '2026-09-10', ' ALICE@example.com ', 100000);
+        $this->transaction($this->platformA, '2026-09-05', 'alice@example.com', 200000, Transaction::TYPE_RENEWAL);
+        $this->transaction($this->platformA, '2026-09-10', ' ALICE@example.com ', 100000, Transaction::TYPE_RENEWAL);
         $this->transaction($this->platformA, '2026-09-30', 'bob@example.com', 300000);
         $this->transaction($this->platformA, '2026-09-15', null, 400000);
-        $this->transaction($this->platformA, '2026-09-12', 'carol@example.com', 999999, 'failed');
+        $this->transaction($this->platformA, '2026-09-12', 'carol@example.com', 999999, Transaction::TYPE_RENEWAL, 'failed');
         $this->downloader($this->platformA, '2026-09-01', 30);
         $this->downloader($this->platformA, '2026-09-30', 70);
 
@@ -126,14 +133,15 @@ class PerformanceSummaryTest extends TestCase
                     'total_transactions' => ['value' => 4, 'previous_value' => 1, 'change_percentage' => 300, 'trend' => 'up'],
                     'total_downloaders' => ['value' => 100, 'previous_value' => 50, 'change_percentage' => 100, 'trend' => 'up'],
                     'unique_users' => ['value' => 2, 'previous_value' => 1, 'change_percentage' => 100, 'trend' => 'up'],
-                    'new_users' => ['value' => 1, 'previous_value' => 1, 'change_percentage' => 0, 'trend' => 'same'],
-                    'repeat_order_users' => ['value' => 1, 'previous_value' => 0, 'change_percentage' => null, 'trend' => 'up'],
+                    'new_users' => ['value' => 2, 'previous_value' => 1, 'change_percentage' => 100, 'trend' => 'up'],
+                    'repeat_orders' => ['value' => 2, 'previous_value' => 0, 'change_percentage' => null, 'trend' => 'up'],
                     'average_order_value' => ['value' => 250000, 'previous_value' => 500000, 'change_percentage' => -50, 'trend' => 'down'],
-                    'conversion_rate' => ['value' => 2, 'previous_value' => 2, 'change_percentage' => 0, 'trend' => 'same'],
+                    'conversion_rate' => ['value' => 4, 'previous_value' => 2, 'change_percentage' => 100, 'trend' => 'up'],
                 ],
             ]])
-            ->assertJsonPath('data.kpis.repeat_order_users.change_percentage', null)
-            ->assertJsonPath('data.kpis.new_users.change_percentage', 0)
+            ->assertJsonPath('data.kpis.repeat_orders.change_percentage', null)
+            ->assertJsonPath('data.kpis.new_users.change_percentage', 100)
+            ->assertJsonMissingPath('data.kpis.repeat_order_users')
             ->assertJsonPath('data.message', null);
     }
 
@@ -151,12 +159,28 @@ class PerformanceSummaryTest extends TestCase
                     'total_transactions' => ['value' => 5],
                     'total_downloaders' => ['value' => 120],
                     'unique_users' => ['value' => 3],
-                    'new_users' => ['value' => 2],
-                    'repeat_order_users' => ['value' => 1],
+                    'new_users' => ['value' => 3],
+                    'repeat_orders' => ['value' => 2],
                     'average_order_value' => ['value' => 210000],
-                    'conversion_rate' => ['value' => 2.5],
+                    'conversion_rate' => ['value' => 4.17],
                 ],
             ]]);
+    }
+
+    public function test_renewals_and_first_purchases_without_success_status_are_not_counted(): void
+    {
+        $this->transaction($this->platformA, '2026-09-05', 'alice@example.com', 100000, Transaction::TYPE_RENEWAL);
+        $this->transaction($this->platformA, '2026-09-06', 'alice@example.com', 100000, Transaction::TYPE_RENEWAL, 'failed');
+        $this->transaction($this->platformA, '2026-09-07', 'bob@example.com', 100000, Transaction::TYPE_FIRST, 'pending');
+        $this->downloader($this->platformA, '2026-09-05', 10);
+
+        $this->actingAs($this->manager)
+            ->getJson(self::URL.'?date_from=2026-09-01&date_to=2026-09-30&platform=app-a')
+            ->assertOk()
+            ->assertJsonPath('data.kpis.total_transactions.value', 1)
+            ->assertJsonPath('data.kpis.repeat_orders.value', 1)
+            ->assertJsonPath('data.kpis.new_users.value', 0)
+            ->assertJsonPath('data.kpis.conversion_rate.value', 10);
     }
 
     public function test_empty_period_returns_informative_empty_state(): void
