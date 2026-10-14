@@ -30,6 +30,10 @@ class Transaction extends Model
 
     public const STATUS_SUCCESS = 'Success';
 
+    public const TYPE_FIRST = 'Perdana';
+
+    public const TYPE_RENEWAL = 'Perpanjangan';
+
     /**
      * Get the attributes that should be cast.
      *
@@ -57,6 +61,26 @@ class Transaction extends Model
     public function scopeSuccessful(Builder $query): void
     {
         $query->where('status_message', self::STATUS_SUCCESS);
+    }
+
+    /**
+     * First purchases (product_type = Perdana) count as new users.
+     *
+     * @param  Builder<Transaction>  $query
+     */
+    public function scopeFirstPurchase(Builder $query): void
+    {
+        $query->where('product_type', self::TYPE_FIRST);
+    }
+
+    /**
+     * Renewals (product_type = Perpanjangan) count as repeat orders.
+     *
+     * @param  Builder<Transaction>  $query
+     */
+    public function scopeRenewal(Builder $query): void
+    {
+        $query->where('product_type', self::TYPE_RENEWAL);
     }
 
     /**

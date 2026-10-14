@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Account\AccountController;
 use App\Http\Controllers\Auth\AuthController;
+use App\Http\Controllers\Performance\PerformanceSummaryController;
 use App\Models\Account;
 use Illuminate\Support\Facades\Route;
 
@@ -28,4 +29,7 @@ Route::middleware('auth')->group(function () {
             ->can('delete', 'account')
             ->name('destroy');
     });
+
+    Route::get('/performance/summary', PerformanceSummaryController::class)
+        ->name('api.performance.summary');
 });
