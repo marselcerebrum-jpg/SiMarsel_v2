@@ -7,11 +7,11 @@ use App\Models\Account;
 class AccountPolicy
 {
     /**
-     * Determine whether the user can view any accounts.
+     * Every logged-in role can view the account list.
      */
     public function viewAny(Account $user): bool
     {
-        return $user->isManager();
+        return true;
     }
 
     /**
