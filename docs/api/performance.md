@@ -1,64 +1,107 @@
-# API Ringkasan Performa (kontrak untuk BE)
+# API Ringkasan Performa
 
-> **Status: belum diimplementasikan di BE.** Halaman `/performance` (FE) sudah memakai kontrak ini. Sebelum endpoint tersedia, halaman menampilkan pesan gagal memuat dengan tombol "Coba lagi".
+Menyediakan total KPI performa untuk periode dan platform yang dipilih, beserta perbandingannya dengan periode sebelumnya. Semua rumus dihitung di backend, sehingga frontend cukup menampilkan nilainya.
 
-Semua endpoint **wajib login**. Aturan header, CSRF, dan kode error umum ada di [authentication.md](authentication.md).
-
-**Semua rumus KPI dihitung di BE.** FE hanya menampilkan `value`, `previous_value`, `change_percent`, dan `trend` apa adanya, tanpa menghitung ulang.
-
-## `GET /api/performance/filters`
-
-Pilihan filter platform. Jika endpoint ini gagal, FE tetap menampilkan opsi "Semua platform".
-
-**200 OK**
-
-```json
-{
-    "data": {
-        "platforms": [
-            { "value": "android", "label": "Android" },
-            { "value": "ios", "label": "iOS" },
-            { "value": "web", "label": "Web" }
-        ]
-    }
-}
-```
+Wajib login. Semua role (Manager dan Employee) boleh mengakses. Aturan header dan kode error umum ada di [authentication.md](authentication.md).
 
 ## `GET /api/performance/summary`
 
-**Query**
+### Query parameter
 
-| Field | Tipe | Aturan |
-|---|---|---|
-| `start_date` | date `Y-m-d` | Wajib |
-| `end_date` | date `Y-m-d` | Wajib, `>= start_date`, tidak boleh melewati hari ini |
-| `platform` | string | Opsional. Tidak dikirim berarti semua platform. Harus salah satu `value` dari `/filters` |
+| Parameter | Wajib | Format | Keterangan |
+|---|---|---|---|
+| `date_from` | Ya | `YYYY-MM-DD` | Tanggal mulai (inklusif) |
+| `date_to` | Ya | `YYYY-MM-DD` | Tanggal akhir (inklusif), tidak boleh sebelum `date_from` |
+| `platform` | Tidak | slug platform | Kosongkan untuk menghitung semua platform |
 
-Contoh: `/api/performance/summary?start_date=2026-10-01&end_date=2026-10-09&platform=android`
+Contoh: `GET /api/performance/summary?date_from=2026-09-01&date_to=2026-09-30&platform=app-a`
 
-**200 OK**
+### Periode pembanding
+
+Periode sebelumnya memiliki jumlah hari yang sama dan berakhir tepat sehari sebelum `date_from`.
+
+| Periode dipilih | Periode sebelumnya |
+|---|---|
+| 1-30 Sep 2026 (30 hari) | 2-31 Agu 2026 |
+| 10 Sep 2026 (1 hari) | 9 Sep 2026 |
+
+### Rumus KPI
+
+Semua KPI hanya memakai transaksi dengan `status_message` = `Success`.
+
+| Key | KPI | Sumber | Rumus |
+|---|---|---|---|
+| `total_revenue` | Total Revenue | `transactions` | Jumlah `nominal` |
+| `total_transactions` | Total Transaksi | `transactions` | Jumlah transaksi |
+| `total_downloaders` | Total Downloader | `downloaders` | Jumlah `total` |
+| `unique_users` | User Unik | `transactions` | Jumlah email berbeda. Email disamakan huruf kecilnya dan spasinya dibuang, jadi `Alice@x.com` dan ` alice@x.com ` dihitung satu user. Transaksi tanpa email tidak dihitung. |
+| `new_users` | User Baru | `transactions` | Jumlah transaksi berhasil dengan `product_type` = `Perdana` |
+| `repeat_orders` | Repeat Order | `transactions` | Jumlah transaksi berhasil dengan `product_type` = `Perpanjangan` |
+| `average_order_value` | AOV | `transactions` | `total_revenue ÷ total_transactions`, dibulatkan 2 desimal. `null` jika tidak ada transaksi. |
+| `conversion_rate` | Konversi (%) | keduanya | `total_transactions ÷ total_downloaders × 100`, dibulatkan 2 desimal. `null` jika downloader = 0. |
+
+`new_users` dan `repeat_orders` menghitung **transaksi**, bukan orang. Satu email yang melakukan dua kali `Perpanjangan` dihitung 2.
+
+> **Perubahan untuk frontend:** key `repeat_order_users` diganti menjadi `repeat_orders`.
+
+### Bentuk setiap KPI
+
+| Field | Keterangan |
+|---|---|
+| `value` | Nilai di periode yang dipilih |
+| `previous_value` | Nilai di periode sebelumnya |
+| `change_percentage` | `(value - previous_value) ÷ previous_value × 100`, dibulatkan 2 desimal. `null` jika `previous_value` = 0 atau `null`. |
+| `trend` | `up` (naik), `down` (turun), atau `same` (sama). Nilai `null` dibandingkan sebagai 0. |
+
+### 200 OK
 
 ```json
 {
     "data": {
-        "period": { "start_date": "2026-10-01", "end_date": "2026-10-09" },
-        "previous_period": { "start_date": "2026-09-22", "end_date": "2026-09-30" },
-        "metrics": {
-            "total_revenue":       { "value": 125000000, "previous_value": 100000000, "change_percent": 25.0,  "trend": "up" },
-            "transactions":        { "value": 250,       "previous_value": 260,       "change_percent": -3.85, "trend": "down" },
-            "registered_users":    { "value": 1200,      "previous_value": 1100,      "change_percent": 9.09,  "trend": "up" },
-            "unique_buyers":       { "value": 210,       "previous_value": 210,       "change_percent": 0,     "trend": "same" },
-            "average_order_value": { "value": 500000,    "previous_value": 384615,    "change_percent": 30.0,  "trend": "up" },
-            "repeat_order_users":  { "value": 30,        "previous_value": 25,        "change_percent": 20.0,  "trend": "up" },
-            "conversion_rate":     { "value": 17.5,      "previous_value": 19.09,     "change_percent": -8.33, "trend": "down" }
+        "filter": { "date_from": "2026-09-01", "date_to": "2026-09-30", "platform": "app-a" },
+        "previous_period": { "date_from": "2026-08-02", "date_to": "2026-08-31" },
+        "is_empty": false,
+        "message": null,
+        "kpis": {
+            "total_revenue": { "value": 1000000, "previous_value": 500000, "change_percentage": 100, "trend": "up" },
+            "total_transactions": { "value": 4, "previous_value": 1, "change_percentage": 300, "trend": "up" },
+            "total_downloaders": { "value": 100, "previous_value": 50, "change_percentage": 100, "trend": "up" },
+            "unique_users": { "value": 2, "previous_value": 1, "change_percentage": 100, "trend": "up" },
+            "new_users": { "value": 2, "previous_value": 1, "change_percentage": 100, "trend": "up" },
+            "repeat_orders": { "value": 2, "previous_value": 0, "change_percentage": null, "trend": "up" },
+            "average_order_value": { "value": 250000, "previous_value": 500000, "change_percentage": -50, "trend": "down" },
+            "conversion_rate": { "value": 4, "previous_value": 2, "change_percentage": 100, "trend": "up" }
         }
     }
 }
 ```
 
-**422**: error validasi Laravel. FE menampilkan pesan `errors.start_date`, `errors.end_date`, dan `errors.platform` di bawah field filternya.
+### Data kosong
 
-## `GET /api/performance/trend`
+Jika periode yang dipilih tidak punya transaksi berhasil dan tidak punya data downloader, respons tetap **200**, dengan:
+
+```json
+{
+    "data": {
+        "is_empty": true,
+        "message": "Data tidak tersedia untuk filter yang dipilih.",
+        "kpis": { "...": "nilai 0, atau null untuk average_order_value dan conversion_rate" }
+    }
+}
+```
+
+Tampilkan `message` sebagai kondisi kosong di halaman.
+
+### 422 Validasi gagal
+
+| Kondisi | Pesan |
+|---|---|
+| `date_from` atau `date_to` kosong | `Tanggal mulai wajib diisi.` / `Tanggal akhir wajib diisi.` |
+| Format tanggal salah | `Tanggal mulai harus berformat YYYY-MM-DD.` |
+| `date_to` sebelum `date_from` | `Tanggal akhir tidak boleh sebelum tanggal mulai.` |
+| Slug platform tidak ada | `Platform tidak ditemukan.` |
+
+## `GET /api/performance/trend` (usulan FE, belum ada di BE)
 
 Data tren untuk bagian **Analisa Tren & Performa**. Memakai filter yang sama dengan `/summary`, ditambah `metric` dan `granularity`. FE memanggil endpoint ini lagi setiap kali filter, metric, atau periode berubah. Perubahan visualisasi (Bar, Line, Area, Pie, Table) hanya menggambar ulang di FE, tanpa request baru.
 
@@ -66,11 +109,11 @@ Data tren untuk bagian **Analisa Tren & Performa**. Memakai filter yang sama den
 
 | Field | Tipe | Aturan |
 |---|---|---|
-| `start_date`, `end_date`, `platform` | | Sama dengan `/summary` |
+| `date_from`, `date_to`, `platform` | | Sama dengan `/summary` |
 | `metric` | string | Wajib: `revenue`, `transactions`, `downloader`, `conversion`, `new_users`, `repeat_order` |
 | `granularity` | string | Wajib: `daily`, `weekly`, `monthly` |
 
-Contoh: `/api/performance/trend?start_date=2026-10-01&end_date=2026-10-09&metric=revenue&granularity=daily`
+Contoh: `/api/performance/trend?date_from=2026-10-01&date_to=2026-10-09&metric=revenue&granularity=daily`
 
 **200 OK**
 
@@ -82,11 +125,11 @@ Contoh: `/api/performance/trend?start_date=2026-10-01&end_date=2026-10-09&metric
         "points": [
             {
                 "period_start": "2026-10-01", "period_end": "2026-10-01",
-                "value": 12500000, "change_percent": null, "trend": null
+                "value": 12500000, "change_percentage": null, "trend": null
             },
             {
                 "period_start": "2026-10-02", "period_end": "2026-10-02",
-                "value": 15000000, "change_percent": 20.0, "trend": "up"
+                "value": 15000000, "change_percentage": 20.0, "trend": "up"
             }
         ]
     }
@@ -95,37 +138,10 @@ Contoh: `/api/performance/trend?start_date=2026-10-01&end_date=2026-10-09&metric
 
 | Field | Keterangan |
 |---|---|
-| `points[].period_start`, `period_end` | Rentang satu titik data (`Y-m-d`). Daily: tanggal yang sama. Weekly: Senin–Minggu, dipotong sesuai `start_date`/`end_date`. Monthly: awal–akhir bulan, dipotong sesuai filter |
+| `points[].period_start`, `period_end` | Rentang satu titik data (`Y-m-d`). Daily: tanggal yang sama. Weekly: Senin–Minggu, dipotong sesuai `date_from`/`date_to`. Monthly: awal–akhir bulan, dipotong sesuai filter |
 | `points[].value` | Nilai metric pada rentang itu, dengan rumus yang sama dengan `/summary`. `conversion` dalam persen |
-| `points[].change_percent`, `trend` | Perbandingan nilai dengan titik sebelumnya (`up` / `down` / `same`). `null` untuk titik pertama. Dipakai di kolom Perubahan pada Table |
+| `points[].change_percentage`, `trend` | Perbandingan nilai dengan titik sebelumnya (`up` / `down` / `same`). `null` untuk titik pertama. Dipakai di kolom Perubahan pada Table |
 
 Urutkan `points` dari periode terlama. Kembalikan titik bernilai `0` untuk periode tanpa data, agar grafik tidak bolong. FE memakai `period_start`/`period_end` untuk label sumbu dan tooltip (nilai + periode saat hover).
 
 `downloader` adalah total user/downloader yang registrasi, sedangkan `new_users` adalah user yang pertama kali tercatat pada periode itu. Definisi pasti `new_users` perlu disepakati BE.
-
-## Objek metrik
-
-| Field | Tipe | Keterangan |
-|---|---|---|
-| `value` | number / null | Nilai pada periode terpilih. `null` berarti data tidak tersedia (FE menampilkan "Data tidak tersedia") |
-| `previous_value` | number / null | Nilai pada `previous_period` |
-| `change_percent` | number / null | Persentase perubahan dibanding periode sebelumnya. `null` jika tidak bisa dihitung (misalnya `previous_value` 0) |
-| `trend` | `up` / `down` / `same` / null | Status perkembangan. `null` berarti tidak ada data pembanding |
-
-Uang dalam Rupiah (angka bulat, bukan string). `conversion_rate` dalam persen (`17.5` berarti 17,5%).
-
-Jika semua `value` bernilai `0` atau `null`, FE menampilkan kondisi data kosong.
-
-## Definisi KPI yang perlu ditetapkan BE
-
-| Key | Indikator | Sumber | Usulan aturan (perlu disepakati) |
-|---|---|---|---|
-| `total_revenue` | Total Revenue | Tabel transaksi | Jumlah nominal transaksi berstatus berhasil |
-| `transactions` | Jumlah Transaksi | Tabel transaksi | Jumlah transaksi berstatus berhasil |
-| `registered_users` | User Terdaftar | Tabel downloader | Jumlah user/downloader yang berhasil registrasi |
-| `unique_buyers` | User Unik | Tabel transaksi | Jumlah email **distinct** dari transaksi berhasil |
-| `average_order_value` | AOV | Tabel transaksi | `total_revenue ÷ transactions` (`null` jika transaksi 0) |
-| `repeat_order_users` | Repeat Order | Tabel transaksi | Jumlah email dengan transaksi berhasil lebih dari 1 kali |
-| `conversion_rate` | Konversi | Transaksi + downloader | `unique_buyers ÷ registered_users × 100` |
-
-`previous_period` adalah rentang dengan panjang yang sama, tepat sebelum `start_date`. Hal yang masih perlu disepakati: status transaksi yang dihitung berhasil, dan apakah repeat order dihitung di dalam periode atau sepanjang waktu.
