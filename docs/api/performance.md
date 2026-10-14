@@ -112,7 +112,7 @@ Backend mengirim data yang sama untuk semua bentuk visualisasi (Bar, Line, Area,
 | Parameter | Wajib | Nilai |
 |---|---|---|
 | `date_from`, `date_to`, `platform` | Sama seperti `/summary` | |
-| `metric` | Ya | `revenue`, `transactions`, `downloaders`, `conversion`, `new_users`, `repeat_order` |
+| `metric` | Ya | `revenue`, `transactions`, `downloaders`, `conversion`, `new_users`, `repeat_orders` |
 | `period` | Ya | `daily`, `weekly`, `monthly` |
 
 Contoh: `GET /api/performance/trend?date_from=2026-09-01&date_to=2026-09-30&platform=app-a&metric=revenue&period=weekly`
@@ -138,11 +138,11 @@ Rumusnya sama dengan Ringkasan Performa, tapi dihitung terpisah untuk setiap per
 | `revenue` | Revenue | `currency` | Jumlah `nominal` transaksi `Success` |
 | `transactions` | Transactions | `count` | Jumlah transaksi `Success` |
 | `downloaders` | Downloader | `count` | Jumlah `downloaders.total` |
-| `conversion` | Conversion | `percent` | User unik ÷ downloader × 100. `null` jika periode itu tidak punya downloader. |
-| `new_users` | User Baru | `count` | Email yang pembelian pertamanya jatuh di periode itu |
-| `repeat_order` | Repeat Order | `count` | Email dengan lebih dari 1 pembelian di dalam periode itu |
+| `conversion` | Conversion | `percent` | Transaksi `Success` ÷ downloader × 100. `null` jika periode itu tidak punya downloader. |
+| `new_users` | User Baru | `count` | Jumlah transaksi `Success` dengan `product_type` = `Perdana` |
+| `repeat_orders` | Repeat Order | `count` | Jumlah transaksi `Success` dengan `product_type` = `Perpanjangan` |
 
-Untuk `revenue`, `transactions`, dan `downloaders`, jumlah semua titik sama dengan angka di `/summary`. Untuk metric berbasis user (`conversion`, `repeat_order`), jumlah semua titik **tidak selalu sama** dengan angka ringkasan. Contohnya, satu email yang membeli di dua minggu berbeda dihitung sekali di ringkasan, tapi muncul di dua titik mingguan.
+Untuk `revenue`, `transactions`, `downloaders`, `new_users`, dan `repeat_orders`, jumlah semua titik sama dengan angka di `/summary`. `conversion` adalah persentase, jadi tidak dijumlahkan: nilainya dihitung ulang dari transaksi dan downloader di setiap periode.
 
 ### 200 OK
 
