@@ -42,12 +42,19 @@ class PerformanceTrendTest extends TestCase
         $this->platformB = Platform::factory()->create(['slug' => 'app-b']);
     }
 
-    private function transaction(Platform $platform, string $date, ?string $email, float $nominal, string $status = Transaction::STATUS_SUCCESS): void
-    {
+    private function transaction(
+        Platform $platform,
+        string $date,
+        ?string $email,
+        float $nominal,
+        string $type = Transaction::TYPE_FIRST,
+        string $status = Transaction::STATUS_SUCCESS,
+    ): void {
         Transaction::factory()->for($platform)->create([
             'paid_date' => $date,
             'customer_email' => $email,
             'nominal' => $nominal,
+            'product_type' => $type,
             'status_message' => $status,
         ]);
     }
@@ -65,10 +72,10 @@ class PerformanceTrendTest extends TestCase
         $this->transaction($this->platformA, '2026-07-15', 'alice@example.com', 100000);
 
         $this->transaction($this->platformA, '2026-09-02', 'alice@example.com', 200000);
-        $this->transaction($this->platformA, '2026-09-05', ' ALICE@example.com ', 100000);
+        $this->transaction($this->platformA, '2026-09-05', ' ALICE@example.com ', 100000, Transaction::TYPE_RENEWAL);
         $this->transaction($this->platformA, '2026-09-08', 'bob@example.com', 300000);
-        $this->transaction($this->platformA, '2026-09-10', 'dave@example.com', 999999, 'failed');
-        $this->transaction($this->platformA, '2026-09-15', null, 50000);
+        $this->transaction($this->platformA, '2026-09-10', 'dave@example.com', 999999, Transaction::TYPE_RENEWAL, 'failed');
+        $this->transaction($this->platformA, '2026-09-15', null, 50000, Transaction::TYPE_RENEWAL);
         $this->transaction($this->platformA, '2026-09-30', 'carol@example.com', 400000);
         $this->downloader($this->platformA, '2026-09-01', 40);
         $this->downloader($this->platformA, '2026-09-08', 100);
@@ -154,9 +161,9 @@ class PerformanceTrendTest extends TestCase
         $expected = [
             'transactions' => [2, 1, 1, 0, 1],
             'downloaders' => [40, 100, 0, 0, 20],
-            'conversion' => [2.5, 1, null, null, 5],
-            'new_users' => [0, 1, 0, 0, 1],
-            'repeat_order' => [1, 0, 0, 0, 0],
+            'conversion' => [5, 1, null, null, 5],
+            'new_users' => [1, 1, 0, 0, 1],
+            'repeat_orders' => [1, 0, 1, 0, 0],
         ];
 
         foreach ($expected as $metric => $values) {
@@ -165,6 +172,21 @@ class PerformanceTrendTest extends TestCase
 
         $this->weeklyTrend('conversion')->assertJsonPath('data.metric.unit', 'percent');
         $this->weeklyTrend('new_users')->assertJsonPath('data.metric.label', 'User Baru');
+        $this->weeklyTrend('repeat_orders')->assertJsonPath('data.metric.label', 'Repeat Order');
+    }
+
+    public function test_trend_totals_match_the_performance_summary(): void
+    {
+        $this->seedTrendData();
+
+        $summary = $this->actingAs($this->manager)
+            ->getJson('/api/performance/summary?date_from=2026-09-01&date_to=2026-09-30&platform=app-a')
+            ->json('data.kpis');
+
+        foreach (['revenue' => 'total_revenue', 'transactions' => 'total_transactions', 'downloaders' => 'total_downloaders', 'new_users' => 'new_users', 'repeat_orders' => 'repeat_orders'] as $metric => $kpi) {
+            $points = $this->weeklyTrend($metric)->json('data.datasets.0.data');
+            $this->assertEquals($summary[$kpi]['value'], array_sum($points), $metric);
+        }
     }
 
     public function test_all_platforms_are_included_when_platform_filter_is_empty(): void
