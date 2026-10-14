@@ -148,10 +148,74 @@ class PerformanceTrendTest extends TestCase
                 'period_start' => '2026-09-01',
                 'period_end' => '2026-09-06',
                 'value' => 300000,
+                'change_percentage' => null,
+                'trend' => null,
             ])
             ->assertJsonPath('data.rows.4.period_start', '2026-09-28')
             ->assertJsonPath('data.rows.4.period_end', '2026-09-30')
             ->assertJsonPath('data.is_empty', false);
+    }
+
+    /**
+     * @return list<array{0: float|int|null, 1: string|null}>
+     */
+    private function rowChanges(TestResponse $response): array
+    {
+        return array_map(
+            fn (array $row) => [$row['change_percentage'], $row['trend']],
+            $response->json('data.rows'),
+        );
+    }
+
+    public function test_rows_show_change_compared_to_the_previous_row(): void
+    {
+        $this->seedTrendData();
+
+        // Revenue per week: 300000, 300000, 50000, 0, 400000.
+        $this->assertSame([
+            [null, null],
+            [0, 'same'],
+            [-83.33, 'down'],
+            [-100, 'down'],
+            [null, 'up'],
+        ], $this->rowChanges($this->weeklyTrend('revenue')));
+
+        // Downloaders per week: 40, 100, 0, 0, 20.
+        $this->assertSame([
+            [null, null],
+            [150, 'up'],
+            [-100, 'down'],
+            [null, 'same'],
+            [null, 'up'],
+        ], $this->rowChanges($this->weeklyTrend('downloaders')));
+    }
+
+    public function test_row_change_treats_null_conversion_as_zero(): void
+    {
+        $this->seedTrendData();
+
+        // Conversion per week: 5, 1, null, null, 5.
+        $this->assertSame([
+            [null, null],
+            [-80, 'down'],
+            [-100, 'down'],
+            [null, 'same'],
+            [null, 'up'],
+        ], $this->rowChanges($this->weeklyTrend('conversion')));
+    }
+
+    public function test_row_change_uses_the_same_rule_as_the_summary(): void
+    {
+        $this->seedTrendData();
+
+        $summary = $this->actingAs($this->manager)
+            ->getJson('/api/performance/summary?date_from=2026-09-07&date_to=2026-09-13&platform=app-a')
+            ->json('data.kpis.total_revenue');
+
+        $row = $this->weeklyTrend('revenue')->json('data.rows.1');
+
+        $this->assertSame($summary['change_percentage'], $row['change_percentage']);
+        $this->assertSame($summary['trend'], $row['trend']);
     }
 
     public function test_every_metric_is_calculated_per_bucket(): void
