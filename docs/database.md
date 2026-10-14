@@ -41,8 +41,8 @@ php artisan migrate --seed
 ## Aturan bisnis
 
 - Tidak ada registrasi mandiri. Akun hanya dibuat oleh Manager lewat `POST /api/accounts`.
-- Hanya role Manager (`MGR`) yang boleh melihat, membuat, mengubah, dan menghapus akun.
-- Manager tidak bisa menghapus akunnya sendiri.
+- Semua role boleh melihat daftar akun. Hanya role Manager (`MGR`) yang boleh membuat, mengubah, dan menghapus akun.
+- Manager tidak bisa menghapus akunnya sendiri dan tidak bisa mengubah role akunnya sendiri.
 - Semua role boleh melihat daftar dan detail divisi. Hanya role Manager (`MGR`) yang boleh membuat, mengubah, dan menghapus divisi.
 - Password disimpan dalam bentuk hash (bcrypt) dan tidak pernah dikembalikan oleh API.
 - Username: 4-25 karakter, hanya huruf, angka, titik, dan underscore.

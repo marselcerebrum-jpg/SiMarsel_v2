@@ -60,18 +60,29 @@ class AccountCrudTest extends TestCase
         $this->deleteJson("/api/accounts/{$this->employee->id}")->assertUnauthorized();
     }
 
-    public function test_employee_cannot_access_account_endpoints(): void
+    public function test_employee_can_list_accounts(): void
+    {
+        $this->actingAs($this->employee)
+            ->getJson('/api/accounts')
+            ->assertOk()
+            ->assertJsonCount(2, 'data')
+            ->assertJsonPath('data.0.username', 'manager')
+            ->assertJsonPath('data.1.username', 'employee');
+    }
+
+    public function test_employee_cannot_create_update_or_delete_accounts(): void
     {
         $this->actingAs($this->employee);
+        $forbidden = ['message' => 'Anda tidak memiliki akses untuk melakukan aksi ini.'];
 
-        $this->getJson('/api/accounts')
-            ->assertForbidden()
-            ->assertExactJson(['message' => 'Anda tidak memiliki akses untuk melakukan aksi ini.']);
-        $this->postJson('/api/accounts', $this->validPayload())->assertForbidden();
-        $this->putJson("/api/accounts/{$this->manager->id}", ['fullname' => 'X'])->assertForbidden();
-        $this->deleteJson("/api/accounts/{$this->manager->id}")->assertForbidden();
+        $this->postJson('/api/accounts', $this->validPayload())->assertForbidden()->assertExactJson($forbidden);
+        $this->putJson("/api/accounts/{$this->manager->id}", ['fullname' => 'X'])->assertForbidden()->assertExactJson($forbidden);
+        $this->patchJson("/api/accounts/{$this->manager->id}", ['fullname' => 'X'])->assertForbidden()->assertExactJson($forbidden);
+        $this->patchJson("/api/accounts/{$this->employee->id}", ['fullname' => 'X'])->assertForbidden();
+        $this->deleteJson("/api/accounts/{$this->manager->id}")->assertForbidden()->assertExactJson($forbidden);
 
         $this->assertDatabaseCount('accounts', 2);
+        $this->assertDatabaseHas('accounts', ['id' => $this->manager->id, 'fullname' => $this->manager->fullname]);
     }
 
     public function test_manager_can_list_all_accounts(): void
@@ -207,6 +218,39 @@ class AccountCrudTest extends TestCase
         $this->actingAs($this->manager)
             ->deleteJson('/api/accounts/999')
             ->assertNotFound();
+    }
+
+    public function test_manager_cannot_change_own_role(): void
+    {
+        $this->actingAs($this->manager)
+            ->putJson("/api/accounts/{$this->manager->id}", ['role_id' => $this->employeeRole->id])
+            ->assertUnprocessable()
+            ->assertExactJson(['message' => 'Anda tidak dapat mengubah role akun Anda sendiri.']);
+
+        $this->assertTrue($this->manager->fresh()->isManager());
+    }
+
+    public function test_manager_can_update_own_profile_when_role_is_unchanged(): void
+    {
+        $this->actingAs($this->manager)
+            ->patchJson("/api/accounts/{$this->manager->id}", [
+                'fullname' => 'Manager Baru',
+                'role_id' => $this->manager->role_id,
+            ])
+            ->assertOk()
+            ->assertJsonPath('data.fullname', 'Manager Baru');
+
+        $this->assertTrue($this->manager->fresh()->isManager());
+    }
+
+    public function test_manager_can_change_role_of_another_account(): void
+    {
+        $this->actingAs($this->manager)
+            ->patchJson("/api/accounts/{$this->employee->id}", ['role_id' => $this->manager->role_id])
+            ->assertOk()
+            ->assertJsonPath('data.role.code_role', Role::MANAGER);
+
+        $this->assertTrue($this->employee->fresh()->isManager());
     }
 
     public function test_manager_cannot_delete_own_account(): void
