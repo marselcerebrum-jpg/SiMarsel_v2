@@ -1,7 +1,7 @@
 import '../../../css/pages/performance.css';
 import Alpine from 'alpinejs';
 import { errorMessage, validationErrors } from '../../http';
-import { fetchFilterOptions, fetchSummary } from './api';
+import { fetchSummary } from './api';
 import { PERIOD_PRESETS, defaultFilter, filterFromUrl, presetRange, syncUrl, toQuery, today, validateRange } from './filter';
 import { formatDateTime, formatRange, formatValue, trendBadge } from './format';
 import { comparisonRows } from './table';
@@ -10,10 +10,15 @@ import performanceTrend from './trend';
 const COUNT_DURATION = 900;
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
 
-Alpine.data('performanceSummary', (definitions = []) => ({
+// Backend field names for the date filter, mapped to the form fields.
+const ERROR_FIELDS = { date_from: 'start_date', date_to: 'end_date' };
+
+const toRange = (period) => (period ? { start_date: period.date_from, end_date: period.date_to } : null);
+
+Alpine.data('performanceSummary', (definitions = [], platforms = []) => ({
     definitions,
     presets: PERIOD_PRESETS,
-    platforms: [],
+    platforms,
 
     filter: filterFromUrl(),
     errors: {},
@@ -27,7 +32,6 @@ Alpine.data('performanceSummary', (definitions = []) => ({
     frame: null,
 
     init() {
-        this.loadPlatforms();
         this.load();
     },
 
@@ -36,15 +40,23 @@ Alpine.data('performanceSummary', (definitions = []) => ({
     },
 
     get metrics() {
-        return this.summary?.metrics ?? {};
+        return this.summary?.kpis ?? {};
+    },
+
+    get isEmpty() {
+        return this.summary?.is_empty === true;
+    },
+
+    get emptyMessage() {
+        return this.summary?.message || 'Data tidak tersedia untuk filter yang dipilih.';
     },
 
     get periodLabel() {
-        return formatRange(this.summary?.period);
+        return formatRange(toRange(this.summary?.filter));
     },
 
     get previousPeriodLabel() {
-        return formatRange(this.summary?.previous_period);
+        return formatRange(toRange(this.summary?.previous_period));
     },
 
     get loadedLabel() {
@@ -81,14 +93,16 @@ Alpine.data('performanceSummary', (definitions = []) => ({
     detail(key, fallback) {
         const value = (name) => this.metrics[name]?.value;
 
-        if (key === 'total_revenue' && value('total_revenue') != null) {
-            return `${formatValue(value('total_revenue'), 'currency')} · ${formatValue(value('transactions'), 'number')} transaksi`;
+        if (this.isEmpty || this.isUnavailable(key)) return 'Data tidak tersedia';
+
+        if (key === 'total_revenue') {
+            return `${formatValue(value('total_revenue'), 'currency')} · ${formatValue(value('total_transactions'), 'number')} transaksi`;
         }
-        if (key === 'conversion_rate' && value('unique_buyers') != null && value('registered_users') != null) {
-            return `${formatValue(value('unique_buyers'), 'number')} pembeli / ${formatValue(value('registered_users'), 'number')} downloader`;
+        if (key === 'conversion_rate') {
+            return `${formatValue(value('total_transactions'), 'number')} transaksi / ${formatValue(value('total_downloaders'), 'number')} downloader`;
         }
 
-        return this.isUnavailable(key) ? 'Data tidak tersedia' : fallback;
+        return fallback;
     },
 
     /**
@@ -96,16 +110,6 @@ Alpine.data('performanceSummary', (definitions = []) => ({
      */
     progress(key) {
         return `${Math.min(Math.max(Number(this.display[key]) || 0, 0), 100)}%`;
-    },
-
-    async loadPlatforms() {
-        try {
-            const { data } = await fetchFilterOptions();
-            this.platforms = data.platforms ?? [];
-        } catch {
-            // The filter still works with "Semua platform" when options fail to load.
-            this.platforms = [];
-        }
     },
 
     changePreset() {
@@ -185,7 +189,9 @@ Alpine.data('performanceSummary', (definitions = []) => ({
             if (requestId !== this.requestId) return;
 
             if (error.status === 422 && error.data?.errors) {
-                this.errors = validationErrors(error);
+                this.errors = Object.fromEntries(
+                    Object.entries(validationErrors(error)).map(([field, message]) => [ERROR_FIELDS[field] ?? field, message]),
+                );
             } else {
                 this.loadError = errorMessage(error, 'Gagal memuat ringkasan performa.');
             }

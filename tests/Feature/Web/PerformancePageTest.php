@@ -3,6 +3,7 @@
 namespace Tests\Feature\Web;
 
 use App\Models\Account;
+use App\Models\Platform;
 use App\Models\Role;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -46,7 +47,7 @@ class PerformancePageTest extends TestCase
                 'Total Revenue',
                 'Total Transactions',
                 'Total Downloader',
-                'Unique Buyers',
+                'Unique Users',
                 'AOV',
                 'Repeat Order',
                 'Conversion',
@@ -64,6 +65,17 @@ class PerformancePageTest extends TestCase
             ->assertSee('id="filter-end"', false)
             ->assertSee('id="filter-platform"', false)
             ->assertSee('All Platforms');
+    }
+
+    public function test_platform_filter_lists_platforms_from_database(): void
+    {
+        Platform::factory()->create(['slug' => 'jadiasn', 'name' => 'JadiASN']);
+        Platform::factory()->create(['slug' => 'cerebrum', 'name' => 'Cerebrum']);
+
+        $this->actingAs($this->employee)
+            ->get('/performance')
+            ->assertOk()
+            ->assertSeeInOrder(['cerebrum', 'Cerebrum', 'jadiasn', 'JadiASN']);
     }
 
     public function test_performance_page_has_trend_analysis_controls(): void

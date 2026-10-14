@@ -2,10 +2,6 @@ import { http } from '../../http';
 
 const BASE = '/api/performance';
 
-export function fetchFilterOptions() {
-    return http(`${BASE}/filters`);
-}
-
 export function fetchSummary(params) {
     return http(`${BASE}/summary?${new URLSearchParams(params)}`);
 }

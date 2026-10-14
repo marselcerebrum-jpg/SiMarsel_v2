@@ -79,10 +79,10 @@ export function syncUrl(filter) {
 }
 
 /**
- * Query sent to the summary endpoint. An empty platform means all platforms.
+ * Query sent to the performance endpoints. An empty platform means all platforms.
  */
 export function toQuery(filter) {
-    const query = { start_date: filter.start_date, end_date: filter.end_date };
+    const query = { date_from: filter.start_date, date_to: filter.end_date };
     if (filter.platform) query.platform = filter.platform;
 
     return query;

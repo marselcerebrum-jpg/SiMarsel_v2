@@ -14,20 +14,22 @@
             'grid' => 'md:grid-cols-3',
             'metrics' => [
                 ['key' => 'total_revenue', 'label' => 'Total Revenue', 'format' => 'currency', 'compact' => true, 'hint' => 'Total nilai transaksi berhasil'],
-                ['key' => 'transactions', 'label' => 'Total Transactions', 'format' => 'number', 'hint' => 'Jumlah transaksi berhasil'],
-                ['key' => 'registered_users', 'label' => 'Total Downloader', 'format' => 'number', 'hint' => 'User yang berhasil registrasi'],
+                ['key' => 'total_transactions', 'label' => 'Total Transactions', 'format' => 'number', 'hint' => 'Jumlah transaksi berhasil'],
+                ['key' => 'total_downloaders', 'label' => 'Total Downloader', 'format' => 'number', 'hint' => 'Jumlah downloader aplikasi'],
             ],
         ],
         'secondary' => [
             'grid' => 'sm:grid-cols-2 xl:grid-cols-4',
             'metrics' => [
-                ['key' => 'unique_buyers', 'label' => 'Unique Buyers', 'format' => 'number', 'hint' => 'Email pembeli unik'],
-                ['key' => 'average_order_value', 'label' => 'AOV', 'format' => 'currency', 'hint' => 'Rata-rata nilai per transaksi'],
-                ['key' => 'repeat_order_users', 'label' => 'Repeat Order', 'format' => 'number', 'hint' => 'Email dengan ≥ 2 transaksi'],
-                ['key' => 'conversion_rate', 'label' => 'Conversion', 'format' => 'percent', 'hint' => 'Pembeli dibanding downloader', 'progress' => true],
+                ['key' => 'unique_users', 'label' => 'Unique Users', 'format' => 'number', 'hint' => 'Email pembeli unik'],
+                ['key' => 'average_order_value', 'label' => 'AOV', 'format' => 'currency', 'hint' => 'Total revenue ÷ jumlah transaksi'],
+                ['key' => 'repeat_orders', 'label' => 'Repeat Order', 'format' => 'number', 'hint' => 'Transaksi perpanjangan'],
+                ['key' => 'conversion_rate', 'label' => 'Conversion', 'format' => 'percent', 'hint' => 'Transaksi dibanding downloader', 'progress' => true],
             ],
         ],
     ];
+
+    $platformOptions = $platforms->map(fn ($platform) => ['value' => $platform->slug, 'label' => $platform->name])->values();
 
     $definitions = collect($rows)
         ->flatMap(fn (array $row) => $row['metrics'])
@@ -61,7 +63,7 @@
 @endphp
 
 @section('page')
-    <div x-data="performanceSummary(@js($definitions))" class="min-w-0">
+    <div x-data="performanceSummary(@js($definitions), @js($platformOptions))" class="min-w-0">
         <header class="performance-rise flex flex-col gap-3 text-white sm:flex-row sm:items-center sm:justify-between">
             <div>
                 <h1 class="text-3xl font-extrabold tracking-tight sm:text-4xl">Performance Summary</h1>
@@ -76,10 +78,10 @@
                 <p class="inline-flex h-11 items-center gap-2 rounded-xl border border-white/30 bg-white/15 px-4 text-xs font-semibold backdrop-blur" aria-live="polite">
                     <span class="relative flex size-2" aria-hidden="true">
                         <span x-show="loading" class="absolute inline-flex size-full animate-ping rounded-full bg-white/80"></span>
-                        <span class="relative inline-flex size-2 rounded-full" :class="loading ? 'bg-white' : (summary ? 'bg-emerald-300' : 'bg-white/50')"></span>
+                        <span class="relative inline-flex size-2 rounded-full" :class="loading ? 'bg-white' : (isEmpty ? 'bg-amber-300' : (summary ? 'bg-emerald-300' : 'bg-white/50'))"></span>
                     </span>
                     <span x-show="loading">Memuat data…</span>
-                    <span x-show="!loading" x-cloak x-text="summary ? `${periodLabel} · ${platformLabel}` : platformLabel"></span>
+                    <span x-show="!loading" x-cloak x-text="isEmpty ? emptyMessage : (summary ? `${periodLabel} · ${platformLabel}` : platformLabel)"></span>
                 </p>
                 <button
                     type="button"

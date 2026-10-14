@@ -85,8 +85,8 @@ export function trendBadge(metric) {
         return { tone: 'bg-soft text-label', textTone: 'text-label', text: 'No Comparison', short: '', sentence: 'Tidak ada data pembanding' };
     }
 
-    const hasChange = metric.change_percent !== null && metric.change_percent !== undefined && metric.trend !== 'same';
-    const change = hasChange ? `${decimal.format(Math.abs(metric.change_percent))}%` : '';
+    const hasChange = metric.change_percentage !== null && metric.change_percentage !== undefined && metric.trend !== 'same';
+    const change = hasChange ? `${decimal.format(Math.abs(metric.change_percentage))}%` : '';
 
     return {
         tone: trend.tone,
