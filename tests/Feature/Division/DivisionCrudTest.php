@@ -157,6 +157,7 @@ class DivisionCrudTest extends TestCase
                 'id' => $this->division->id,
                 'code_division' => 'IT',
                 'name' => 'Information Tech',
+                'accounts_count' => 0,
             ])
             ->assertJsonPath('data.1.code_division', 'FIN');
     }
@@ -243,5 +244,17 @@ class DivisionCrudTest extends TestCase
             ->assertExactJson(['message' => 'Data tidak ditemukan.']);
         $this->patchJson('/api/divisions/999', ['name' => 'X'])->assertNotFound();
         $this->deleteJson('/api/divisions/999')->assertNotFound();
+    }
+
+    public function test_division_list_includes_account_count(): void
+    {
+        $this->employee->update(['division_id' => $this->division->id]);
+        Division::create(['code_division' => 'FIN', 'name' => 'Finance']);
+
+        $this->actingAs($this->employee)
+            ->getJson('/api/divisions')
+            ->assertOk()
+            ->assertJsonPath('data.0.accounts_count', 1)
+            ->assertJsonPath('data.1.accounts_count', 0);
     }
 }

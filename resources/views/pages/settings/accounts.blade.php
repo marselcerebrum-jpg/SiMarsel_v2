@@ -2,7 +2,7 @@
 
 @section('title', 'Settings')
 @push('scripts')
-    @vite('resources/js/pages/settings/index.js')
+    @vite('resources/js/pages/settings/accounts.js')
 @endpush
 
 @php

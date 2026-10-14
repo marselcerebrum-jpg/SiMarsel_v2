@@ -3,6 +3,7 @@
 namespace App\View\Components;
 
 use App\Models\Account;
+use App\Models\Division;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\View\Component;
 use Illuminate\View\View;
@@ -26,6 +27,7 @@ class Sidebar extends Component
             ],
             'System' => [
                 $this->link('Account Management', 'gear', 'settings.index', ['viewAny', Account::class]),
+                $this->link('Division Management', 'building', 'divisions.index', ['viewAny', Division::class]),
             ],
         ];
     }
