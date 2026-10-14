@@ -7,6 +7,7 @@ use App\Http\Controllers\Performance\PaymentMethodDistributionController;
 use App\Http\Controllers\Performance\PerformanceSummaryController;
 use App\Http\Controllers\Performance\PerformanceTrendController;
 use App\Http\Controllers\Performance\PlatformContributionController;
+use App\Http\Controllers\Performance\ProductPerformanceController;
 use App\Models\Account;
 use App\Models\Division;
 use Illuminate\Support\Facades\Route;
@@ -61,4 +62,6 @@ Route::middleware('auth')->group(function () {
         ->name('api.performance.payment-methods');
     Route::get('/performance/platform-contribution', PlatformContributionController::class)
         ->name('api.performance.platform-contribution');
+    Route::get('/performance/products', ProductPerformanceController::class)
+        ->name('api.performance.products');
 });
