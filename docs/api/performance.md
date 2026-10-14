@@ -1,4 +1,4 @@
-# API Ringkasan Performa
+# API Performa
 
 Menyediakan total KPI performa untuk periode dan platform yang dipilih, beserta perbandingannya dengan periode sebelumnya. Semua rumus dihitung di backend, sehingga frontend cukup menampilkan nilainya.
 
@@ -101,47 +101,98 @@ Tampilkan `message` sebagai kondisi kosong di halaman.
 | `date_to` sebelum `date_from` | `Tanggal akhir tidak boleh sebelum tanggal mulai.` |
 | Slug platform tidak ada | `Platform tidak ditemukan.` |
 
-## `GET /api/performance/trend` (usulan FE, belum ada di BE)
+## `GET /api/performance/trend`
 
-Data tren untuk bagian **Analisa Tren & Performa**. Memakai filter yang sama dengan `/summary`, ditambah `metric` dan `granularity`. FE memanggil endpoint ini lagi setiap kali filter, metric, atau periode berubah. Perubahan visualisasi (Bar, Line, Area, Pie, Table) hanya menggambar ulang di FE, tanpa request baru.
+Data deret waktu untuk grafik dan tabel Analisa Tren & Performa. Filter-nya sama dengan Ringkasan Performa. Wajib login, dan semua role boleh mengakses.
 
-**Query**
+Backend mengirim data yang sama untuk semua bentuk visualisasi (Bar, Line, Area, Pie, Table). Pilihan bentuk visualisasi diatur di frontend lewat dropdown, tanpa request ulang ke backend.
 
-| Field | Tipe | Aturan |
+### Query parameter
+
+| Parameter | Wajib | Nilai |
 |---|---|---|
-| `date_from`, `date_to`, `platform` | | Sama dengan `/summary` |
-| `metric` | string | Wajib: `revenue`, `transactions`, `downloader`, `conversion`, `new_users`, `repeat_order` |
-| `granularity` | string | Wajib: `daily`, `weekly`, `monthly` |
+| `date_from`, `date_to`, `platform` | Sama seperti `/summary` | |
+| `metric` | Ya | `revenue`, `transactions`, `downloaders`, `conversion`, `new_users`, `repeat_orders` |
+| `period` | Ya | `daily`, `weekly`, `monthly` |
 
-Contoh: `/api/performance/trend?date_from=2026-10-01&date_to=2026-10-09&metric=revenue&granularity=daily`
+Contoh: `GET /api/performance/trend?date_from=2026-09-01&date_to=2026-09-30&platform=app-a&metric=revenue&period=weekly`
 
-**200 OK**
+### Pembagian periode
+
+| Period | Satu titik data | Label | Batas rentang |
+|---|---|---|---|
+| `daily` | 1 tanggal | `01 Sep 2026` | Maksimal 366 hari |
+| `weekly` | Senin - Minggu | `01 - 06 Sep 2026`, `31 Aug - 03 Sep 2026` | Maksimal 366 hari |
+| `monthly` | 1 bulan kalender | `Sep 2026` | Tanpa batas |
+
+- Minggu dan bulan pertama atau terakhir **dipotong mengikuti rentang filter**. Contohnya, filter mulai Selasa 1 Sep menghasilkan minggu pertama 1 - 6 Sep.
+- Periode tanpa data tetap muncul dengan nilai `0`, supaya grafik tidak bolong.
+- Tanggal mengikuti timezone aplikasi `Asia/Jakarta`.
+
+### Rumus per titik data
+
+Rumusnya sama dengan Ringkasan Performa, tapi dihitung terpisah untuk setiap periode.
+
+| `metric` | Label | `unit` | Nilai per periode |
+|---|---|---|---|
+| `revenue` | Revenue | `currency` | Jumlah `nominal` transaksi `Success` |
+| `transactions` | Transactions | `count` | Jumlah transaksi `Success` |
+| `downloaders` | Downloader | `count` | Jumlah `downloaders.total` |
+| `conversion` | Conversion | `percent` | Transaksi `Success` ÷ downloader × 100. `null` jika periode itu tidak punya downloader. |
+| `new_users` | User Baru | `count` | Jumlah transaksi `Success` dengan `product_type` = `Perdana` |
+| `repeat_orders` | Repeat Order | `count` | Jumlah transaksi `Success` dengan `product_type` = `Perpanjangan` |
+
+Untuk `revenue`, `transactions`, `downloaders`, `new_users`, dan `repeat_orders`, jumlah semua titik sama dengan angka di `/summary`. `conversion` adalah persentase, jadi tidak dijumlahkan: nilainya dihitung ulang dari transaksi dan downloader di setiap periode.
+
+### 200 OK
 
 ```json
 {
     "data": {
-        "metric": "revenue",
-        "granularity": "daily",
-        "points": [
-            {
-                "period_start": "2026-10-01", "period_end": "2026-10-01",
-                "value": 12500000, "change_percentage": null, "trend": null
-            },
-            {
-                "period_start": "2026-10-02", "period_end": "2026-10-02",
-                "value": 15000000, "change_percentage": 20.0, "trend": "up"
-            }
+        "filter": { "date_from": "2026-09-01", "date_to": "2026-09-30", "platform": "app-a" },
+        "metric": { "key": "revenue", "label": "Revenue", "unit": "currency" },
+        "period": "weekly",
+        "is_empty": false,
+        "message": null,
+        "labels": ["01 - 06 Sep 2026", "07 - 13 Sep 2026", "14 - 20 Sep 2026", "21 - 27 Sep 2026", "28 - 30 Sep 2026"],
+        "datasets": [
+            { "label": "Revenue", "data": [300000, 300000, 50000, 0, 400000] }
+        ],
+        "rows": [
+            { "label": "01 - 06 Sep 2026", "period_start": "2026-09-01", "period_end": "2026-09-06", "value": 300000, "change_percentage": null, "trend": null },
+            { "label": "07 - 13 Sep 2026", "period_start": "2026-09-07", "period_end": "2026-09-13", "value": 300000, "change_percentage": 0, "trend": "same" },
+            { "label": "14 - 20 Sep 2026", "period_start": "2026-09-14", "period_end": "2026-09-20", "value": 50000, "change_percentage": -83.33, "trend": "down" }
         ]
     }
 }
 ```
 
+| Field | Dipakai untuk |
+|---|---|
+| `labels`, `datasets` | Langsung ke Chart.js: `new Chart(canvas, { type, data: { labels, datasets } })` |
+| `rows` | Isi tabel (termasuk kolom Perubahan), dan tooltip saat hover (label periode, rentang tanggal, nilai) |
+| `metric.unit` | Format angka: `currency` → Rupiah, `percent` → tambah `%`, `count` → angka biasa |
+
+### Field setiap item `rows`
+
 | Field | Keterangan |
 |---|---|
-| `points[].period_start`, `period_end` | Rentang satu titik data (`Y-m-d`). Daily: tanggal yang sama. Weekly: Senin–Minggu, dipotong sesuai `date_from`/`date_to`. Monthly: awal–akhir bulan, dipotong sesuai filter |
-| `points[].value` | Nilai metric pada rentang itu, dengan rumus yang sama dengan `/summary`. `conversion` dalam persen |
-| `points[].change_percentage`, `trend` | Perbandingan nilai dengan titik sebelumnya (`up` / `down` / `same`). `null` untuk titik pertama. Dipakai di kolom Perubahan pada Table |
+| `label` | Label periode, sama dengan `labels` |
+| `period_start`, `period_end` | Rentang tanggal periode itu (`YYYY-MM-DD`) |
+| `value` | Nilai metric di periode itu, sama dengan `datasets[0].data` |
+| `change_percentage` | `(value - value baris sebelumnya) ÷ value baris sebelumnya × 100`, dibulatkan 2 desimal. `null` untuk baris pertama, atau jika nilai baris sebelumnya `0`/`null`. |
+| `trend` | `up`, `down`, atau `same` dibanding baris sebelumnya; nilai `null` dihitung sebagai `0`. `null` untuk baris pertama. |
 
-Urutkan `points` dari periode terlama. Kembalikan titik bernilai `0` untuk periode tanpa data, agar grafik tidak bolong. FE memakai `period_start`/`period_end` untuk label sumbu dan tooltip (nilai + periode saat hover).
+Aturan `change_percentage` dan `trend` sama persis dengan perbandingan periode di `/summary`.
 
-`downloader` adalah total user/downloader yang registrasi, sedangkan `new_users` adalah user yang pertama kali tercatat pada periode itu. Definisi pasti `new_users` perlu disepakati BE.
+Jika rentang tidak punya data sama sekali, respons tetap **200** dengan `is_empty: true` dan `message: "Data tidak tersedia untuk filter yang dipilih."`.
+
+### 422 Validasi gagal
+
+Selain validasi filter di `/summary`:
+
+| Kondisi | Pesan |
+|---|---|
+| `metric` atau `period` kosong | `Metric wajib diisi.` / `Periode wajib diisi.` |
+| Nilai di luar pilihan | `Metric tidak valid.` / `Periode tidak valid.` |
+| Rentang lebih dari 366 hari untuk `daily` atau `weekly` | `Rentang tanggal untuk periode daily maksimal 366 hari.` |

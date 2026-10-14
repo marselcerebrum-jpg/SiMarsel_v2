@@ -3,15 +3,12 @@
 namespace App\Services;
 
 use App\Repositories\PerformanceRepository;
+use App\Services\Concerns\ComparesWithPreviousValue;
 use Carbon\CarbonImmutable;
 
 class PerformanceSummaryService
 {
-    public const TREND_UP = 'up';
-
-    public const TREND_DOWN = 'down';
-
-    public const TREND_SAME = 'same';
+    use ComparesWithPreviousValue;
 
     public function __construct(private PerformanceRepository $performanceRepository) {}
 
@@ -80,20 +77,10 @@ class PerformanceSummaryService
      */
     private function compare(int|float|null $current, int|float|null $previous): array
     {
-        $currentValue = $current ?? 0;
-        $previousValue = $previous ?? 0;
-
         return [
             'value' => $current,
             'previous_value' => $previous,
-            'change_percentage' => $previousValue == 0
-                ? null
-                : round(($currentValue - $previousValue) / $previousValue * 100, 2),
-            'trend' => match ($currentValue <=> $previousValue) {
-                1 => self::TREND_UP,
-                -1 => self::TREND_DOWN,
-                default => self::TREND_SAME,
-            },
+            ...$this->changeFromPrevious($current, $previous),
         ];
     }
 }
