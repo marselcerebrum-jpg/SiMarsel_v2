@@ -117,15 +117,17 @@ class PerformanceTrendService
         return match ($metric) {
             TrendMetric::Revenue => $this->transactionValues('revenue', $empty, $bucketOfDay, $from, $to, $platformId),
             TrendMetric::Transactions => $this->transactionValues('transactions', $empty, $bucketOfDay, $from, $to, $platformId),
+            TrendMetric::NewUsers => $this->transactionValues('new_users', $empty, $bucketOfDay, $from, $to, $platformId),
+            TrendMetric::RepeatOrders => $this->transactionValues('repeat_orders', $empty, $bucketOfDay, $from, $to, $platformId),
             TrendMetric::Downloaders => $this->downloaderValues($empty, $bucketOfDay, $from, $to, $platformId),
             TrendMetric::Conversion => $this->conversionValues($empty, $bucketOfDay, $from, $to, $platformId),
-            TrendMetric::NewUsers => $this->newUserValues($empty, $bucketOfDay, $from, $to, $platformId),
-            TrendMetric::RepeatOrder => $this->repeatOrderValues($empty, $bucketOfDay, $from, $to, $platformId),
         };
     }
 
     /**
-     * @param  'revenue'|'transactions'  $column
+     * Sum one daily transaction column into the buckets.
+     *
+     * @param  'revenue'|'transactions'|'new_users'|'repeat_orders'  $column
      * @param  list<int>  $values
      * @param  array<string, int>  $bucketOfDay
      * @return array{0: list<int|float>, 1: bool}
@@ -135,7 +137,7 @@ class PerformanceTrendService
         $rows = $this->performanceRepository->dailyTransactionTotals($from, $to, $platformId);
 
         foreach ($rows as $row) {
-            $values[$bucketOfDay[$row->day]] += $column === 'revenue' ? (float) $row->revenue : (int) $row->transactions;
+            $values[$bucketOfDay[$row->day]] += $column === 'revenue' ? (float) $row->revenue : (int) $row->{$column};
         }
 
         if ($column === 'revenue') {
@@ -162,7 +164,7 @@ class PerformanceTrendService
     }
 
     /**
-     * Unique customers divided by downloaders in each bucket; null when the bucket has no downloaders.
+     * Successful transactions divided by downloaders in each bucket; null when the bucket has no downloaders.
      *
      * @param  list<int>  $values
      * @param  array<string, int>  $bucketOfDay
@@ -171,61 +173,17 @@ class PerformanceTrendService
     private function conversionValues(array $values, array $bucketOfDay, CarbonImmutable $from, CarbonImmutable $to, ?int $platformId): array
     {
         [$downloaders, $hasDownloaders] = $this->downloaderValues($values, $bucketOfDay, $from, $to, $platformId);
-        $rows = $this->performanceRepository->dailyCustomerTransactions($from, $to, $platformId);
-
-        $customers = array_fill(0, count($values), []);
-        foreach ($rows as $row) {
-            $customers[$bucketOfDay[$row->day]][$row->email] = true;
-        }
+        [$transactions, $hasTransactions] = $this->transactionValues('transactions', $values, $bucketOfDay, $from, $to, $platformId);
 
         $conversion = array_map(
-            fn (int $total, array $emails) => $total > 0 ? round(count($emails) / $total * 100, 2) : null,
+            fn (int $downloaderTotal, int $transactionTotal) => $downloaderTotal > 0
+                ? round($transactionTotal / $downloaderTotal * 100, 2)
+                : null,
             $downloaders,
-            $customers,
+            $transactions,
         );
 
-        return [$conversion, $hasDownloaders || $rows->isNotEmpty()];
-    }
-
-    /**
-     * @param  list<int>  $values
-     * @param  array<string, int>  $bucketOfDay
-     * @return array{0: list<int>, 1: bool}
-     */
-    private function newUserValues(array $values, array $bucketOfDay, CarbonImmutable $from, CarbonImmutable $to, ?int $platformId): array
-    {
-        $rows = $this->performanceRepository->firstPurchaseDays($from, $to, $platformId);
-
-        foreach ($rows as $row) {
-            $values[$bucketOfDay[$row->first_day]]++;
-        }
-
-        return [$values, $rows->isNotEmpty()];
-    }
-
-    /**
-     * Customers with more than one successful transaction inside the same bucket.
-     *
-     * @param  list<int>  $values
-     * @param  array<string, int>  $bucketOfDay
-     * @return array{0: list<int>, 1: bool}
-     */
-    private function repeatOrderValues(array $values, array $bucketOfDay, CarbonImmutable $from, CarbonImmutable $to, ?int $platformId): array
-    {
-        $rows = $this->performanceRepository->dailyCustomerTransactions($from, $to, $platformId);
-
-        $purchases = array_fill(0, count($values), []);
-        foreach ($rows as $row) {
-            $bucket = $bucketOfDay[$row->day];
-            $purchases[$bucket][$row->email] = ($purchases[$bucket][$row->email] ?? 0) + (int) $row->transactions;
-        }
-
-        $repeatCustomers = array_map(
-            fn (array $emails) => count(array_filter($emails, fn (int $count) => $count > 1)),
-            $purchases,
-        );
-
-        return [$repeatCustomers, $rows->isNotEmpty()];
+        return [$conversion, $hasDownloaders || $hasTransactions];
     }
 
     /**
