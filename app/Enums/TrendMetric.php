@@ -9,7 +9,7 @@ enum TrendMetric: string
     case Downloaders = 'downloaders';
     case Conversion = 'conversion';
     case NewUsers = 'new_users';
-    case RepeatOrder = 'repeat_order';
+    case RepeatOrders = 'repeat_orders';
 
     public function label(): string
     {
@@ -19,7 +19,7 @@ enum TrendMetric: string
             self::Downloaders => 'Downloader',
             self::Conversion => 'Conversion',
             self::NewUsers => 'User Baru',
-            self::RepeatOrder => 'Repeat Order',
+            self::RepeatOrders => 'Repeat Order',
         };
     }
 
