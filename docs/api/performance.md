@@ -159,7 +159,9 @@ Untuk `revenue`, `transactions`, `downloaders`, `new_users`, dan `repeat_orders`
             { "label": "Revenue", "data": [300000, 300000, 50000, 0, 400000] }
         ],
         "rows": [
-            { "label": "01 - 06 Sep 2026", "period_start": "2026-09-01", "period_end": "2026-09-06", "value": 300000 }
+            { "label": "01 - 06 Sep 2026", "period_start": "2026-09-01", "period_end": "2026-09-06", "value": 300000, "change_percentage": null, "trend": null },
+            { "label": "07 - 13 Sep 2026", "period_start": "2026-09-07", "period_end": "2026-09-13", "value": 300000, "change_percentage": 0, "trend": "same" },
+            { "label": "14 - 20 Sep 2026", "period_start": "2026-09-14", "period_end": "2026-09-20", "value": 50000, "change_percentage": -83.33, "trend": "down" }
         ]
     }
 }
@@ -168,8 +170,20 @@ Untuk `revenue`, `transactions`, `downloaders`, `new_users`, dan `repeat_orders`
 | Field | Dipakai untuk |
 |---|---|
 | `labels`, `datasets` | Langsung ke Chart.js: `new Chart(canvas, { type, data: { labels, datasets } })` |
-| `rows` | Isi tabel, dan tooltip saat hover (label periode, rentang tanggal, nilai) |
+| `rows` | Isi tabel (termasuk kolom Perubahan), dan tooltip saat hover (label periode, rentang tanggal, nilai) |
 | `metric.unit` | Format angka: `currency` → Rupiah, `percent` → tambah `%`, `count` → angka biasa |
+
+### Field setiap item `rows`
+
+| Field | Keterangan |
+|---|---|
+| `label` | Label periode, sama dengan `labels` |
+| `period_start`, `period_end` | Rentang tanggal periode itu (`YYYY-MM-DD`) |
+| `value` | Nilai metric di periode itu, sama dengan `datasets[0].data` |
+| `change_percentage` | `(value - value baris sebelumnya) ÷ value baris sebelumnya × 100`, dibulatkan 2 desimal. `null` untuk baris pertama, atau jika nilai baris sebelumnya `0`/`null`. |
+| `trend` | `up`, `down`, atau `same` dibanding baris sebelumnya; nilai `null` dihitung sebagai `0`. `null` untuk baris pertama. |
+
+Aturan `change_percentage` dan `trend` sama persis dengan perbandingan periode di `/summary`.
 
 Jika rentang tidak punya data sama sekali, respons tetap **200** dengan `is_empty: true` dan `message: "Data tidak tersedia untuk filter yang dipilih."`.
 
