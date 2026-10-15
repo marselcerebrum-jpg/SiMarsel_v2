@@ -184,7 +184,7 @@ Alpine.data('performanceSummary', (definitions = [], platforms = []) => ({
 
             this.summary = data;
             this.loadedAt = new Date();
-            this.countTo(data.metrics);
+            this.countTo(data.kpis);
         } catch (error) {
             if (requestId !== this.requestId) return;
 

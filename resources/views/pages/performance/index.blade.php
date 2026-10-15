@@ -11,11 +11,12 @@
     // Display metadata only. Every value, comparison and formula comes from the backend.
     $rows = [
         'primary' => [
-            'grid' => 'md:grid-cols-3',
+            'grid' => 'sm:grid-cols-2 xl:grid-cols-4',
             'metrics' => [
                 ['key' => 'total_revenue', 'label' => 'Total Revenue', 'format' => 'currency', 'compact' => true, 'hint' => 'Total nilai transaksi berhasil'],
                 ['key' => 'total_transactions', 'label' => 'Total Transactions', 'format' => 'number', 'hint' => 'Jumlah transaksi berhasil'],
                 ['key' => 'total_downloaders', 'label' => 'Total Downloader', 'format' => 'number', 'hint' => 'Jumlah downloader aplikasi'],
+                ['key' => 'new_users', 'label' => 'User Baru', 'format' => 'number', 'hint' => 'Transaksi perdana'],
             ],
         ],
         'secondary' => [
