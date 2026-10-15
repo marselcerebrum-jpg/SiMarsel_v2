@@ -139,7 +139,8 @@ class PageAccessTest extends TestCase
             ->assertOk()
             ->assertSee('Manajemen Divisi')
             ->assertSeeInOrder(['Total Divisi', 'Anggota Divisi', 'Divisi Kosong'])
-            ->assertSeeInOrder(['Buat Divisi', 'Daftar Divisi'])
+            ->assertSeeInOrder(['Daftar Divisi', 'Buat Divisi'])
+            ->assertSee('id="create-division-title"', false)
             ->assertSee('Hapus Divisi?');
     }
 

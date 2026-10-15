@@ -10,8 +10,6 @@ Alpine.data('divisionManagement', (canManage = false) => ({
     canManage,
     divisions: [],
 
-    tab: canManage ? 'create' : 'list',
-
     draft: emptyForm(),
     draftErrors: {},
     draftError: '',
@@ -71,6 +69,11 @@ Alpine.data('divisionManagement', (canManage = false) => ({
         this.draftError = '';
     },
 
+    openCreate() {
+        this.resetDraft();
+        this.modal = 'create';
+    },
+
     openEdit(division) {
         this.form = { code_division: division.code_division, name: division.name };
         this.editingId = division.id;
@@ -86,7 +89,7 @@ Alpine.data('divisionManagement', (canManage = false) => ({
     },
 
     closeModal() {
-        if (this.saving) return;
+        if (this.saving || this.creating) return;
 
         this.modal = null;
         this.editingId = null;
@@ -128,6 +131,7 @@ Alpine.data('divisionManagement', (canManage = false) => ({
 
             this.divisions.push(data);
             this.resetDraft();
+            this.modal = null;
             showToast({ title: 'Divisi berhasil dibuat', text: `${data.name} sudah ditambahkan.` });
         } catch (error) {
             if (error.status === 422 && error.data?.errors) {
