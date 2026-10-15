@@ -18,5 +18,16 @@ class DatabaseSeeder extends Seeder
             RoleSeeder::class,
             AccountSeeder::class,
         ]);
+
+        // Demo performance data for local development only, so tests keep a clean database.
+        if (app()->isLocal()) {
+            fake()->seed(2026);
+
+            $this->call([
+                PlatformSeeder::class,
+                DownloaderSeeder::class,
+                TransactionSeeder::class,
+            ]);
+        }
     }
 }
