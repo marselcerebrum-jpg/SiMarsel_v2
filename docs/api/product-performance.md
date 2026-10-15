@@ -4,6 +4,42 @@ Performa setiap produk berdasarkan filter Source App/Platform, Tahun, dan Bulan,
 
 Wajib login. Semua role (Manager dan Employee) boleh mengakses. Aturan header dan kode error umum ada di [authentication.md](authentication.md).
 
+## `GET /api/performance/products/filters`
+
+Pilihan untuk dropdown filter Source App, Tahun, dan Bulan. Panggil sekali saat halaman dibuka, lalu panggil lagi dengan `platform` saat Source App diganti supaya pilihan tahun dan bulan ikut menyesuaikan.
+
+| Parameter | Wajib | Format | Keterangan |
+|---|---|---|---|
+| `platform` | Tidak | slug platform | Batasi `years` dan `months` ke platform ini |
+
+| Field | Isi |
+|---|---|
+| `platforms` | Semua platform di master `platforms`, urut nama A-Z. Selalu lengkap walaupun `platform` diisi |
+| `years` | Tahun yang punya transaksi `Success`, dari yang terbaru |
+| `months` | Bulan (`1`-`12`) yang punya transaksi `Success`, dikelompokkan per tahun |
+| `default` | Tahun dan bulan terakhir yang punya data, untuk nilai awal filter. `null` jika belum ada transaksi |
+
+### 200 OK
+
+```json
+{
+    "data": {
+        "platform": null,
+        "platforms": [
+            { "slug": "app-a", "name": "App A" },
+            { "slug": "app-b", "name": "App B" }
+        ],
+        "years": [2026, 2025],
+        "months": { "2026": [2, 9, 10], "2025": [12] },
+        "default": { "year": 2026, "month": 10 }
+    }
+}
+```
+
+Jika belum ada transaksi, `years` bernilai `[]`, `months` bernilai `{}`, dan `default` berisi `null`.
+
+**422** jika slug platform tidak ada: `Platform tidak ditemukan.`
+
 ## `GET /api/performance/products`
 
 ### Query parameter
