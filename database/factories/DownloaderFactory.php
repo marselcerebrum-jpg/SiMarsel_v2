@@ -7,6 +7,8 @@ use App\Models\Platform;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
+ * Daily app downloads per platform.
+ *
  * @extends Factory<Downloader>
  */
 class DownloaderFactory extends Factory
@@ -20,8 +22,8 @@ class DownloaderFactory extends Factory
     {
         return [
             'platform_id' => Platform::factory(),
-            'date' => fake()->date(),
-            'total' => fake()->numberBetween(0, 500),
+            'date' => fake()->dateTimeBetween('-6 months')->format('Y-m-d'),
+            'total' => fake()->numberBetween(40, 400),
         ];
     }
 }
