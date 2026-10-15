@@ -3,6 +3,7 @@
 use App\Http\Controllers\Account\AccountController;
 use App\Http\Controllers\Auth\AuthController;
 use App\Http\Controllers\Division\DivisionController;
+use App\Http\Controllers\Performance\PaymentMethodDistributionController;
 use App\Http\Controllers\Performance\PerformanceSummaryController;
 use App\Http\Controllers\Performance\PerformanceTrendController;
 use App\Http\Controllers\Performance\PlatformContributionController;
@@ -56,6 +57,8 @@ Route::middleware('auth')->group(function () {
         ->name('api.performance.summary');
     Route::get('/performance/trend', PerformanceTrendController::class)
         ->name('api.performance.trend');
+    Route::get('/performance/payment-methods', PaymentMethodDistributionController::class)
+        ->name('api.performance.payment-methods');
     Route::get('/performance/platform-contribution', PlatformContributionController::class)
         ->name('api.performance.platform-contribution');
 });
