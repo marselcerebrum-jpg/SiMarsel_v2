@@ -8,6 +8,7 @@ use App\Http\Controllers\Performance\PerformanceSummaryController;
 use App\Http\Controllers\Performance\PerformanceTrendController;
 use App\Http\Controllers\Performance\PlatformContributionController;
 use App\Http\Controllers\Performance\ProductPerformanceController;
+use App\Http\Controllers\Performance\ProductPerformanceFilterController;
 use App\Models\Account;
 use App\Models\Division;
 use Illuminate\Support\Facades\Route;
@@ -64,4 +65,6 @@ Route::middleware('auth')->group(function () {
         ->name('api.performance.platform-contribution');
     Route::get('/performance/products', ProductPerformanceController::class)
         ->name('api.performance.products');
+    Route::get('/performance/products/filters', ProductPerformanceFilterController::class)
+        ->name('api.performance.products.filters');
 });
