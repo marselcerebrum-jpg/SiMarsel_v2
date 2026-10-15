@@ -9,3 +9,7 @@ export function fetchSummary(params) {
 export function fetchTrend(params) {
     return http(`${BASE}/trend?${new URLSearchParams(params)}`);
 }
+
+export function fetchPlatformContribution(params) {
+    return http(`${BASE}/platform-contribution?${new URLSearchParams(params)}`);
+}

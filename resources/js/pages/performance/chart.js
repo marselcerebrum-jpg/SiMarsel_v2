@@ -13,6 +13,10 @@ const BRAND = {
 
 const PIE_COLORS = ['#5d60a2', '#5da29f', '#5d83a2', '#3d4760', '#9a9cd0', '#94c9c6', '#97b4cc', '#7a849e'];
 
+export function pieColor(index) {
+    return PIE_COLORS[index % PIE_COLORS.length];
+}
+
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
 
 Chart.defaults.font.family = "'Instrument Sans', ui-sans-serif, system-ui, sans-serif";
@@ -38,7 +42,7 @@ function dataset(type, metric, values) {
     if (type === 'pie') {
         return {
             ...base,
-            backgroundColor: values.map((_, index) => PIE_COLORS[index % PIE_COLORS.length]),
+            backgroundColor: values.map((_, index) => pieColor(index)),
             borderColor: BRAND.surface,
             borderWidth: 2,
             hoverOffset: 10,
@@ -130,6 +134,59 @@ export function chartConfig({ type, rows, metric }) {
                         ticks: { maxTicksLimit: 8, padding: 8, callback: (value) => formatAxis(value, metric.format) },
                     },
                 },
+        },
+    };
+}
+
+/**
+ * Pie chart of revenue per platform. The tooltip shows the platform name with its
+ * revenue, transactions, users, and contribution, all taken from the backend.
+ */
+export function contributionChartConfig(platforms) {
+    return {
+        type: 'pie',
+        data: {
+            labels: platforms.map(({ name }) => name),
+            datasets: [{
+                label: 'Revenue',
+                data: platforms.map(({ revenue }) => revenue),
+                backgroundColor: platforms.map((_, index) => pieColor(index)),
+                borderColor: BRAND.surface,
+                borderWidth: 2,
+                hoverOffset: 12,
+            }],
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            animation: reducedMotion.matches ? false : { duration: 700, easing: 'easeOutQuart' },
+            layout: { padding: 8 },
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    backgroundColor: '#1f2639',
+                    padding: 12,
+                    cornerRadius: 12,
+                    titleColor: '#ffffff',
+                    titleFont: { weight: '600' },
+                    bodyColor: '#e2e8f0',
+                    usePointStyle: true,
+                    boxPadding: 4,
+                    callbacks: {
+                        title: (items) => platforms[items[0].dataIndex].name,
+                        label: (item) => {
+                            const platform = platforms[item.dataIndex];
+
+                            return [
+                                ` Revenue: ${formatValue(platform.revenue, 'currency')}`,
+                                ` Transactions: ${formatValue(platform.transactions, 'number')}`,
+                                ` Users: ${formatValue(platform.users, 'number')}`,
+                                ` Contribution: ${formatValue(platform.contribution_percentage, 'percent')}`,
+                            ];
+                        },
+                    },
+                },
+            },
         },
     };
 }

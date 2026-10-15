@@ -5,6 +5,7 @@ import { fetchSummary } from './api';
 import { PERIOD_PRESETS, defaultFilter, filterFromUrl, presetRange, syncUrl, toQuery, today, validateRange } from './filter';
 import { formatDateTime, formatRange, formatValue, trendBadge } from './format';
 import { comparisonRows } from './table';
+import performanceContribution from './contribution';
 import performanceTrend from './trend';
 
 const COUNT_DURATION = 900;
@@ -202,3 +203,4 @@ Alpine.data('performanceSummary', (definitions = [], platforms = []) => ({
 }));
 
 Alpine.data('performanceTrend', performanceTrend);
+Alpine.data('performanceContribution', performanceContribution);

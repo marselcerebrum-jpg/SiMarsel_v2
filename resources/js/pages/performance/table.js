@@ -1,3 +1,4 @@
+import { pieColor } from './chart';
 import { formatValue, trendBadge } from './format';
 
 /**
@@ -28,4 +29,29 @@ export function trendRows(rows, format) {
         value: formatValue(row.value, format),
         trend: trendBadge(row),
     }));
+}
+
+/**
+ * Rows for the platform contribution table, in the backend order (largest revenue first).
+ * The color matches the platform's slice in the pie chart.
+ */
+export function contributionRows(platforms) {
+    return platforms.map((platform, index) => ({
+        key: platform.slug,
+        name: platform.name,
+        color: pieColor(index),
+        revenue: formatValue(platform.revenue, 'currency'),
+        transactions: formatValue(platform.transactions, 'number'),
+        users: formatValue(platform.users, 'number'),
+        share: Math.min(Math.max(Number(platform.contribution_percentage) || 0, 0), 100),
+        contribution: formatValue(platform.contribution_percentage, 'percent'),
+    }));
+}
+
+export function contributionTotals(totals) {
+    return {
+        revenue: formatValue(totals?.revenue, 'currency'),
+        transactions: formatValue(totals?.transactions, 'number'),
+        users: formatValue(totals?.users, 'number'),
+    };
 }

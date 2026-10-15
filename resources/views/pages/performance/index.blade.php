@@ -117,7 +117,11 @@
             @include('pages.performance.components.performance-trend')
         </section>
 
-        <section class="{{ $card }} performance-rise mt-4 p-5 sm:p-6" style="--delay: {{ $delay + 60 }}ms" aria-labelledby="performance-comparison-title">
+        <section class="{{ $card }} performance-rise relative mt-4 overflow-hidden p-5 sm:p-7" style="--delay: {{ $delay + 60 }}ms" aria-labelledby="performance-contribution-title">
+            @include('pages.performance.components.performance-contribution')
+        </section>
+
+        <section class="{{ $card }} performance-rise mt-4 p-5 sm:p-6" style="--delay: {{ $delay + 120 }}ms" aria-labelledby="performance-comparison-title">
             @include('pages.performance.components.performance-table')
         </section>
     </div>

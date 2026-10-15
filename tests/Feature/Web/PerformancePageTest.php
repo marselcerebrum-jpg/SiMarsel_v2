@@ -97,6 +97,19 @@ class PerformancePageTest extends TestCase
             ->assertSeeInOrder(['>Daily<', '>Weekly<', '>Monthly<'], false);
     }
 
+    public function test_performance_page_has_platform_contribution_section(): void
+    {
+        $this->actingAs($this->employee)
+            ->get('/performance')
+            ->assertOk()
+            ->assertSee('Platform Contribution')
+            ->assertSee('x-data="performanceContribution"', false)
+            ->assertSee('@performance-filter.window="loadContribution($event.detail)"', false)
+            ->assertSee('x-ref="contributionCanvas"', false)
+            ->assertSeeInOrder(['>Platform</th>', '>Revenue</th>', '>Transactions</th>', '>Users</th>', '>Contribution</th>'], false)
+            ->assertSeeInOrder(['Trend &amp; Performance Analysis', 'Platform Contribution', 'Period Comparison'], false);
+    }
+
     public function test_sidebar_links_performance_page_and_marks_it_active(): void
     {
         $this->actingAs($this->employee)
