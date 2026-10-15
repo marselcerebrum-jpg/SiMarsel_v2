@@ -4,10 +4,6 @@ const decimal = new Intl.NumberFormat('id-ID', { minimumFractionDigits: 1, maxim
 const compactCurrency = new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', notation: 'compact', maximumFractionDigits: 2 });
 const compactNumber = new Intl.NumberFormat('id-ID', { notation: 'compact', maximumFractionDigits: 1 });
 const longDate = new Intl.DateTimeFormat('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
-const shortDate = new Intl.DateTimeFormat('id-ID', { day: 'numeric', month: 'short' });
-const shortMonth = new Intl.DateTimeFormat('id-ID', { month: 'short', year: 'numeric' });
-const longMonth = new Intl.DateTimeFormat('id-ID', { month: 'long', year: 'numeric' });
-const weekday = new Intl.DateTimeFormat('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
 
 export function formatValue(value, format, { compact = false } = {}) {
     if (value === null || value === undefined) return '—';
@@ -36,22 +32,6 @@ export function formatAxis(value, format) {
     if (format === 'percent') return `${number.format(value)}%`;
 
     return compactNumber.format(value);
-}
-
-/**
- * Label of one trend bucket. Short for axes, long for tooltips and the table.
- */
-export function formatPeriod({ period_start: start, period_end: end }, granularity, { long = false } = {}) {
-    if (!start) return '';
-
-    if (granularity === 'monthly') return (long ? longMonth : shortMonth).format(toDate(start));
-    if (granularity === 'weekly') {
-        return long
-            ? formatRange({ start_date: start, end_date: end ?? start })
-            : `${shortDate.format(toDate(start))} – ${shortDate.format(toDate(end ?? start))}`;
-    }
-
-    return long ? weekday.format(toDate(start)) : shortDate.format(toDate(start));
 }
 
 export function formatRange(range) {

@@ -40,9 +40,9 @@
                             type="button"
                             role="radio"
                             class="{{ $pill }}"
-                            :class="granularity === @js($option['value']) ? {{ $pillActive }} : {{ $pillIdle }}"
-                            :aria-checked="(granularity === @js($option['value'])).toString()"
-                            @click="setGranularity(@js($option['value']))"
+                            :class="period === @js($option['value']) ? {{ $pillActive }} : {{ $pillIdle }}"
+                            :aria-checked="(period === @js($option['value'])).toString()"
+                            @click="setPeriod(@js($option['value']))"
                         >{{ $option['label'] }}</button>
                     @endforeach
                 </div>
@@ -83,7 +83,7 @@
             <div x-show="!trendLoading && !hasPoints" x-cloak class="absolute inset-0 grid place-items-center text-center">
                 <div class="flex flex-col items-center gap-2 text-label">
                     <x-icon name="chart" class="size-8" />
-                    <p class="text-sm">Grafik akan tampil setelah data tersedia.</p>
+                    <p class="text-sm" x-text="trendPlaceholder">Grafik akan tampil setelah data tersedia.</p>
                 </div>
             </div>
         </div>

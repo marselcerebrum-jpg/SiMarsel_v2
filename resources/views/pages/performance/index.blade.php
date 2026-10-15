@@ -40,10 +40,10 @@
         'metrics' => [
             ['value' => 'revenue', 'label' => 'Revenue', 'format' => 'currency'],
             ['value' => 'transactions', 'label' => 'Transactions', 'format' => 'number'],
-            ['value' => 'downloader', 'label' => 'Downloader', 'format' => 'number'],
+            ['value' => 'downloaders', 'label' => 'Downloader', 'format' => 'number'],
             ['value' => 'conversion', 'label' => 'Conversion', 'format' => 'percent'],
-            ['value' => 'new_users', 'label' => 'New Users', 'format' => 'number'],
-            ['value' => 'repeat_order', 'label' => 'Repeat Order', 'format' => 'number'],
+            ['value' => 'new_users', 'label' => 'User Baru', 'format' => 'number'],
+            ['value' => 'repeat_orders', 'label' => 'Repeat Order', 'format' => 'number'],
         ],
         'charts' => [
             ['value' => 'bar', 'label' => 'Bar'],

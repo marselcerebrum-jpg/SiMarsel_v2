@@ -2,11 +2,10 @@ import Alpine from 'alpinejs';
 import { errorMessage } from '../../http';
 import { fetchTrend } from './api';
 import { chartConfig, renderChart } from './chart';
-import { formatPeriod } from './format';
 import { trendRows } from './table';
 
 /**
- * Trend & performance analysis. Reloads whenever the Performance Summary filter
+ * Trend & performance analysis (GET /api/performance/trend). Reloads whenever the Performance Summary filter
  * dispatches `performance-filter`, or when the metric or period changes.
  */
 export default (metrics = []) => {
@@ -17,10 +16,12 @@ export default (metrics = []) => {
         trendMetrics: metrics,
         metric: metrics[0]?.value ?? 'revenue',
         chartType: 'bar',
-        granularity: 'daily',
+        period: 'daily',
 
         trendQuery: null,
-        points: [],
+        rows: [],
+        trendEmpty: false,
+        trendMessage: '',
         trendLoading: true,
         trendError: '',
         trendRequestId: 0,
@@ -30,19 +31,23 @@ export default (metrics = []) => {
         },
 
         get hasPoints() {
-            return this.points.length > 0;
+            return this.rows.length > 0 && !this.trendEmpty;
+        },
+
+        get trendPlaceholder() {
+            return this.trendError || this.trendMessage || 'Grafik akan tampil setelah data tersedia.';
         },
 
         get trendTableRows() {
-            return trendRows(this.points, this.metricMeta.format, this.granularity);
+            return this.hasPoints ? trendRows(this.rows, this.metricMeta.format) : [];
         },
 
         get chartLabel() {
-            const first = this.points[0];
-            const last = this.points[this.points.length - 1];
-            if (!first) return `Grafik ${this.metricMeta.label}`;
+            const first = this.rows[0];
+            const last = this.rows[this.rows.length - 1];
+            if (!this.hasPoints) return `Grafik ${this.metricMeta.label}`;
 
-            return `Grafik ${this.metricMeta.label} dari ${formatPeriod(first, this.granularity, { long: true })} sampai ${formatPeriod(last, this.granularity, { long: true })}`;
+            return `Grafik ${this.metricMeta.label} dari ${first.label} sampai ${last.label}`;
         },
 
         setMetric(value) {
@@ -52,10 +57,10 @@ export default (metrics = []) => {
             this.fetchTrend();
         },
 
-        setGranularity(value) {
-            if (this.granularity === value) return;
+        setPeriod(value) {
+            if (this.period === value) return;
 
-            this.granularity = value;
+            this.period = value;
             this.fetchTrend();
         },
 
@@ -72,14 +77,18 @@ export default (metrics = []) => {
             this.trendError = '';
 
             try {
-                const { data } = await fetchTrend({ ...this.trendQuery, metric: this.metric, granularity: this.granularity });
+                const { data } = await fetchTrend({ ...this.trendQuery, metric: this.metric, period: this.period });
                 if (requestId !== this.trendRequestId) return;
 
-                this.points = data.points ?? [];
+                this.rows = data.rows ?? [];
+                this.trendEmpty = data.is_empty === true;
+                this.trendMessage = data.message ?? '';
             } catch (error) {
                 if (requestId !== this.trendRequestId) return;
 
-                this.points = [];
+                this.rows = [];
+                this.trendEmpty = false;
+                this.trendMessage = '';
                 this.trendError = errorMessage(error, 'Gagal memuat data tren.');
             } finally {
                 if (requestId === this.trendRequestId) {
@@ -100,9 +109,8 @@ export default (metrics = []) => {
             this.$nextTick(() => {
                 chart = renderChart(this.$refs.canvas, chartConfig({
                     type: this.chartType,
-                    points: Alpine.raw(this.points),
+                    rows: Alpine.raw(this.rows),
                     metric: this.metricMeta,
-                    granularity: this.granularity,
                 }), chart);
             });
         },

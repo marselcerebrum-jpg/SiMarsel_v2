@@ -1,5 +1,5 @@
 import Chart from 'chart.js/auto';
-import { formatAxis, formatPeriod, formatValue } from './format';
+import { formatAxis, formatValue } from './format';
 
 const BRAND = {
     indigo: '#5d60a2',
@@ -74,16 +74,18 @@ function dataset(type, metric, values) {
 }
 
 /**
- * Chart.js config for one metric over time. "area" is a filled line chart.
+ * Chart.js config for one metric over time, built from the backend `rows`.
+ * "area" is a filled line chart. A null value (conversion without downloaders)
+ * leaves a gap in the chart and shows as "—" in the tooltip.
  */
-export function chartConfig({ type, points, metric, granularity }) {
+export function chartConfig({ type, rows, metric }) {
     const isPie = type === 'pie';
-    const values = points.map((point) => point.value);
+    const values = rows.map((row) => row.value);
 
     return {
         type: type === 'area' ? 'line' : type,
         data: {
-            labels: points.map((point) => formatPeriod(point, granularity)),
+            labels: rows.map((row) => row.label),
             datasets: [dataset(type, metric, values)],
         },
         options: {
@@ -94,7 +96,7 @@ export function chartConfig({ type, points, metric, granularity }) {
             layout: { padding: { top: 8 } },
             plugins: {
                 legend: {
-                    display: isPie && points.length <= 12,
+                    display: isPie && rows.length <= 12,
                     position: 'bottom',
                     labels: { usePointStyle: true, pointStyle: 'circle', boxWidth: 8, padding: 16, color: BRAND.ink },
                 },
@@ -108,8 +110,8 @@ export function chartConfig({ type, points, metric, granularity }) {
                     displayColors: isPie,
                     usePointStyle: true,
                     callbacks: {
-                        title: (items) => formatPeriod(points[items[0].dataIndex], granularity, { long: true }),
-                        label: (item) => ` ${metric.label}: ${formatValue(item.raw, metric.format)}`,
+                        title: (items) => rows[items[0].dataIndex].label,
+                        label: (item) => ` ${metric.label}: ${formatValue(rows[item.dataIndex].value, metric.format)}`,
                     },
                 },
             },

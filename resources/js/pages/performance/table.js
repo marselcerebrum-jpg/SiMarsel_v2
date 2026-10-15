@@ -1,4 +1,4 @@
-import { formatPeriod, formatValue, trendBadge } from './format';
+import { formatValue, trendBadge } from './format';
 
 /**
  * Rows for the period comparison table, in the same order as the KPI cards.
@@ -18,13 +18,14 @@ export function comparisonRows(definitions, metrics) {
 }
 
 /**
- * Rows for the trend table: one row per period bucket returned by the backend.
+ * Rows for the trend table, one per backend row. The change column uses the
+ * backend's change_percentage and trend (null for the first row).
  */
-export function trendRows(points, format, granularity) {
-    return points.map((point) => ({
-        key: point.period_start,
-        period: formatPeriod(point, granularity, { long: true }),
-        value: formatValue(point.value, format),
-        trend: trendBadge(point),
+export function trendRows(rows, format) {
+    return rows.map((row) => ({
+        key: row.period_start,
+        period: row.label,
+        value: formatValue(row.value, format),
+        trend: trendBadge(row),
     }));
 }

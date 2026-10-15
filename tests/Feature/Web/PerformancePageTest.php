@@ -89,7 +89,9 @@ class PerformancePageTest extends TestCase
             ->assertSee('aria-label="Metric"', false)
             ->assertSee('aria-label="Data Period"', false)
             ->assertSee('id="trend-chart"', false)
-            ->assertSeeInOrder(['Revenue', 'Transactions', 'Downloader', 'Conversion', 'New Users', 'Repeat Order'])
+            ->assertSeeInOrder(['Revenue', 'Transactions', 'Downloader', 'Conversion', 'User Baru', 'Repeat Order'])
+            ->assertSeeInOrder(["setMetric('revenue')", "setMetric('transactions')", "setMetric('downloaders')", "setMetric('conversion')", "setMetric('new_users')", "setMetric('repeat_orders')"], false)
+            ->assertSeeInOrder(["setPeriod('daily')", "setPeriod('weekly')", "setPeriod('monthly')"], false)
             ->assertSeeInOrder(['>Bar<', '>Line<', '>Area<', '>Pie<', '>Table<'], false)
             ->assertSeeInOrder(['>Daily<', '>Weekly<', '>Monthly<'], false);
     }
