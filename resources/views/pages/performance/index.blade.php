@@ -16,7 +16,7 @@
                 ['key' => 'total_revenue', 'label' => 'Total Revenue', 'format' => 'currency', 'compact' => true, 'hint' => 'Total nilai transaksi berhasil'],
                 ['key' => 'total_transactions', 'label' => 'Total Transactions', 'format' => 'number', 'hint' => 'Jumlah transaksi berhasil'],
                 ['key' => 'total_downloaders', 'label' => 'Total Downloader', 'format' => 'number', 'hint' => 'Jumlah downloader aplikasi'],
-                ['key' => 'new_users', 'label' => 'User Baru', 'format' => 'number', 'hint' => 'Transaksi perdana'],
+                ['key' => 'new_users', 'label' => 'New Users', 'format' => 'number', 'hint' => 'Transaksi perdana'],
             ],
         ],
         'secondary' => [

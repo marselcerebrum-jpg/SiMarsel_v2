@@ -47,7 +47,7 @@ class PerformancePageTest extends TestCase
                 'Total Revenue',
                 'Total Transactions',
                 'Total Downloader',
-                'User Baru',
+                'New Users',
                 'Unique Users',
                 'AOV',
                 'Repeat Order',
