@@ -41,4 +41,31 @@ class ProductPerformanceRepository
             ->groupBy('product')
             ->get();
     }
+
+    /**
+     * Every platform in the master table, ordered by name.
+     *
+     * @return Collection<int, object{slug: string, name: string}>
+     */
+    public function platforms(): Collection
+    {
+        return Platform::orderBy('name')->toBase()->get(['slug', 'name']);
+    }
+
+    /**
+     * Distinct dates that have successful transactions, optionally for one platform.
+     *
+     * @return Collection<int, CarbonInterface>
+     */
+    public function successfulTransactionDates(?string $platformSlug): Collection
+    {
+        return Transaction::query()
+            ->successful()
+            ->when($platformSlug, fn (Builder $query) => $query->whereIn(
+                'platform_id',
+                Platform::select('id')->where('slug', $platformSlug),
+            ))
+            ->distinct()
+            ->pluck('paid_date');
+    }
 }

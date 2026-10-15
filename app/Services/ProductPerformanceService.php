@@ -4,6 +4,8 @@ namespace App\Services;
 
 use App\Repositories\ProductPerformanceRepository;
 use Carbon\CarbonImmutable;
+use Carbon\CarbonInterface;
+use Illuminate\Support\Collection;
 
 class ProductPerformanceService
 {
@@ -65,6 +67,39 @@ class ProductPerformanceService
             'labels' => $products->pluck('name')->all(),
             'datasets' => [
                 ['label' => 'Revenue', 'data' => $products->pluck('revenue')->all()],
+            ],
+        ];
+    }
+
+    /**
+     * Options for the platform, year, and month filters, limited to periods that have successful transactions.
+     *
+     * @return array<string, mixed>
+     */
+    public function filterOptions(?string $platformSlug): array
+    {
+        $periods = $this->productPerformanceRepository
+            ->successfulTransactionDates($platformSlug)
+            ->map(fn (CarbonInterface $date) => ['year' => $date->year, 'month' => $date->month])
+            ->unique(fn (array $period) => $period['year'].'-'.$period['month']);
+
+        $months = $periods
+            ->groupBy('year')
+            ->sortKeysDesc()
+            ->map(fn (Collection $periods) => $periods->pluck('month')->sort()->values()->all());
+
+        $latestYear = $months->keys()->first();
+
+        return [
+            'platform' => $platformSlug,
+            'platforms' => $this->productPerformanceRepository->platforms()
+                ->map(fn (object $platform) => ['slug' => $platform->slug, 'name' => $platform->name])
+                ->all(),
+            'years' => $months->keys()->all(),
+            'months' => (object) $months->all(),
+            'default' => [
+                'year' => $latestYear,
+                'month' => $latestYear ? last($months[$latestYear]) : null,
             ],
         ];
     }
