@@ -3,6 +3,7 @@
 use App\Http\Controllers\Account\AccountController;
 use App\Http\Controllers\Auth\AuthController;
 use App\Http\Controllers\Division\DivisionController;
+use App\Http\Controllers\Performance\PackageDetailController;
 use App\Http\Controllers\Performance\PaymentMethodDistributionController;
 use App\Http\Controllers\Performance\PerformanceSummaryController;
 use App\Http\Controllers\Performance\PerformanceTrendController;
@@ -67,4 +68,8 @@ Route::middleware('auth')->group(function () {
         ->name('api.performance.products');
     Route::get('/performance/products/filters', ProductPerformanceFilterController::class)
         ->name('api.performance.products.filters');
+    Route::get('/performance/packages', [PackageDetailController::class, 'index'])
+        ->name('api.performance.packages.index');
+    Route::get('/performance/packages/export', [PackageDetailController::class, 'export'])
+        ->name('api.performance.packages.export');
 });
