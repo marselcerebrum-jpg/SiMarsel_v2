@@ -70,9 +70,9 @@ class PlatformContributionTest extends TestCase
     {
         $this->actingAs($this->manager);
 
-        $this->getJson(self::URL)
+        $this->getJson(self::URL.'?date_from=2026-09-01')
             ->assertUnprocessable()
-            ->assertJsonValidationErrors(['date_from', 'date_to']);
+            ->assertJsonValidationErrors(['date_to' => 'Tanggal akhir wajib diisi.']);
 
         $this->getJson(self::URL.'?date_from=2026-09-01&date_to=2026-09-30&platform=unknown')
             ->assertJsonValidationErrors(['platform' => 'Platform tidak ditemukan.']);
@@ -85,15 +85,18 @@ class PlatformContributionTest extends TestCase
         $this->actingAs($this->manager)
             ->getJson(self::URL.'?date_from=2026-09-01&date_to=2026-09-30')
             ->assertOk()
-            ->assertJsonPath('data.filter', ['date_from' => '2026-09-01', 'date_to' => '2026-09-30', 'platform' => null])
+            ->assertJsonPath('data.filter.mode', 'date_range')
+            ->assertJsonPath('data.filter.date_from', '2026-09-01')
+            ->assertJsonPath('data.filter.date_to', '2026-09-30')
+            ->assertJsonPath('data.filter.platforms', [])
             ->assertJsonPath('data.is_empty', false)
             ->assertJsonPath('data.message', null)
             ->assertJsonPath('data.platforms', [
-                ['slug' => 'app-a', 'name' => 'App A', 'revenue' => 1000000, 'transactions' => 4, 'users' => 2, 'contribution_percentage' => 86.96],
-                ['slug' => 'app-b', 'name' => 'App B', 'revenue' => 150000, 'transactions' => 2, 'users' => 2, 'contribution_percentage' => 13.04],
-                ['slug' => 'app-c', 'name' => 'App C', 'revenue' => 0, 'transactions' => 0, 'users' => 0, 'contribution_percentage' => 0],
+                ['rank' => 1, 'slug' => 'app-a', 'name' => 'App A', 'revenue' => 1000000, 'transactions' => 4, 'users' => 2, 'contribution_percentage' => 87],
+                ['rank' => 2, 'slug' => 'app-b', 'name' => 'App B', 'revenue' => 150000, 'transactions' => 2, 'users' => 2, 'contribution_percentage' => 13],
+                ['rank' => 3, 'slug' => 'app-c', 'name' => 'App C', 'revenue' => 0, 'transactions' => 0, 'users' => 0, 'contribution_percentage' => 0],
             ])
-            ->assertJsonPath('data.totals', ['revenue' => 1150000, 'transactions' => 6, 'users' => 4])
+            ->assertJsonPath('data.totals', ['revenue' => 1150000, 'transactions' => 6, 'users' => 4, 'platforms' => 3])
             ->assertJsonPath('data.labels', ['App A', 'App B', 'App C'])
             ->assertJsonPath('data.datasets', [['label' => 'Revenue', 'data' => [1000000, 150000, 0]]]);
     }
@@ -107,7 +110,21 @@ class PlatformContributionTest extends TestCase
             ->assertOk()
             ->assertJsonCount(1, 'data.platforms')
             ->assertJsonPath('data.platforms.0.slug', 'app-b')
-            ->assertJsonPath('data.platforms.0.contribution_percentage', 100);
+            ->assertJsonPath('data.platforms.0.rank', 1)
+            ->assertJsonPath('data.platforms.0.contribution_percentage', 100)
+            ->assertJsonPath('data.totals.platforms', 1);
+    }
+
+    public function test_contribution_percentage_is_rounded_to_one_decimal(): void
+    {
+        $this->transaction($this->platformA, '2026-09-05', 'alice@example.com', 100000);
+        $this->transaction($this->platformB, '2026-09-05', 'bob@example.com', 200000);
+
+        // 100000 / 300000 = 33.333...%, 200000 / 300000 = 66.666...%.
+        $this->actingAs($this->manager)
+            ->getJson(self::URL.'?date_from=2026-09-01&date_to=2026-09-30')
+            ->assertJsonPath('data.platforms.0.contribution_percentage', 66.7)
+            ->assertJsonPath('data.platforms.1.contribution_percentage', 33.3);
     }
 
     public function test_contribution_matches_the_performance_summary_totals(): void
@@ -131,9 +148,10 @@ class PlatformContributionTest extends TestCase
             ->getJson(self::URL.'?date_from=2026-10-01&date_to=2026-10-31')
             ->assertOk()
             ->assertJsonPath('data.is_empty', true)
-            ->assertJsonPath('data.message', 'Data tidak tersedia untuk filter yang dipilih.')
-            ->assertJsonPath('data.totals', ['revenue' => 0, 'transactions' => 0, 'users' => 0])
+            ->assertJsonPath('data.message', 'Tidak ada data kontribusi platform untuk filter yang dipilih.')
+            ->assertJsonPath('data.totals', ['revenue' => 0, 'transactions' => 0, 'users' => 0, 'platforms' => 3])
             ->assertJsonPath('data.datasets.0.data', [0, 0, 0])
-            ->assertJsonPath('data.platforms.0.contribution_percentage', 0);
+            ->assertJsonPath('data.platforms.*.contribution_percentage', [null, null, null])
+            ->assertJsonPath('data.platforms.*.rank', [1, 2, 3]);
     }
 }

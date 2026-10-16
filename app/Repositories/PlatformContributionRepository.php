@@ -4,30 +4,31 @@ namespace App\Repositories;
 
 use App\Models\Platform;
 use App\Models\Transaction;
-use Carbon\CarbonInterface;
+use App\Repositories\Concerns\AppliesPerformanceFilter;
+use App\Support\PerformanceFilter;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Query\JoinClause;
 use Illuminate\Support\Collection;
 
 class PlatformContributionRepository
 {
+    use AppliesPerformanceFilter;
+
     /**
      * Revenue, transactions, and unique customer emails per platform.
-     * Platforms without successful transactions in the period are still returned with zero values.
+     * Selected platforms (or every platform) are returned even without successful transactions in the period.
      *
      * @return Collection<int, object{slug: string, name: string, revenue: string|float, transactions: int, users: int}>
      */
-    public function totalsPerPlatform(CarbonInterface $from, CarbonInterface $to, ?string $platformSlug): Collection
+    public function totalsPerPlatform(PerformanceFilter $filter): Collection
     {
         return Platform::query()
-            ->when($platformSlug, fn (Builder $query) => $query->where('platforms.slug', $platformSlug))
-            ->leftJoin('transactions', function (JoinClause $join) use ($from, $to) {
+            ->when($filter->platforms !== [], fn (Builder $query) => $query->whereIn('platforms.slug', $filter->platforms))
+            ->leftJoin('transactions', function (JoinClause $join) use ($filter) {
                 $join->on('transactions.platform_id', '=', 'platforms.id')
-                    ->where('transactions.status_message', Transaction::STATUS_SUCCESS)
-                    ->whereBetween('transactions.paid_date', [
-                        $from->copy()->startOfDay()->toDateTimeString(),
-                        $to->copy()->endOfDay()->toDateTimeString(),
-                    ]);
+                    ->where('transactions.status_message', Transaction::STATUS_SUCCESS);
+
+                $this->whereInPerformancePeriod($join, $filter, 'transactions.paid_date');
             })
             ->toBase()
             ->selectRaw(
