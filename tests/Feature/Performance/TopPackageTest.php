@@ -101,8 +101,9 @@ class TopPackageTest extends TestCase
                 'date_from' => '2026-10-01',
                 'date_to' => '2026-10-31',
             ])
+            ->assertJsonPath('data.rank_by', 'revenue')
             ->assertJsonPath('data.is_empty', false)
-            ->assertJsonPath('data.totals', ['packages' => 3, 'revenue' => 1000000])
+            ->assertJsonPath('data.totals', ['packages' => 3, 'revenue' => 1000000, 'transactions' => 4])
             ->assertJsonPath('data.packages.0', [
                 'rank' => 1,
                 'product' => self::CPNS_1Y,
@@ -133,7 +134,7 @@ class TopPackageTest extends TestCase
             ->assertJsonPath('data.filter.limit', 2)
             ->assertJsonCount(2, 'data.packages')
             ->assertJsonCount(2, 'data.labels')
-            ->assertJsonPath('data.totals', ['packages' => 3, 'revenue' => 1000000])
+            ->assertJsonPath('data.totals', ['packages' => 3, 'revenue' => 1000000, 'transactions' => 4])
             ->assertJsonPath('data.packages.1.contribution_percentage', 30);
     }
 
@@ -176,7 +177,7 @@ class TopPackageTest extends TestCase
             ->assertJsonPath('data.is_empty', true)
             ->assertJsonPath('data.message', 'Data tidak tersedia untuk filter yang dipilih.')
             ->assertJsonPath('data.packages', [])
-            ->assertJsonPath('data.totals', ['packages' => 0, 'revenue' => 0]);
+            ->assertJsonPath('data.totals', ['packages' => 0, 'revenue' => 0, 'transactions' => 0]);
     }
 
     public function test_it_validates_the_filters(): void
