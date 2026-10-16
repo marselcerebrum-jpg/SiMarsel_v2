@@ -9,6 +9,24 @@ class TopPackageService
 {
     public const DEFAULT_LIMIT = 10;
 
+    public const RANK_BY_REVENUE = 'revenue';
+
+    public const RANK_BY_TRANSACTIONS = 'transactions';
+
+    /**
+     * Sort order and chart dataset label per ranking metric. Ties fall back to the other metric, then the product name.
+     */
+    private const RANKINGS = [
+        self::RANK_BY_REVENUE => [
+            'sort' => [['revenue', 'desc'], ['transactions', 'desc'], ['product', 'asc']],
+            'label' => 'Total Pendapatan',
+        ],
+        self::RANK_BY_TRANSACTIONS => [
+            'sort' => [['transactions', 'desc'], ['revenue', 'desc'], ['product', 'asc']],
+            'label' => 'Jumlah Transaksi',
+        ],
+    ];
+
     /**
      * Markaz product names end with the active period, e.g. "Bimbel CPNS 2026 - Masa Aktif 1 Tahun".
      */
@@ -17,12 +35,14 @@ class TopPackageService
     public function __construct(private ProductPerformanceRepository $productPerformanceRepository) {}
 
     /**
-     * The packages with the highest revenue for the selected platform, year, and optional month.
+     * The packages with the highest revenue or transaction count for the selected platform, year, and optional month.
      *
      * @return array<string, mixed>
      */
-    public function top(?string $platformSlug, int $year, ?int $month, int $limit): array
+    public function top(?string $platformSlug, int $year, ?int $month, int $limit, string $rankBy = self::RANK_BY_REVENUE): array
     {
+        $ranking = self::RANKINGS[$rankBy];
+
         $from = CarbonImmutable::create($year, $month ?? 1, 1)->startOfDay();
         $to = $month ? $from->endOfMonth()->startOfDay() : $from->endOfYear()->startOfDay();
 
@@ -34,18 +54,22 @@ class TopPackageService
                 'revenue' => round((float) $row->revenue, 2),
                 'transactions' => (int) $row->transactions,
             ])
-            ->sortBy([['revenue', 'desc'], ['transactions', 'desc'], ['product', 'asc']])
+            ->sortBy($ranking['sort'])
             ->values();
 
-        $totalRevenue = round($packages->sum('revenue'), 2);
+        $totals = [
+            'packages' => $packages->count(),
+            'revenue' => round($packages->sum('revenue'), 2),
+            'transactions' => $packages->sum('transactions'),
+        ];
 
         $top = $packages
             ->take($limit)
             ->map(fn (array $package, int $index) => [
                 'rank' => $index + 1,
                 ...$package,
-                'contribution_percentage' => $totalRevenue > 0
-                    ? round($package['revenue'] / $totalRevenue * 100, 2)
+                'contribution_percentage' => $totals[$rankBy] > 0
+                    ? round($package[$rankBy] / $totals[$rankBy] * 100, 2)
                     : 0,
             ]);
 
@@ -60,16 +84,14 @@ class TopPackageService
                 'date_from' => $from->toDateString(),
                 'date_to' => $to->toDateString(),
             ],
+            'rank_by' => $rankBy,
             'is_empty' => $isEmpty,
             'message' => $isEmpty ? 'Data tidak tersedia untuk filter yang dipilih.' : null,
-            'totals' => [
-                'packages' => $packages->count(),
-                'revenue' => $totalRevenue,
-            ],
+            'totals' => $totals,
             'packages' => $top->all(),
             'labels' => $top->map(fn (array $package) => $this->label($package))->all(),
             'datasets' => [
-                ['label' => 'Total Pendapatan', 'data' => $top->pluck('revenue')->all()],
+                ['label' => $ranking['label'], 'data' => $top->pluck($rankBy)->all()],
             ],
         ];
     }
