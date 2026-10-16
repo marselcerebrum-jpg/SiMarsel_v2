@@ -257,16 +257,18 @@ Alpine.data('topPackagesByVolume', () =>
     }),
 );
 
+// `hint` = definisi metrik (sama dengan docs/api/products.md), tampil saat judul kolom di-hover.
+// `excelFormat` dipakai untuk kolom rata-rata agar nilai desimalnya tidak dibulatkan di Excel.
 const PERFORMANCE_COLUMNS = [
-    { key: 'name', header: 'Nama Paket', width: 34 },
-    { key: 'revenue', header: 'Revenue', type: 'number', format: rupiah },
-    { key: 'trx', header: 'Trx', type: 'number', format: number },
-    { key: 'low_price', header: 'Low Price', type: 'number', format: rupiah },
-    { key: 'low_trx', header: 'Low Trx', type: 'number', format: number },
-    { key: 'avg_price', header: 'Avg Price', type: 'number', format: rupiah },
-    { key: 'avg_trx', header: 'Avg Trx', type: 'number', format: number },
-    { key: 'high_price', header: 'High Price', type: 'number', format: rupiah },
-    { key: 'high_trx', header: 'High Trx', type: 'number', format: number },
+    { key: 'name', header: 'Nama Paket', width: 34, hint: 'Nama produk lengkap, termasuk masa aktif' },
+    { key: 'revenue', header: 'Revenue', type: 'number', format: rupiah, hint: 'Total nominal transaksi berhasil' },
+    { key: 'trx', header: 'Trx', type: 'number', format: number, hint: 'Jumlah transaksi berhasil' },
+    { key: 'low_price', header: 'Low Price', type: 'number', format: rupiah, hint: 'Nominal terendah dari satu transaksi' },
+    { key: 'low_trx', header: 'Low Trx', type: 'number', format: number, hint: 'Jumlah transaksi terendah dalam satu hari' },
+    { key: 'avg_price', header: 'Avg Price', type: 'number', format: rupiah, excelFormat: '#,##0.00', hint: 'Revenue dibagi Trx' },
+    { key: 'avg_trx', header: 'Avg Trx', type: 'number', format: number, excelFormat: '#,##0.00', hint: 'Trx dibagi jumlah hari yang ada penjualannya' },
+    { key: 'high_price', header: 'High Price', type: 'number', format: rupiah, hint: 'Nominal tertinggi dari satu transaksi' },
+    { key: 'high_trx', header: 'High Trx', type: 'number', format: number, hint: 'Jumlah transaksi tertinggi dalam satu hari' },
 ].map((column) => ({ ...column, value: (row) => row[column.key] }));
 
 Alpine.data('packagePerformance', () => ({

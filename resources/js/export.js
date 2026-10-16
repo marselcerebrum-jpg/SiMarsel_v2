@@ -1,6 +1,6 @@
 /**
- * Ekspor tabel di sisi browser. `columns` berisi { header, value(row), type? }
- * dengan type 'number' untuk kolom angka.
+ * Ekspor tabel di sisi browser. `columns` berisi { header, value(row), type?, excelFormat? }
+ * dengan type 'number' untuk kolom angka; excelFormat menimpa format angka bawaan '#,##0'.
  */
 
 function download(blob, fileName) {
@@ -38,7 +38,7 @@ export async function exportExcel(fileName, columns, rows) {
         columns.map((column) => {
             const value = column.value(row);
 
-            return column.type === 'number' ? { value: Number(value), type: Number, format: '#,##0' } : { value: String(value ?? '') };
+            return column.type === 'number' ? { value: Number(value), type: Number, format: column.excelFormat ?? '#,##0' } : { value: String(value ?? '') };
         }),
     );
 

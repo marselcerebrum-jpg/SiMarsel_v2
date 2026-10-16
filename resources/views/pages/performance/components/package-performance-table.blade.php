@@ -44,7 +44,7 @@
                     <thead class="bg-soft text-[11px] font-bold tracking-wider text-label uppercase">
                         <tr>
                             <template x-for="column in columns" :key="column.key">
-                                <th scope="col" class="px-4 py-3 whitespace-nowrap" :class="column.type === 'number' && 'text-right'" x-text="column.header"></th>
+                                <th scope="col" class="cursor-help px-4 py-3 whitespace-nowrap" :class="column.type === 'number' && 'text-right'" :title="column.hint" x-text="column.header"></th>
                             </template>
                         </tr>
                     </thead>
@@ -70,6 +70,12 @@
 
             <p x-show="rows.length" class="mt-3 text-xs text-muted" aria-live="polite">
                 Menampilkan <span class="font-semibold text-ink" x-text="rows.length"></span> dari <span x-text="items.length"></span> paket
+            </p>
+
+            <p class="mt-1 text-xs text-muted">
+                Hanya transaksi berhasil yang dihitung. <span class="font-semibold text-ink">Price</span> dihitung per transaksi,
+                <span class="font-semibold text-ink">Trx</span> dihitung per hari (hanya hari yang ada penjualannya).
+                Arahkan kursor ke judul kolom untuk definisi lengkap.
             </p>
 
             <div x-show="loading" x-transition.opacity class="absolute inset-0 grid place-items-center rounded-2xl bg-surface/70 backdrop-blur-[1px]">
