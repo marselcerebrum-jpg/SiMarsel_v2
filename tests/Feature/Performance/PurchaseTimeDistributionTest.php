@@ -71,9 +71,9 @@ class PurchaseTimeDistributionTest extends TestCase
     {
         $this->actingAs($this->manager);
 
-        $this->getJson(self::URL)
+        $this->getJson(self::URL.'?date_from=2026-09-01')
             ->assertUnprocessable()
-            ->assertJsonValidationErrors(['date_from', 'date_to']);
+            ->assertJsonValidationErrors(['date_to' => 'Tanggal akhir wajib diisi.']);
 
         $this->getJson(self::URL.'?date_from=2026-09-01&date_to=2026-09-30&platform=unknown')
             ->assertJsonValidationErrors(['platform' => 'Platform tidak ditemukan.']);
@@ -86,7 +86,10 @@ class PurchaseTimeDistributionTest extends TestCase
         $this->actingAs($this->manager)
             ->getJson(self::URL.'?date_from=2026-09-01&date_to=2026-09-30')
             ->assertOk()
-            ->assertJsonPath('data.filter', ['date_from' => '2026-09-01', 'date_to' => '2026-09-30', 'platform' => null])
+            ->assertJsonPath('data.filter.mode', 'date_range')
+            ->assertJsonPath('data.filter.date_from', '2026-09-01')
+            ->assertJsonPath('data.filter.date_to', '2026-09-30')
+            ->assertJsonPath('data.filter.platforms', [])
             ->assertJsonPath('data.is_empty', false)
             ->assertJsonPath('data.message', null)
             ->assertJsonPath('data.totals', ['transactions' => 9])
