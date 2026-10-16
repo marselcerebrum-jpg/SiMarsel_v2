@@ -236,8 +236,37 @@ class PerformanceFilterApiTest extends TestCase
             ->assertJsonPath('data.labels.0', 'Jan 2026')
             ->assertJsonPath('data.datasets', [[
                 'label' => 'Revenue',
-                'data' => [0, 0, 400000, 0, 0, 0, 0, 0, 470000, 30000, 0, 0],
+                'data' => [0, 0, 400000, 0, 0, 0, 0, 0, 470000, 30000, null, null],
             ]]);
+    }
+
+    public function test_current_month_is_compared_with_the_whole_previous_month(): void
+    {
+        $summary = $this->summary('?year=2026&month=10');
+
+        $this->assertSame(['2026-10-01', '2026-10-31'], [$summary['filter']['date_from'], $summary['filter']['date_to']]);
+        $this->assertSame(['2026-09-01', '2026-09-30'], [$summary['previous_period']['date_from'], $summary['previous_period']['date_to']]);
+        $this->assertEquals(30000, $summary['kpis']['total_revenue']['value']);
+        $this->assertEquals(470000, $summary['kpis']['total_revenue']['previous_value']);
+        $this->assertSame('down', $summary['kpis']['total_revenue']['trend']);
+    }
+
+    public function test_trend_days_after_today_have_no_value_or_change_yet(): void
+    {
+        $rows = $this->actingAs($this->manager)
+            ->getJson('/api/performance/trend?year=2026&month=10&metric=revenue')
+            ->assertOk()
+            ->assertJsonCount(31, 'data.labels')
+            ->assertJsonPath('data.datasets.0.data.14', 20000)
+            ->assertJsonPath('data.datasets.0.data.15', 0)
+            ->assertJsonPath('data.datasets.0.data.16', null)
+            ->json('data.rows');
+
+        // 15 Oct has a sale; 16 Oct is today, so it still has a value and a change.
+        $this->assertSame([20000, null, 'up'], [$rows[14]['value'], $rows[14]['change_percentage'], $rows[14]['trend']]);
+        $this->assertSame([0, -100, 'down'], [$rows[15]['value'], $rows[15]['change_percentage'], $rows[15]['trend']]);
+        $this->assertSame([null, null, null], [$rows[16]['value'], $rows[16]['change_percentage'], $rows[16]['trend']]);
+        $this->assertSame([null, null, null], [$rows[30]['value'], $rows[30]['change_percentage'], $rows[30]['trend']]);
     }
 
     public function test_trend_compares_several_years_month_by_month(): void
@@ -249,11 +278,38 @@ class PerformanceFilterApiTest extends TestCase
             ->assertJsonPath('data.labels', ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'])
             ->assertJsonPath('data.datasets', [
                 ['label' => '2025', 'data' => [0, 0, 200000, 0, 0, 0, 50000, 0, 0, 0, 0, 0]],
-                ['label' => '2026', 'data' => [0, 0, 400000, 0, 0, 0, 0, 0, 470000, 30000, 0, 0]],
+                ['label' => '2026', 'data' => [0, 0, 400000, 0, 0, 0, 0, 0, 470000, 30000, null, null]],
             ])
             ->assertJsonCount(24, 'data.rows')
             ->assertJsonPath('data.rows.0.label', 'Jan 2025')
-            ->assertJsonPath('data.rows.12.label', 'Jan 2026');
+            ->assertJsonPath('data.rows.12.label', 'Jan 2026')
+            // Jul 2026 (0) is compared with Jul 2025 (Rp50.000).
+            ->assertJsonPath('data.rows.18.label', 'Jul 2026')
+            ->assertJsonPath('data.rows.18.change_percentage', -100)
+            ->assertJsonPath('data.rows.18.trend', 'down');
+    }
+
+    public function test_trend_rows_compare_each_month_with_the_same_month_of_the_previous_selected_year(): void
+    {
+        $rows = collect($this->actingAs($this->manager)
+            ->getJson('/api/performance/trend?years[]=2024&years[]=2026&metric=revenue')
+            ->assertOk()
+            ->json('data.rows'))
+            ->keyBy('label')
+            ->map(fn (array $row) => [$row['value'], $row['change_percentage'], $row['trend']]);
+
+        // The first selected year has nothing to compare with.
+        $this->assertSame([100000, null, null], $rows['Mar 2024']);
+        $this->assertSame([0, null, null], $rows['Dec 2024']);
+
+        // Jan 2026 is compared with Jan 2024, not with Dec 2024.
+        $this->assertSame([0, null, 'same'], $rows['Jan 2026']);
+        $this->assertSame([400000, 300, 'up'], $rows['Mar 2026']);
+        $this->assertSame([0, null, 'same'], $rows['Apr 2026']);
+        $this->assertSame([470000, null, 'up'], $rows['Sep 2026']);
+
+        // Months after today have no value or change yet.
+        $this->assertSame([null, null, null], $rows['Nov 2026']);
     }
 
     public function test_trend_period_must_fit_the_selected_years(): void
