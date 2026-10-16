@@ -24,6 +24,18 @@ const millions = (value) => `${(value / 1_000_000).toLocaleString('id-ID', { max
 
 const truncate = (text, max) => (text.length > max ? `${text.slice(0, max - 1)}…` : text);
 
+// "Bimbel CPNS 2026… (1 Tahun)": nama dipotong lebih dulu agar masa aktif tetap terlihat,
+// karena satu paket bisa dijual dengan beberapa masa aktif.
+const packageLabel = (item, max) => {
+    if (!item.active_period) return truncate(item.name, max);
+
+    const suffix = ` (${item.active_period})`;
+
+    return `${truncate(item.name, Math.max(8, max - suffix.length))}${suffix}`;
+};
+
+const activePeriod = (item) => item.active_period ?? '-';
+
 const currentYear = new Date().getFullYear();
 
 /**
@@ -160,7 +172,7 @@ function barChartCard(fetcher, { horizontal, value, valueTick, tooltipLines }) {
                     autoSkip: false,
                     maxRotation: 40,
                     callback(tick) {
-                        return truncate(this.getLabelForValue(tick), horizontal ? 28 : 16);
+                        return horizontal ? packageLabel(items()[tick], 40) : truncate(this.getLabelForValue(tick), 16);
                     },
                 },
             };
@@ -211,7 +223,7 @@ Alpine.data('topPackagesByRevenue', () =>
         horizontal: true,
         value: (item) => item.revenue,
         valueTick: millions,
-        tooltipLines: (item) => [`Masa Aktif: ${item.active_period}`, `Total Pendapatan: ${rupiah(item.revenue)}`],
+        tooltipLines: (item) => [`Masa Aktif: ${activePeriod(item)}`, `Total Pendapatan: ${rupiah(item.revenue)}`],
     }),
 );
 
@@ -220,7 +232,7 @@ Alpine.data('topPackagesByVolume', () =>
         horizontal: false,
         value: (item) => item.transactions,
         valueTick: (tick) => number(tick),
-        tooltipLines: (item) => [`Masa Aktif: ${item.active_period}`, `Total Transaksi: ${number(item.transactions)}`],
+        tooltipLines: (item) => [`Masa Aktif: ${activePeriod(item)}`, `Total Transaksi: ${number(item.transactions)}`],
     }),
 );
 
