@@ -6,6 +6,7 @@ use App\Enums\TrendMetric;
 use App\Enums\TrendPeriod;
 use App\Repositories\PerformanceRepository;
 use App\Services\Concerns\ComparesWithPreviousValue;
+use App\Support\PerformanceFilter;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 
@@ -17,27 +18,20 @@ class PerformanceTrendService
 
     /**
      * Build the time series of one metric, split into daily, weekly (Monday - Sunday), or monthly buckets.
+     * When several years are selected, the chart compares them month by month with one dataset per year.
      *
      * @return array<string, mixed>
      */
-    public function trend(
-        CarbonImmutable $from,
-        CarbonImmutable $to,
-        ?string $platformSlug,
-        TrendMetric $metric,
-        TrendPeriod $period,
-    ): array {
-        $platformId = $platformSlug ? $this->performanceRepository->findPlatformIdBySlug($platformSlug) : null;
-
-        $buckets = $this->buckets($from, $to, $period);
-        [$values, $hasData] = $this->values($metric, $buckets, $from, $to, $platformId);
+    public function trend(PerformanceFilter $filter, TrendMetric $metric, TrendPeriod $period): array
+    {
+        $buckets = array_merge(...array_map(
+            fn (array $range) => $this->buckets($range[0], $range[1], $period),
+            $filter->ranges,
+        ));
+        [$values, $hasData] = $this->values($metric, $buckets, $filter);
 
         return [
-            'filter' => [
-                'date_from' => $from->toDateString(),
-                'date_to' => $to->toDateString(),
-                'platform' => $platformSlug,
-            ],
+            'filter' => $filter->toArray(),
             'metric' => [
                 'key' => $metric->value,
                 'label' => $metric->label(),
@@ -46,11 +40,40 @@ class PerformanceTrendService
             'period' => $period->value,
             'is_empty' => ! $hasData,
             'message' => $hasData ? null : 'Data tidak tersedia untuk filter yang dipilih.',
-            'labels' => array_column($buckets, 'label'),
-            'datasets' => [
-                ['label' => $metric->label(), 'data' => $values],
-            ],
+            ...($filter->comparesYears()
+                ? $this->yearComparisonChart($buckets, $values)
+                : [
+                    'labels' => array_column($buckets, 'label'),
+                    'datasets' => [
+                        ['label' => $metric->label(), 'data' => $values],
+                    ],
+                ]),
             'rows' => $this->rows($buckets, $values),
+        ];
+    }
+
+    /**
+     * Month labels (Jan - Dec) with one dataset per selected year.
+     *
+     * @param  list<array{start: CarbonImmutable, end: CarbonImmutable, label: string}>  $buckets
+     * @param  list<int|float|null>  $values
+     * @return array{labels: list<string>, datasets: list<array{label: string, data: list<int|float|null>}>}
+     */
+    private function yearComparisonChart(array $buckets, array $values): array
+    {
+        $datasets = [];
+
+        foreach ($buckets as $index => $bucket) {
+            $datasets[$bucket['start']->year][] = $values[$index];
+        }
+
+        return [
+            'labels' => array_map(fn (int $month) => CarbonImmutable::create(2000, $month, 1)->format('M'), range(1, 12)),
+            'datasets' => array_map(
+                fn (int $year, array $data) => ['label' => (string) $year, 'data' => $data],
+                array_keys($datasets),
+                $datasets,
+            ),
         ];
     }
 
@@ -125,20 +148,18 @@ class PerformanceTrendService
     private function values(
         TrendMetric $metric,
         array $buckets,
-        CarbonImmutable $from,
-        CarbonImmutable $to,
-        ?int $platformId,
+        PerformanceFilter $filter,
     ): array {
         $bucketOfDay = $this->bucketOfDay($buckets);
         $empty = array_fill(0, count($buckets), 0);
 
         return match ($metric) {
-            TrendMetric::Revenue => $this->transactionValues('revenue', $empty, $bucketOfDay, $from, $to, $platformId),
-            TrendMetric::Transactions => $this->transactionValues('transactions', $empty, $bucketOfDay, $from, $to, $platformId),
-            TrendMetric::NewUsers => $this->transactionValues('new_users', $empty, $bucketOfDay, $from, $to, $platformId),
-            TrendMetric::RepeatOrders => $this->transactionValues('repeat_orders', $empty, $bucketOfDay, $from, $to, $platformId),
-            TrendMetric::Downloaders => $this->downloaderValues($empty, $bucketOfDay, $from, $to, $platformId),
-            TrendMetric::Conversion => $this->conversionValues($empty, $bucketOfDay, $from, $to, $platformId),
+            TrendMetric::Revenue => $this->transactionValues('revenue', $empty, $bucketOfDay, $filter),
+            TrendMetric::Transactions => $this->transactionValues('transactions', $empty, $bucketOfDay, $filter),
+            TrendMetric::NewUsers => $this->transactionValues('new_users', $empty, $bucketOfDay, $filter),
+            TrendMetric::RepeatOrders => $this->transactionValues('repeat_orders', $empty, $bucketOfDay, $filter),
+            TrendMetric::Downloaders => $this->downloaderValues($empty, $bucketOfDay, $filter),
+            TrendMetric::Conversion => $this->conversionValues($empty, $bucketOfDay, $filter),
         };
     }
 
@@ -150,9 +171,9 @@ class PerformanceTrendService
      * @param  array<string, int>  $bucketOfDay
      * @return array{0: list<int|float>, 1: bool}
      */
-    private function transactionValues(string $column, array $values, array $bucketOfDay, CarbonImmutable $from, CarbonImmutable $to, ?int $platformId): array
+    private function transactionValues(string $column, array $values, array $bucketOfDay, PerformanceFilter $filter): array
     {
-        $rows = $this->performanceRepository->dailyTransactionTotals($from, $to, $platformId);
+        $rows = $this->performanceRepository->dailyTransactionTotals($filter);
 
         foreach ($rows as $row) {
             $values[$bucketOfDay[$row->day]] += $column === 'revenue' ? (float) $row->revenue : (int) $row->{$column};
@@ -170,9 +191,9 @@ class PerformanceTrendService
      * @param  array<string, int>  $bucketOfDay
      * @return array{0: list<int>, 1: bool}
      */
-    private function downloaderValues(array $values, array $bucketOfDay, CarbonImmutable $from, CarbonImmutable $to, ?int $platformId): array
+    private function downloaderValues(array $values, array $bucketOfDay, PerformanceFilter $filter): array
     {
-        $rows = $this->performanceRepository->dailyDownloaderTotals($from, $to, $platformId);
+        $rows = $this->performanceRepository->dailyDownloaderTotals($filter);
 
         foreach ($rows as $row) {
             $values[$bucketOfDay[$row->day]] += (int) $row->total;
@@ -188,10 +209,10 @@ class PerformanceTrendService
      * @param  array<string, int>  $bucketOfDay
      * @return array{0: list<float|null>, 1: bool}
      */
-    private function conversionValues(array $values, array $bucketOfDay, CarbonImmutable $from, CarbonImmutable $to, ?int $platformId): array
+    private function conversionValues(array $values, array $bucketOfDay, PerformanceFilter $filter): array
     {
-        [$downloaders, $hasDownloaders] = $this->downloaderValues($values, $bucketOfDay, $from, $to, $platformId);
-        [$transactions, $hasTransactions] = $this->transactionValues('transactions', $values, $bucketOfDay, $from, $to, $platformId);
+        [$downloaders, $hasDownloaders] = $this->downloaderValues($values, $bucketOfDay, $filter);
+        [$transactions, $hasTransactions] = $this->transactionValues('transactions', $values, $bucketOfDay, $filter);
 
         $conversion = array_map(
             fn (int $downloaderTotal, int $transactionTotal) => $downloaderTotal > 0
