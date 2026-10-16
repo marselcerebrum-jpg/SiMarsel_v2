@@ -17,7 +17,7 @@ Contoh:
 
 ### Periode pembanding
 
-Setiap mode filter punya periode pembanding sendiri, misalnya rentang tanggal dibandingkan dengan jumlah hari yang sama tepat sebelumnya, bulan dibandingkan dengan bulan sebelumnya, dan setiap tahun dibandingkan dengan tahun sebelumnya. Tabel lengkapnya ada di [filter Ringkasan Performa](performance-filter.md#perbandingan-periode-naik--turun--sama).
+Setiap mode filter punya periode pembanding sendiri, misalnya rentang tanggal dibandingkan dengan jumlah hari yang sama tepat sebelumnya, bulan (termasuk default bulan berjalan) dibandingkan dengan seluruh bulan sebelumnya walaupun belum selesai, dan setiap tahun dibandingkan dengan tahun sebelumnya. Tabel lengkapnya ada di [filter Ringkasan Performa](performance-filter.md#perbandingan-periode-naik--turun--sama).
 
 | Periode dipilih | Periode sebelumnya |
 |---|---|
