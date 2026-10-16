@@ -18,13 +18,13 @@ class PerformanceFilterTest extends TestCase
         return array_map(fn (array $range) => [$range[0]->toDateString(), $range[1]->toDateString()], $ranges);
     }
 
-    public function test_current_month_runs_until_today_and_compares_with_the_same_number_of_days_before(): void
+    public function test_current_month_runs_until_today_and_compares_with_the_whole_previous_month(): void
     {
         $filter = PerformanceFilter::currentMonth(today: CarbonImmutable::create(2026, 10, 16, 13, 45));
 
         $this->assertSame(PerformanceFilter::MODE_CURRENT_MONTH, $filter->mode);
         $this->assertSame([['2026-10-01', '2026-10-16']], $this->dates($filter->ranges));
-        $this->assertSame([['2026-09-15', '2026-09-30']], $this->dates($filter->previousRanges));
+        $this->assertSame([['2026-09-01', '2026-09-30']], $this->dates($filter->previousRanges));
         $this->assertSame(TrendPeriod::Daily, $filter->defaultPeriod);
     }
 
