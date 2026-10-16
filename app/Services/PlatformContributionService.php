@@ -3,7 +3,7 @@
 namespace App\Services;
 
 use App\Repositories\PlatformContributionRepository;
-use Carbon\CarbonImmutable;
+use App\Support\PerformanceFilter;
 
 class PlatformContributionService
 {
@@ -14,10 +14,10 @@ class PlatformContributionService
      *
      * @return array<string, mixed>
      */
-    public function contribution(CarbonImmutable $from, CarbonImmutable $to, ?string $platformSlug): array
+    public function contribution(PerformanceFilter $filter): array
     {
         $platforms = $this->platformContributionRepository
-            ->totalsPerPlatform($from, $to, $platformSlug)
+            ->totalsPerPlatform($filter)
             ->map(fn (object $row) => [
                 'slug' => $row->slug,
                 'name' => $row->name,
@@ -43,11 +43,7 @@ class PlatformContributionService
         $isEmpty = $totalTransactions === 0;
 
         return [
-            'filter' => [
-                'date_from' => $from->toDateString(),
-                'date_to' => $to->toDateString(),
-                'platform' => $platformSlug,
-            ],
+            'filter' => $filter->toArray(),
             'is_empty' => $isEmpty,
             'message' => $isEmpty ? 'Tidak ada data kontribusi platform untuk filter yang dipilih.' : null,
             'totals' => [

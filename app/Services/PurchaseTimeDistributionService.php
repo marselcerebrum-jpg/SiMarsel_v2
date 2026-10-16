@@ -3,7 +3,7 @@
 namespace App\Services;
 
 use App\Repositories\PurchaseTimeDistributionRepository;
-use Carbon\CarbonImmutable;
+use App\Support\PerformanceFilter;
 
 class PurchaseTimeDistributionService
 {
@@ -27,9 +27,9 @@ class PurchaseTimeDistributionService
      *
      * @return array<string, mixed>
      */
-    public function distribution(CarbonImmutable $from, CarbonImmutable $to, ?string $platformSlug): array
+    public function distribution(PerformanceFilter $filter): array
     {
-        $rows = $this->purchaseTimeDistributionRepository->transactionsPerHour($from, $to, $platformSlug);
+        $rows = $this->purchaseTimeDistributionRepository->transactionsPerHour($filter);
 
         $perHour = $rows->whereNotNull('hour')
             ->mapWithKeys(fn (object $row) => [(int) $row->hour => (int) $row->transactions]);
@@ -68,11 +68,7 @@ class PurchaseTimeDistributionService
         $isEmpty = $totalTransactions === 0;
 
         return [
-            'filter' => [
-                'date_from' => $from->toDateString(),
-                'date_to' => $to->toDateString(),
-                'platform' => $platformSlug,
-            ],
+            'filter' => $filter->toArray(),
             'is_empty' => $isEmpty,
             'message' => $isEmpty ? 'Data tidak tersedia untuk filter yang dipilih.' : null,
             'totals' => [

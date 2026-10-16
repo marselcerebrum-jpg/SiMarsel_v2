@@ -8,15 +8,13 @@ Wajib login. Semua role (Manager dan Employee) boleh mengakses. Aturan header da
 
 ### Query parameter
 
-Sama persis dengan `/api/performance/summary`.
+Sama persis dengan `/api/performance/summary`, lihat [filter Ringkasan Performa](performance-filter.md): beberapa platform (`platforms[]`) dan satu mode periode (default bulan berjalan, rentang tanggal, bulan, beberapa tahun, atau rentang tahun).
 
-| Parameter | Wajib | Format | Keterangan |
-|---|---|---|---|
-| `date_from` | Ya | `YYYY-MM-DD` | Tanggal mulai (inklusif) |
-| `date_to` | Ya | `YYYY-MM-DD` | Tanggal akhir (inklusif), tidak boleh sebelum `date_from` |
-| `platform` | Tidak | slug platform | Kosongkan untuk menampilkan semua platform |
+Contoh:
 
-Contoh: `GET /api/performance/platform-contribution?date_from=2026-09-01&date_to=2026-09-30`
+- `GET /api/performance/platform-contribution?date_from=2026-09-01&date_to=2026-09-30`
+- `GET /api/performance/platform-contribution?year=2026&month=9&platforms[]=jadiasn&platforms[]=cerebrum`
+- `GET /api/performance/platform-contribution?years[]=2025&years[]=2026` (gabungan kedua tahun)
 
 ### Rumus per platform
 
@@ -31,6 +29,7 @@ Hanya transaksi dengan `status_message` = `Success` yang dihitung.
 | `contribution_percentage` | `revenue` platform ÷ total revenue × 100, dibulatkan **1 desimal**. `null` jika total revenue = 0, tampilkan sebagai **N/A**. |
 
 - **Semua platform di master platform selalu ditampilkan**, termasuk yang tidak punya transaksi di periode itu (nilainya `0`).
+- Jika beberapa platform dipilih lewat `platforms[]`, hanya platform-platform itu yang muncul, dan persentasenya dihitung dari total revenue platform yang dipilih.
 - Urutan: revenue terbesar lebih dulu, lalu nama platform A-Z.
 - Jika filter `platform` dipilih, hanya platform itu yang muncul, dengan kontribusi `100` (atau `null`/N/A jika tidak ada transaksi), dan `totals.platforms` = `1`.
 - Karena pembulatan, jumlah semua `contribution_percentage` bisa 99.9 atau 100.1.
@@ -44,7 +43,7 @@ Satu email yang bertransaksi di dua platform dihitung di **kedua** platform. Kar
 ```json
 {
     "data": {
-        "filter": { "date_from": "2026-09-01", "date_to": "2026-09-30", "platform": null },
+        "filter": { "mode": "date_range", "date_from": "2026-09-01", "date_to": "2026-09-30", "platform": null, "platforms": [], "...": "lihat performance-filter.md" },
         "is_empty": false,
         "message": null,
         "totals": { "revenue": 1150000, "transactions": 6, "users": 4, "platforms": 3 },
@@ -74,4 +73,4 @@ Jika tidak ada transaksi `Success` di periode yang dipilih, respons tetap **200*
 
 ### 422 Validasi gagal
 
-Sama dengan `/api/performance/summary`: tanggal kosong atau salah format, `date_to` sebelum `date_from`, atau slug platform tidak ditemukan.
+Sama dengan [filter Ringkasan Performa](performance-filter.md#422-validasi-gagal), misalnya lebih dari satu mode periode, format tanggal salah, atau slug platform tidak ditemukan.
