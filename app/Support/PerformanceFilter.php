@@ -39,14 +39,23 @@ final class PerformanceFilter
 
     /**
      * From the first day of this month until today; this is the dashboard default when no period is selected.
+     * Like a selected month, it is compared with the whole previous month even though this month is not over yet.
      *
      * @param  list<string>  $platforms
      */
     public static function currentMonth(array $platforms = [], ?CarbonImmutable $today = null): self
     {
         $today = ($today ?? CarbonImmutable::today())->startOfDay();
+        $start = $today->startOfMonth();
+        $previous = $start->subMonth();
 
-        return self::sameLengthComparison(self::MODE_CURRENT_MONTH, $today->startOfMonth(), $today, $platforms);
+        return new self(
+            self::MODE_CURRENT_MONTH,
+            $platforms,
+            [[$start, $today]],
+            [[$previous, $previous->endOfMonth()->startOfDay()]],
+            TrendPeriod::Daily,
+        );
     }
 
     /**
