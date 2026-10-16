@@ -46,11 +46,14 @@ Contoh:
 | Default, hari ini 16 Okt 2026 | 1 - 16 Okt 2026 | 15 - 30 Sep 2026 |
 | `date_from=2026-09-01&date_to=2026-09-30` | 1 - 30 Sep 2026 | 2 - 31 Agu 2026 |
 | `year=2026&month=1` | 1 - 31 Jan 2026 | 1 - 31 Des 2025 |
+| `year=2026&month=10` (bulan berjalan, hari ini 16 Okt) | 1 - 31 Okt 2026 | 1 - 30 Sep 2026 |
 | `years[]=2025&years[]=2026` | 2025 + 2026 | 2024 + 2025 |
 | `years[]=2024&years[]=2026` | 2024 + 2026 | 2023 + 2025 |
 | `year_from=2024&year_to=2026` | 2024 - 2026 | 2021 - 2023 |
 
 Untuk mode `years`, Card Overview menampilkan **gabungan** semua tahun yang dipilih. Perbandingan antar tahun dilihat di Grafik Data.
+
+Bulan dan tahun **selalu dibandingkan utuh**, walaupun bulan atau tahun berjalan belum selesai. Contohnya, Oktober 2026 yang baru berjalan 16 hari tetap dibandingkan dengan seluruh September, jadi wajar jika terlihat turun. Jika ingin perbandingan dengan jumlah hari yang sama, pakai mode default atau `date_from`/`date_to`.
 
 ## Blok `filter` di setiap respons
 
