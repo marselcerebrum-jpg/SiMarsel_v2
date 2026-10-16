@@ -14,11 +14,14 @@ class PerformanceTrendService
 {
     use ComparesWithPreviousValue;
 
+    private const MONTHS_PER_YEAR = 12;
+
     public function __construct(private PerformanceRepository $performanceRepository) {}
 
     /**
      * Build the time series of one metric, split into daily, weekly (Monday - Sunday), or monthly buckets.
      * When several years are selected, the chart compares them month by month with one dataset per year.
+     * Buckets that start after today have no data yet, so their value is null.
      *
      * @return array<string, mixed>
      */
@@ -29,6 +32,13 @@ class PerformanceTrendService
             $filter->ranges,
         ));
         [$values, $hasData] = $this->values($metric, $buckets, $filter);
+
+        $today = CarbonImmutable::today();
+        $values = array_map(
+            fn (array $bucket, int|float|null $value) => $bucket['start']->gt($today) ? null : $value,
+            $buckets,
+            $values,
+        );
 
         return [
             'filter' => $filter->toArray(),
@@ -48,7 +58,7 @@ class PerformanceTrendService
                         ['label' => $metric->label(), 'data' => $values],
                     ],
                 ]),
-            'rows' => $this->rows($buckets, $values),
+            'rows' => $this->rows($buckets, $values, $filter->comparesYears() ? self::MONTHS_PER_YEAR : 1),
         ];
     }
 
@@ -78,22 +88,26 @@ class PerformanceTrendService
     }
 
     /**
-     * Table rows with the change compared to the previous row; the first row has no previous row.
+     * Table rows with the change compared to an earlier row: the previous row, or, when several years
+     * are compared, the same month of the previous selected year ($step = 12).
+     * Rows without an earlier row, and rows after today, have no change.
      *
      * @param  list<array{start: CarbonImmutable, end: CarbonImmutable, label: string}>  $buckets
      * @param  list<int|float|null>  $values
      * @return list<array<string, mixed>>
      */
-    private function rows(array $buckets, array $values): array
+    private function rows(array $buckets, array $values, int $step): array
     {
+        $today = CarbonImmutable::today();
+
         return array_map(fn (int $index) => [
             'label' => $buckets[$index]['label'],
             'period_start' => $buckets[$index]['start']->toDateString(),
             'period_end' => $buckets[$index]['end']->toDateString(),
             'value' => $values[$index],
-            ...($index === 0
+            ...($index < $step || $buckets[$index]['start']->gt($today)
                 ? ['change_percentage' => null, 'trend' => null]
-                : $this->changeFromPrevious($values[$index], $values[$index - 1])),
+                : $this->changeFromPrevious($values[$index], $values[$index - $step])),
         ], array_keys($buckets));
     }
 
