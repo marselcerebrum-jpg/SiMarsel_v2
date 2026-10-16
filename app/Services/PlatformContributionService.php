@@ -31,11 +31,13 @@ class PlatformContributionService
         $totalRevenue = round($platforms->sum('revenue'), 2);
         $totalTransactions = $platforms->sum('transactions');
 
-        $platforms = $platforms->map(fn (array $platform) => [
+        // The percentage is null (shown as N/A) when there is no revenue to divide by.
+        $platforms = $platforms->map(fn (array $platform, int $index) => [
+            'rank' => $index + 1,
             ...$platform,
             'contribution_percentage' => $totalRevenue > 0
-                ? round($platform['revenue'] / $totalRevenue * 100, 2)
-                : 0,
+                ? round($platform['revenue'] / $totalRevenue * 100, 1)
+                : null,
         ]);
 
         $isEmpty = $totalTransactions === 0;
@@ -47,11 +49,12 @@ class PlatformContributionService
                 'platform' => $platformSlug,
             ],
             'is_empty' => $isEmpty,
-            'message' => $isEmpty ? 'Data tidak tersedia untuk filter yang dipilih.' : null,
+            'message' => $isEmpty ? 'Tidak ada data kontribusi platform untuk filter yang dipilih.' : null,
             'totals' => [
                 'revenue' => $totalRevenue,
                 'transactions' => $totalTransactions,
                 'users' => $platforms->sum('users'),
+                'platforms' => $platforms->count(),
             ],
             'platforms' => $platforms->all(),
             'labels' => $platforms->pluck('name')->all(),
