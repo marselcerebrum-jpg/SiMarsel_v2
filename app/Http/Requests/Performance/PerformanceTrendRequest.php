@@ -4,15 +4,14 @@ namespace App\Http\Requests\Performance;
 
 use App\Enums\TrendMetric;
 use App\Enums\TrendPeriod;
-use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
 
-class PerformanceTrendRequest extends PerformanceSummaryRequest
+class PerformanceTrendRequest extends PerformanceFilterRequest
 {
     /**
-     * Uses the performance summary filters plus the selected metric and period.
+     * Uses the performance filters plus the selected metric and an optional period.
      *
      * @return array<string, ValidationRule|array<mixed>|string>
      */
@@ -21,34 +20,36 @@ class PerformanceTrendRequest extends PerformanceSummaryRequest
         return [
             ...parent::rules(),
             'metric' => ['required', Rule::in(array_column(TrendMetric::cases(), 'value'))],
-            'period' => ['required', Rule::in(array_column(TrendPeriod::cases(), 'value'))],
+            'period' => ['nullable', Rule::in(array_column(TrendPeriod::cases(), 'value'))],
         ];
     }
 
     /**
-     * Limit the date range for periods that would otherwise produce too many data points.
+     * Limit the range for periods that would otherwise produce too many data points.
      *
      * @return array<int, callable>
      */
     public function after(): array
     {
         return [
+            ...parent::after(),
             function (Validator $validator) {
-                if ($validator->errors()->hasAny(['date_from', 'date_to', 'period'])) {
+                if ($validator->errors()->isNotEmpty()) {
                     return;
                 }
 
-                $period = TrendPeriod::from($this->input('period'));
+                $period = $this->period();
+                $filter = $this->filter();
+
+                if ($filter->comparesYears() && $period !== TrendPeriod::Monthly) {
+                    $validator->errors()->add('period', 'Perbandingan beberapa tahun hanya mendukung periode monthly.');
+
+                    return;
+                }
+
                 $maxDays = $period->maxDays();
 
-                if ($maxDays === null) {
-                    return;
-                }
-
-                $from = CarbonImmutable::createFromFormat('Y-m-d', $this->input('date_from'))->startOfDay();
-                $to = CarbonImmutable::createFromFormat('Y-m-d', $this->input('date_to'))->startOfDay();
-
-                if ((int) $from->diffInDays($to) + 1 > $maxDays) {
+                if ($maxDays !== null && $filter->days() > $maxDays) {
                     $validator->errors()->add(
                         'date_to',
                         "Rentang tanggal untuk periode {$period->value} maksimal {$maxDays} hari.",
@@ -56,6 +57,16 @@ class PerformanceTrendRequest extends PerformanceSummaryRequest
                 }
             },
         ];
+    }
+
+    /**
+     * The selected period, or the filter's default: daily for a month or date range, monthly for years.
+     */
+    public function period(): TrendPeriod
+    {
+        return $this->filled('period')
+            ? TrendPeriod::from($this->input('period'))
+            : $this->filter()->defaultPeriod;
     }
 
     /**
@@ -67,6 +78,7 @@ class PerformanceTrendRequest extends PerformanceSummaryRequest
     {
         return [
             ...parent::messages(),
+            'required' => ':attribute wajib diisi.',
             'in' => ':attribute tidak valid.',
         ];
     }

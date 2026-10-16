@@ -3,7 +3,7 @@
 namespace App\Services;
 
 use App\Repositories\PaymentMethodDistributionRepository;
-use Carbon\CarbonImmutable;
+use App\Support\PerformanceFilter;
 
 class PaymentMethodDistributionService
 {
@@ -16,10 +16,10 @@ class PaymentMethodDistributionService
      *
      * @return array<string, mixed>
      */
-    public function distribution(CarbonImmutable $from, CarbonImmutable $to, ?string $platformSlug): array
+    public function distribution(PerformanceFilter $filter): array
     {
         $methods = $this->paymentMethodDistributionRepository
-            ->totalsPerPaymentMethod($from, $to, $platformSlug)
+            ->totalsPerPaymentMethod($filter)
             ->map(fn (object $row) => [
                 'name' => filled($row->name) ? $row->name : self::UNKNOWN_METHOD,
                 'transactions' => (int) $row->transactions,
@@ -40,11 +40,7 @@ class PaymentMethodDistributionService
         $isEmpty = $totalTransactions === 0;
 
         return [
-            'filter' => [
-                'date_from' => $from->toDateString(),
-                'date_to' => $to->toDateString(),
-                'platform' => $platformSlug,
-            ],
+            'filter' => $filter->toArray(),
             'is_empty' => $isEmpty,
             'message' => $isEmpty ? 'Data tidak tersedia untuk filter yang dipilih.' : null,
             'totals' => [
