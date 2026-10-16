@@ -11,7 +11,17 @@ class TopPackageController extends Controller
 {
     public function __construct(private TopPackageService $topPackageService) {}
 
-    public function __invoke(TopPackageRequest $request): TopPackageResource
+    public function byRevenue(TopPackageRequest $request): TopPackageResource
+    {
+        return $this->top($request, TopPackageService::RANK_BY_REVENUE);
+    }
+
+    public function byTransactions(TopPackageRequest $request): TopPackageResource
+    {
+        return $this->top($request, TopPackageService::RANK_BY_TRANSACTIONS);
+    }
+
+    private function top(TopPackageRequest $request, string $rankBy): TopPackageResource
     {
         $month = $request->validated('month');
         $limit = $request->validated('limit');
@@ -21,6 +31,7 @@ class TopPackageController extends Controller
             (int) $request->validated('year'),
             $month === null ? null : (int) $month,
             $limit === null ? TopPackageService::DEFAULT_LIMIT : (int) $limit,
+            $rankBy,
         );
 
         return TopPackageResource::make($top);

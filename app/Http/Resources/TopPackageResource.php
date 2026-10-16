@@ -16,6 +16,7 @@ class TopPackageResource extends JsonResource
     {
         return [
             'filter' => $this->resource['filter'],
+            'rank_by' => $this->resource['rank_by'],
             'is_empty' => $this->resource['is_empty'],
             'message' => $this->resource['message'],
             'totals' => $this->resource['totals'],
