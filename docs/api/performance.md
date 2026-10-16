@@ -141,6 +141,7 @@ Contoh:
 
 - Minggu dan bulan pertama atau terakhir **dipotong mengikuti rentang filter**. Contohnya, filter mulai Selasa 1 Sep menghasilkan minggu pertama 1 - 6 Sep.
 - Periode tanpa data tetap muncul dengan nilai `0`, supaya grafik tidak bolong.
+- Periode yang **dimulai setelah hari ini** (misalnya sisa hari di bulan berjalan, atau Nov - Des di tahun berjalan) bernilai `null`, begitu juga `change_percentage` dan `trend`-nya. Datanya memang belum ada, jadi grafik tidak turun ke 0. Hari ini sendiri tetap punya nilai.
 - Tanggal mengikuti timezone aplikasi `Asia/Jakarta`.
 - Batas 366 hari dihitung dari jumlah hari semua tahun yang dipilih. Contohnya, `year_from=2024&year_to=2026` hanya bisa memakai `monthly`.
 
@@ -150,7 +151,8 @@ Jika lebih dari satu tahun dipilih lewat `years[]`, periodenya selalu `monthly`,
 
 - `labels` berisi nama bulan: `["Jan", "Feb", ..., "Dec"]`.
 - `datasets` berisi **satu dataset per tahun**, dengan `label` berupa tahunnya.
-- `rows` tetap berurutan per bulan dari tahun pertama sampai tahun terakhir (`Jan 2025` ... `Dec 2026`). `change_percentage` dibandingkan dengan baris sebelumnya, termasuk Jan tahun berikutnya dibanding Dec tahun yang dipilih sebelumnya.
+- `rows` tetap berurutan per bulan dari tahun pertama sampai tahun terakhir (`Jan 2025` ... `Dec 2026`).
+- `change_percentage` dan `trend` setiap baris dibandingkan dengan **bulan yang sama di tahun pilihan sebelumnya**. Contohnya, dengan `years[]=2024&years[]=2026`, Mar 2026 dibandingkan dengan Mar 2024. Baris di tahun pertama bernilai `null` karena tidak punya pembanding.
 
 ```json
 {
@@ -159,14 +161,18 @@ Jika lebih dari satu tahun dipilih lewat `years[]`, periodenya selalu `monthly`,
         "labels": ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"],
         "datasets": [
             { "label": "2025", "data": [0, 0, 200000, 0, 0, 0, 50000, 0, 0, 0, 0, 0] },
-            { "label": "2026", "data": [0, 0, 400000, 0, 0, 0, 0, 0, 470000, 30000, 0, 0] }
+            { "label": "2026", "data": [0, 0, 400000, 0, 0, 0, 0, 0, 470000, 30000, null, null] }
         ],
         "rows": [
-            { "label": "Jan 2025", "period_start": "2025-01-01", "period_end": "2025-01-31", "value": 0, "change_percentage": null, "trend": null }
+            { "label": "Mar 2025", "period_start": "2025-03-01", "period_end": "2025-03-31", "value": 200000, "change_percentage": null, "trend": null },
+            { "label": "Mar 2026", "period_start": "2026-03-01", "period_end": "2026-03-31", "value": 400000, "change_percentage": 100, "trend": "up" },
+            { "label": "Nov 2026", "period_start": "2026-11-01", "period_end": "2026-11-30", "value": null, "change_percentage": null, "trend": null }
         ]
     }
 }
 ```
+
+Contoh `rows` di atas hanya sebagian. Respons asli berisi 24 baris.
 
 Jika hanya satu tahun dipilih, bentuknya sama seperti biasa: label `Jan 2026` ... `Dec 2026` dengan satu dataset.
 
@@ -221,8 +227,8 @@ Untuk `revenue`, `transactions`, `downloaders`, `new_users`, dan `repeat_orders`
 | `label` | Label periode, sama dengan `labels` |
 | `period_start`, `period_end` | Rentang tanggal periode itu (`YYYY-MM-DD`) |
 | `value` | Nilai metric di periode itu, sama dengan `datasets[0].data` (atau dataset tahunnya saat membandingkan beberapa tahun) |
-| `change_percentage` | `(value - value baris sebelumnya) ÷ value baris sebelumnya × 100`, dibulatkan 2 desimal. `null` untuk baris pertama, atau jika nilai baris sebelumnya `0`/`null`. |
-| `trend` | `up`, `down`, atau `same` dibanding baris sebelumnya; nilai `null` dihitung sebagai `0`. `null` untuk baris pertama. |
+| `change_percentage` | `(value - value baris sebelumnya) ÷ value baris sebelumnya × 100`, dibulatkan 2 desimal. `null` untuk baris pertama, untuk periode setelah hari ini, atau jika nilai baris sebelumnya `0`/`null`. Saat membandingkan beberapa tahun, pembandingnya adalah bulan yang sama di tahun pilihan sebelumnya. |
+| `trend` | `up`, `down`, atau `same` dibanding baris sebelumnya (atau bulan yang sama di tahun sebelumnya); nilai `null` dihitung sebagai `0`. `null` untuk baris pertama dan periode setelah hari ini. |
 
 Aturan `change_percentage` dan `trend` sama persis dengan perbandingan periode di `/summary`.
 
