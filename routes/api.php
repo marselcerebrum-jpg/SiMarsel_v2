@@ -73,6 +73,8 @@ Route::middleware('auth')->group(function () {
         ->name('api.performance.packages.index');
     Route::get('/performance/packages/export', [PackageDetailController::class, 'export'])
         ->name('api.performance.packages.export');
-    Route::get('/performance/top-packages', TopPackageController::class)
+    Route::get('/performance/top-packages', [TopPackageController::class, 'byRevenue'])
         ->name('api.performance.top-packages');
+    Route::get('/performance/top-packages/transactions', [TopPackageController::class, 'byTransactions'])
+        ->name('api.performance.top-packages.transactions');
 });
