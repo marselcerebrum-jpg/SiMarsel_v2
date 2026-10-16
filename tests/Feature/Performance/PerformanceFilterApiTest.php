@@ -84,9 +84,22 @@ class PerformanceFilterApiTest extends TestCase
 
         $this->assertSame('current_month', $summary['filter']['mode']);
         $this->assertSame(['2026-10-01', '2026-10-16'], [$summary['filter']['date_from'], $summary['filter']['date_to']]);
-        $this->assertSame(['2026-09-15', '2026-09-30'], [$summary['previous_period']['date_from'], $summary['previous_period']['date_to']]);
         $this->assertEquals(30000, $summary['kpis']['total_revenue']['value']);
         $this->assertSame(2, $summary['kpis']['total_transactions']['value']);
+
+        // Compared with the whole of September, like a selected month.
+        $this->assertSame(['2026-09-01', '2026-09-30'], [$summary['previous_period']['date_from'], $summary['previous_period']['date_to']]);
+        $this->assertEquals(470000, $summary['kpis']['total_revenue']['previous_value']);
+        $this->assertSame('down', $summary['kpis']['total_revenue']['trend']);
+    }
+
+    public function test_default_and_selecting_the_current_month_compare_with_the_same_period(): void
+    {
+        $default = $this->summary();
+        $month = $this->summary('?year=2026&month=10');
+
+        $this->assertSame($default['previous_period']['ranges'], $month['previous_period']['ranges']);
+        $this->assertSame($default['kpis'], $month['kpis']);
     }
 
     public function test_month_shows_that_month_and_compares_with_the_month_before(): void
