@@ -24,7 +24,7 @@ Pilih **salah satu** mode di bawah. Jika lebih dari satu mode dikirim, respons *
 
 | Mode (`filter.mode`) | Parameter | Data yang dihitung | Dibandingkan dengan | Rincian grafik default |
 |---|---|---|---|---|
-| `current_month` | (tidak ada parameter periode) | Tanggal 1 bulan ini sampai hari ini | Jumlah hari yang sama tepat sebelumnya | Harian |
+| `current_month` | (tidak ada parameter periode) | Tanggal 1 bulan ini sampai hari ini | Seluruh bulan sebelumnya | Harian |
 | `date_range` | `date_from`, `date_to` (`YYYY-MM-DD`) | Rentang tanggal tersebut | Jumlah hari yang sama tepat sebelumnya | Harian |
 | `month` | `year`, `month` (1-12) | Satu bulan penuh | Bulan sebelumnya | Harian |
 | `years` | `years[]`, 1 sampai 5 tahun | Setiap tahun yang dipilih (tahun di antaranya tidak ikut) | Masing-masing tahun − 1 | Bulanan |
@@ -43,7 +43,7 @@ Contoh:
 
 | Filter | Periode sekarang | Periode pembanding |
 |---|---|---|
-| Default, hari ini 16 Okt 2026 | 1 - 16 Okt 2026 | 15 - 30 Sep 2026 |
+| Default, hari ini 16 Okt 2026 | 1 - 16 Okt 2026 | 1 - 30 Sep 2026 |
 | `date_from=2026-09-01&date_to=2026-09-30` | 1 - 30 Sep 2026 | 2 - 31 Agu 2026 |
 | `year=2026&month=1` | 1 - 31 Jan 2026 | 1 - 31 Des 2025 |
 | `year=2026&month=10` (bulan berjalan, hari ini 16 Okt) | 1 - 31 Okt 2026 | 1 - 30 Sep 2026 |
@@ -53,7 +53,7 @@ Contoh:
 
 Untuk mode `years`, Card Overview menampilkan **gabungan** semua tahun yang dipilih. Perbandingan antar tahun dilihat di Grafik Data.
 
-Bulan dan tahun **selalu dibandingkan utuh**, walaupun bulan atau tahun berjalan belum selesai. Contohnya, Oktober 2026 yang baru berjalan 16 hari tetap dibandingkan dengan seluruh September, jadi wajar jika terlihat turun. Jika ingin perbandingan dengan jumlah hari yang sama, pakai mode default atau `date_from`/`date_to`.
+Bulan dan tahun **selalu dibandingkan utuh**, walaupun bulan atau tahun berjalan belum selesai. Ini berlaku juga untuk mode default. Contohnya, Oktober 2026 yang baru berjalan 16 hari tetap dibandingkan dengan seluruh September, jadi wajar jika terlihat turun. Default dan `year=2026&month=10` selalu menghasilkan perbandingan yang sama. Hanya `date_from`/`date_to` yang dibandingkan dengan jumlah hari yang sama tepat sebelumnya, karena rentangnya bebas.
 
 ## Blok `filter` di setiap respons
 
