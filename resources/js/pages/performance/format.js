@@ -1,9 +1,9 @@
 const currency = new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 });
 const number = new Intl.NumberFormat('id-ID', { maximumFractionDigits: 0 });
 const decimal = new Intl.NumberFormat('id-ID', { minimumFractionDigits: 1, maximumFractionDigits: 2 });
+const oneDecimal = new Intl.NumberFormat('id-ID', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 const compactCurrency = new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', notation: 'compact', maximumFractionDigits: 2 });
 const compactNumber = new Intl.NumberFormat('id-ID', { notation: 'compact', maximumFractionDigits: 1 });
-const longDate = new Intl.DateTimeFormat('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
 
 export function formatValue(value, format, { compact = false } = {}) {
     if (value === null || value === undefined) return '—';
@@ -14,14 +14,11 @@ export function formatValue(value, format, { compact = false } = {}) {
     return number.format(value);
 }
 
-function toDate(value) {
-    const [year, month, day] = value.split('-').map(Number);
-
-    return new Date(year, month - 1, day);
-}
-
-export function formatDate(value) {
-    return value ? longDate.format(toDate(value)) : '';
+/**
+ * Contribution share with exactly one decimal, e.g. "33,3%". Null means it cannot be computed (N/A).
+ */
+export function formatShare(value) {
+    return value === null || value === undefined ? 'N/A' : `${oneDecimal.format(value)}%`;
 }
 
 /**
@@ -32,14 +29,6 @@ export function formatAxis(value, format) {
     if (format === 'percent') return `${number.format(value)}%`;
 
     return compactNumber.format(value);
-}
-
-export function formatRange(range) {
-    if (!range?.start_date) return '';
-
-    return range.start_date === range.end_date
-        ? formatDate(range.start_date)
-        : `${formatDate(range.start_date)} – ${formatDate(range.end_date)}`;
 }
 
 const TRENDS = {

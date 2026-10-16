@@ -1,22 +1,4 @@
-import { pieColor } from './chart';
-import { formatValue, trendBadge } from './format';
-
-/**
- * Rows for the period comparison table, in the same order as the KPI cards.
- */
-export function comparisonRows(definitions, metrics) {
-    return definitions.map(({ key, label, format }) => {
-        const metric = metrics?.[key] ?? null;
-
-        return {
-            key,
-            label,
-            current: formatValue(metric?.value, format),
-            previous: formatValue(metric?.previous_value, format),
-            trend: trendBadge(metric),
-        };
-    });
-}
+import { formatShare, formatValue, trendBadge } from './format';
 
 /**
  * Rows for the trend table, one per backend row. The change column uses the
@@ -32,26 +14,24 @@ export function trendRows(rows, format) {
 }
 
 /**
- * Rows for the platform contribution table, in the backend order (largest revenue first).
- * The color matches the platform's slice in the pie chart.
+ * Ranking rows for the platform contribution table, in the backend order (largest revenue first).
+ * When total revenue is zero the share cannot be computed, so it shows as N/A with an empty bar.
  */
-export function contributionRows(platforms) {
-    return platforms.map((platform, index) => ({
-        key: platform.slug,
-        name: platform.name,
-        color: pieColor(index),
-        revenue: formatValue(platform.revenue, 'currency'),
-        transactions: formatValue(platform.transactions, 'number'),
-        users: formatValue(platform.users, 'number'),
-        share: Math.min(Math.max(Number(platform.contribution_percentage) || 0, 0), 100),
-        contribution: formatValue(platform.contribution_percentage, 'percent'),
-    }));
-}
+export function contributionRows(platforms, totalRevenue) {
+    const hasRevenue = Number(totalRevenue) > 0;
 
-export function contributionTotals(totals) {
-    return {
-        revenue: formatValue(totals?.revenue, 'currency'),
-        transactions: formatValue(totals?.transactions, 'number'),
-        users: formatValue(totals?.users, 'number'),
-    };
+    return platforms.map((platform, index) => {
+        const share = hasRevenue ? Math.min(Math.max(Number(platform.contribution_percentage) || 0, 0), 100) : null;
+
+        return {
+            key: platform.slug,
+            rank: index + 1,
+            name: platform.name,
+            revenue: formatValue(platform.revenue, 'currency'),
+            transactions: formatValue(platform.transactions, 'number'),
+            users: formatValue(platform.users, 'number'),
+            width: `${share ?? 0}%`,
+            contribution: formatShare(share),
+        };
+    });
 }

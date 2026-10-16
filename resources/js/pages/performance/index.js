@@ -3,8 +3,7 @@ import Alpine from 'alpinejs';
 import { errorMessage, validationErrors } from '../../http';
 import { fetchSummary } from './api';
 import { PERIOD_PRESETS, defaultFilter, filterFromUrl, presetRange, syncUrl, toQuery, today, validateRange } from './filter';
-import { formatDateTime, formatRange, formatValue, trendBadge } from './format';
-import { comparisonRows } from './table';
+import { formatDateTime, formatValue } from './format';
 import performanceContribution from './contribution';
 import performanceTrend from './trend';
 
@@ -13,8 +12,6 @@ const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
 
 // Backend field names for the date filter, mapped to the form fields.
 const ERROR_FIELDS = { date_from: 'start_date', date_to: 'end_date' };
-
-const toRange = (period) => (period ? { start_date: period.date_from, end_date: period.date_to } : null);
 
 Alpine.data('performanceSummary', (definitions = [], platforms = []) => ({
     definitions,
@@ -48,28 +45,8 @@ Alpine.data('performanceSummary', (definitions = [], platforms = []) => ({
         return this.summary?.is_empty === true;
     },
 
-    get emptyMessage() {
-        return this.summary?.message || 'Data tidak tersedia untuk filter yang dipilih.';
-    },
-
-    get periodLabel() {
-        return formatRange(toRange(this.summary?.filter));
-    },
-
-    get previousPeriodLabel() {
-        return formatRange(toRange(this.summary?.previous_period));
-    },
-
     get loadedLabel() {
         return this.loadedAt ? formatDateTime(this.loadedAt) : '';
-    },
-
-    get platformLabel() {
-        return this.platforms.find(({ value }) => value === this.filter.platform)?.label ?? 'All Platforms';
-    },
-
-    get rows() {
-        return comparisonRows(this.definitions, this.metrics);
     },
 
     get skeleton() {
@@ -82,10 +59,6 @@ Alpine.data('performanceSummary', (definitions = [], platforms = []) => ({
 
     isUnavailable(key) {
         return !this.loading && (this.metrics[key]?.value ?? null) === null;
-    },
-
-    trend(key) {
-        return trendBadge(this.metrics[key]);
     },
 
     /**

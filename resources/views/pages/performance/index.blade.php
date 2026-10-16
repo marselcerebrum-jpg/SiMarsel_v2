@@ -76,14 +76,6 @@
             </div>
 
             <div class="flex items-center gap-2 self-start sm:self-auto">
-                <p class="inline-flex h-11 items-center gap-2 rounded-xl border border-white/30 bg-white/15 px-4 text-xs font-semibold backdrop-blur" aria-live="polite">
-                    <span class="relative flex size-2" aria-hidden="true">
-                        <span x-show="loading" class="absolute inline-flex size-full animate-ping rounded-full bg-white/80"></span>
-                        <span class="relative inline-flex size-2 rounded-full" :class="loading ? 'bg-white' : (isEmpty ? 'bg-amber-300' : (summary ? 'bg-emerald-300' : 'bg-white/50'))"></span>
-                    </span>
-                    <span x-show="loading">Memuat data…</span>
-                    <span x-show="!loading" x-cloak x-text="isEmpty ? emptyMessage : (summary ? `${periodLabel} · ${platformLabel}` : platformLabel)"></span>
-                </p>
                 <button
                     type="button"
                     x-show="!loading && loadError"
@@ -119,10 +111,6 @@
 
         <section class="{{ $card }} performance-rise relative mt-4 overflow-hidden p-5 sm:p-7" style="--delay: {{ $delay + 60 }}ms" aria-labelledby="performance-contribution-title">
             @include('pages.performance.components.performance-contribution')
-        </section>
-
-        <section class="{{ $card }} performance-rise mt-4 p-5 sm:p-6" style="--delay: {{ $delay + 120 }}ms" aria-labelledby="performance-comparison-title">
-            @include('pages.performance.components.performance-table')
         </section>
     </div>
 @endsection

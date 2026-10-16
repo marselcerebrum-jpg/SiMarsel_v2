@@ -1,88 +1,102 @@
-import Alpine from 'alpinejs';
 import { errorMessage } from '../../http';
 import { fetchPlatformContribution } from './api';
-import { contributionChartConfig, renderChart } from './chart';
-import { contributionRows, contributionTotals } from './table';
+import { formatValue } from './format';
+import { contributionRows } from './table';
+
+const EMPTY_MESSAGE = 'Tidak ada data kontribusi platform untuk filter yang dipilih.';
+
+// Keeps the fixed tooltip inside the viewport (half of its max width plus a gutter).
+const TIP_EDGE = 136;
 
 /**
- * Platform contribution. Uses the same filter as the Performance Summary:
- * it reloads whenever the main filter dispatches `performance-filter`.
+ * Platform contribution ranking. Uses the same filter as the Performance Summary and the
+ * trend analysis: it reloads whenever the main filter dispatches `performance-filter`.
  */
-export default () => {
-    // Kept outside Alpine's reactive proxy: Chart.js breaks when wrapped in a Proxy.
-    let chart = null;
+export default () => ({
+    contribution: null,
+    contributionLoading: true,
+    contributionError: '',
+    contributionRequestId: 0,
+    contributionQuery: null,
+    tip: null,
 
-    return {
-        contribution: null,
-        contributionLoading: true,
-        contributionError: '',
-        contributionRequestId: 0,
+    get contributionPlatforms() {
+        return this.contribution?.platforms ?? [];
+    },
 
-        get contributionPlatforms() {
-            return this.contribution?.platforms ?? [];
-        },
+    get contributionEmpty() {
+        return this.contribution?.is_empty === true || this.contributionPlatforms.length === 0;
+    },
 
-        get contributionEmpty() {
-            return this.contribution?.is_empty === true || (this.contribution !== null && this.contributionPlatforms.length === 0);
-        },
+    get showContribution() {
+        return this.contribution !== null && !this.contributionEmpty && !this.contributionError;
+    },
 
-        get contributionMessage() {
-            if (this.contributionError) return this.contributionError;
+    get contributionState() {
+        if (this.showContribution) return 'ready';
+        if (this.contributionLoading) return 'loading';
 
-            return this.contribution?.message || 'Data tidak tersedia untuk filter yang dipilih.';
-        },
+        return this.contributionError ? 'error' : 'empty';
+    },
 
-        get showContribution() {
-            return this.contribution !== null && !this.contributionEmpty && !this.contributionError;
-        },
+    get contributionMessage() {
+        return this.contributionError || EMPTY_MESSAGE;
+    },
 
-        get contributionTableRows() {
-            return contributionRows(this.contributionPlatforms);
-        },
+    get contributionRevenue() {
+        return formatValue(this.contribution?.totals?.revenue, 'currency');
+    },
 
-        get contributionTotalRow() {
-            return contributionTotals(this.contribution?.totals);
-        },
+    get contributionPlatformCount() {
+        return formatValue(this.contributionPlatforms.length, 'number');
+    },
 
-        async loadContribution(query) {
-            const requestId = ++this.contributionRequestId;
-            this.contributionLoading = true;
-            this.contributionError = '';
+    get contributionTableRows() {
+        return contributionRows(this.contributionPlatforms, this.contribution?.totals?.revenue);
+    },
 
-            try {
-                const { data } = await fetchPlatformContribution(query);
-                if (requestId !== this.contributionRequestId) return;
+    async loadContribution(query) {
+        const requestId = ++this.contributionRequestId;
+        this.contributionQuery = query;
+        this.contributionLoading = true;
+        this.contributionError = '';
+        this.hideTip();
 
-                this.contribution = data;
-            } catch (error) {
-                if (requestId !== this.contributionRequestId) return;
+        try {
+            const { data } = await fetchPlatformContribution(query);
+            if (requestId !== this.contributionRequestId) return;
 
-                this.contribution = null;
-                this.contributionError = errorMessage(error, 'Gagal memuat kontribusi platform.');
-            } finally {
-                if (requestId === this.contributionRequestId) {
-                    this.contributionLoading = false;
-                    this.drawContribution();
-                }
-            }
-        },
+            this.contribution = data;
+        } catch (error) {
+            if (requestId !== this.contributionRequestId) return;
 
-        drawContribution() {
-            if (!this.showContribution) {
-                chart?.destroy();
-                chart = null;
-                return;
-            }
+            this.contribution = null;
+            this.contributionError = errorMessage(error, 'Gagal memuat kontribusi platform.');
+        } finally {
+            if (requestId === this.contributionRequestId) this.contributionLoading = false;
+        }
+    },
 
-            // Wait for x-show to reveal the canvas so Chart.js can measure it.
-            this.$nextTick(() => {
-                chart = renderChart(this.$refs.contributionCanvas, contributionChartConfig(Alpine.raw(this.contributionPlatforms)), chart);
-            });
-        },
+    retryContribution() {
+        if (this.contributionQuery) this.loadContribution(this.contributionQuery);
+    },
 
-        destroy() {
-            chart?.destroy();
-            chart = null;
-        },
-    };
-};
+    /**
+     * Tooltip for a progress bar, positioned above it. It is teleported to <body> with fixed
+     * positioning so the table's horizontal scroll container cannot clip it.
+     */
+    showTip(row, event) {
+        const rect = event.currentTarget.getBoundingClientRect();
+        const center = rect.left + rect.width / 2;
+
+        this.tip = {
+            ...row,
+            x: Math.min(Math.max(center, TIP_EDGE), window.innerWidth - TIP_EDGE),
+            y: rect.top,
+        };
+    },
+
+    hideTip() {
+        this.tip = null;
+    },
+});

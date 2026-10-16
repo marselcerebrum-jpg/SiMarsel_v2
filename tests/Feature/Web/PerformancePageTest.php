@@ -52,8 +52,8 @@ class PerformancePageTest extends TestCase
                 'AOV',
                 'Repeat Order',
                 'Conversion',
-                'Period Comparison',
-            ]);
+            ])
+            ->assertDontSee('Period Comparison');
     }
 
     public function test_performance_page_has_period_and_platform_filters(): void
@@ -105,9 +105,26 @@ class PerformancePageTest extends TestCase
             ->assertSee('Platform Contribution')
             ->assertSee('x-data="performanceContribution"', false)
             ->assertSee('@performance-filter.window="loadContribution($event.detail)"', false)
-            ->assertSee('x-ref="contributionCanvas"', false)
-            ->assertSeeInOrder(['>Platform</th>', '>Revenue</th>', '>Transactions</th>', '>Users</th>', '>Contribution</th>'], false)
-            ->assertSeeInOrder(['Trend &amp; Performance Analysis', 'Platform Contribution', 'Period Comparison'], false);
+            ->assertDontSee('contributionCanvas', false)
+            ->assertSeeInOrder(['>Platform</th>', '>Revenue</th>', '>Transactions</th>', '>Users</th>', '>Contribution (%)</th>'], false)
+            ->assertSeeInOrder(['Trend &amp; Performance Analysis', 'Platform Contribution'], false);
+    }
+
+    public function test_platform_contribution_shows_summary_progress_bar_tooltip_and_states(): void
+    {
+        $this->actingAs($this->employee)
+            ->get('/performance')
+            ->assertOk()
+            ->assertSeeInOrder(['Total Revenue', 'Platforms', 'Jumlah platform yang tercakup dalam hasil filter'])
+            ->assertSee('x-text="contributionRevenue"', false)
+            ->assertSee('x-text="contributionPlatformCount"', false)
+            ->assertSee(':style="{ width: row.width }"', false)
+            ->assertSee('@mouseenter="showTip(row, $event)"', false)
+            ->assertSee('role="tooltip"', false)
+            ->assertSee("contributionState === 'loading'", false)
+            ->assertSee("contributionState === 'empty'", false)
+            ->assertSee("contributionState === 'error'", false)
+            ->assertSee('@click="retryContribution()"', false);
     }
 
     public function test_sidebar_links_performance_page_and_marks_it_active(): void

@@ -19,14 +19,6 @@
 
     <div class="flex items-start justify-between gap-3">
         <h3 @class(['font-bold tracking-wider text-label uppercase', 'text-[13px]' => $primary, 'text-xs' => ! $primary])>{{ $metric['label'] }}</h3>
-        <span
-            x-show="summary && trend({{ $key }}).short"
-            x-cloak
-            x-transition.scale.origin.right
-            class="shrink-0 rounded-lg px-2 py-0.5 text-xs font-bold whitespace-nowrap"
-            :class="trend({{ $key }}).tone"
-            x-text="trend({{ $key }}).short"
-        ></span>
     </div>
 
     <div x-show="skeleton" class="mt-1.5 space-y-1.5" aria-hidden="true">
@@ -47,9 +39,4 @@
             <div class="h-full rounded-full bg-linear-to-r from-brand-indigo to-brand-teal" :style="{ width: progress({{ $key }}) }"></div>
         </div>
     @endif
-
-    <p x-show="summary && !isUnavailable({{ $key }})" x-cloak x-transition.opacity.duration.500ms class="mt-auto pt-3 text-xs leading-snug">
-        <span class="font-semibold" :class="trend({{ $key }}).textTone" x-text="trend({{ $key }}).sentence"></span>
-        <span x-show="trend({{ $key }}).short && previousPeriodLabel" class="text-label" x-text="`(${previousPeriodLabel})`"></span>
-    </p>
 </article>
