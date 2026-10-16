@@ -10,6 +10,7 @@ use App\Http\Controllers\Performance\PerformanceTrendController;
 use App\Http\Controllers\Performance\PlatformContributionController;
 use App\Http\Controllers\Performance\ProductPerformanceController;
 use App\Http\Controllers\Performance\ProductPerformanceFilterController;
+use App\Http\Controllers\Performance\TopPackageController;
 use App\Models\Account;
 use App\Models\Division;
 use Illuminate\Support\Facades\Route;
@@ -72,4 +73,6 @@ Route::middleware('auth')->group(function () {
         ->name('api.performance.packages.index');
     Route::get('/performance/packages/export', [PackageDetailController::class, 'export'])
         ->name('api.performance.packages.export');
+    Route::get('/performance/top-packages', TopPackageController::class)
+        ->name('api.performance.top-packages');
 });
