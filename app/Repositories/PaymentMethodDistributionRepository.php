@@ -3,30 +3,23 @@
 namespace App\Repositories;
 
 use App\Models\Transaction;
-use Carbon\CarbonInterface;
-use Illuminate\Database\Eloquent\Builder;
+use App\Repositories\Concerns\AppliesPerformanceFilter;
+use App\Support\PerformanceFilter;
 use Illuminate\Support\Collection;
 
 class PaymentMethodDistributionRepository
 {
+    use AppliesPerformanceFilter;
+
     /**
      * Transactions and revenue per payment method from successful transactions.
      * Methods are grouped case- and whitespace-insensitively; an empty method is grouped under an empty name.
      *
      * @return Collection<int, object{name: string|null, transactions: int, revenue: string|float}>
      */
-    public function totalsPerPaymentMethod(CarbonInterface $from, CarbonInterface $to, ?string $platformSlug): Collection
+    public function totalsPerPaymentMethod(PerformanceFilter $filter): Collection
     {
-        return Transaction::query()
-            ->successful()
-            ->whereBetween('paid_date', [
-                $from->copy()->startOfDay()->toDateTimeString(),
-                $to->copy()->endOfDay()->toDateTimeString(),
-            ])
-            ->when($platformSlug, fn (Builder $query) => $query->whereHas(
-                'platform',
-                fn (Builder $platform) => $platform->where('slug', $platformSlug),
-            ))
+        return $this->applyPerformanceFilter(Transaction::query()->successful(), $filter, 'paid_date', 'platform_id')
             ->toBase()
             ->selectRaw(
                 'MIN(TRIM(payment_method)) as name, '

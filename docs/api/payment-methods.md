@@ -8,15 +8,13 @@ Wajib login. Semua role (Manager dan Employee) boleh mengakses. Aturan header da
 
 ### Query parameter
 
-Sama persis dengan `/api/performance/summary`.
+Sama persis dengan `/api/performance/summary`, lihat [filter Ringkasan Performa](performance-filter.md): beberapa platform (`platforms[]`) dan satu mode periode (default bulan berjalan, rentang tanggal, bulan, beberapa tahun, atau rentang tahun).
 
-| Parameter | Wajib | Format | Keterangan |
-|---|---|---|---|
-| `date_from` | Ya | `YYYY-MM-DD` | Tanggal mulai (inklusif) |
-| `date_to` | Ya | `YYYY-MM-DD` | Tanggal akhir (inklusif), tidak boleh sebelum `date_from` |
-| `platform` | Tidak | slug platform | Kosongkan untuk menghitung semua platform |
+Contoh:
 
-Contoh: `GET /api/performance/payment-methods?date_from=2026-09-01&date_to=2026-09-30`
+- `GET /api/performance/payment-methods?date_from=2026-09-01&date_to=2026-09-30`
+- `GET /api/performance/payment-methods?year=2026&month=9&platforms[]=jadiasn&platforms[]=cerebrum`
+- `GET /api/performance/payment-methods?years[]=2025&years[]=2026` (gabungan kedua tahun)
 
 ### Rumus per metode pembayaran
 
@@ -43,7 +41,7 @@ Hanya transaksi dengan `status_message` = `Success` yang dihitung.
 ```json
 {
     "data": {
-        "filter": { "date_from": "2026-09-01", "date_to": "2026-09-30", "platform": null },
+        "filter": { "mode": "date_range", "date_from": "2026-09-01", "date_to": "2026-09-30", "platform": null, "platforms": [], "...": "lihat performance-filter.md" },
         "is_empty": false,
         "message": null,
         "totals": { "transactions": 6, "revenue": 1000000 },
@@ -72,4 +70,4 @@ Jika tidak ada transaksi `Success` di periode yang dipilih, respons tetap **200*
 
 ### 422 Validasi gagal
 
-Sama dengan `/api/performance/summary`: tanggal kosong atau salah format, `date_to` sebelum `date_from`, atau slug platform tidak ditemukan.
+Sama dengan [filter Ringkasan Performa](performance-filter.md#422-validasi-gagal), misalnya lebih dari satu mode periode, format tanggal salah, atau slug platform tidak ditemukan.

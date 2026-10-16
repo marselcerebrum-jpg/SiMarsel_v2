@@ -102,9 +102,9 @@ class PerformanceSummaryTest extends TestCase
     {
         $this->actingAs($this->manager);
 
-        $this->getJson(self::URL)
+        $this->getJson(self::URL.'?date_from=2026-09-01')
             ->assertUnprocessable()
-            ->assertJsonValidationErrors(['date_from', 'date_to']);
+            ->assertJsonValidationErrors(['date_to' => 'Tanggal akhir wajib diisi.']);
 
         $this->getJson(self::URL.'?date_from=01-09-2026&date_to=2026-09-30')
             ->assertJsonValidationErrors(['date_from' => 'Tanggal mulai harus berformat YYYY-MM-DD.']);
