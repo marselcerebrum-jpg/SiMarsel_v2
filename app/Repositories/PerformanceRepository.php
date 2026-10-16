@@ -3,14 +3,16 @@
 namespace App\Repositories;
 
 use App\Models\Downloader;
-use App\Models\Platform;
 use App\Models\Transaction;
-use Carbon\CarbonInterface;
+use App\Repositories\Concerns\AppliesPerformanceFilter;
+use App\Support\PerformanceFilter;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 
 class PerformanceRepository
 {
+    use AppliesPerformanceFilter;
+
     /**
      * Emails are compared case-insensitively and without surrounding spaces.
      */
@@ -23,20 +25,14 @@ class PerformanceRepository
     private const PRODUCT_TYPE_COUNTS = 'COALESCE(SUM(CASE WHEN product_type = ? THEN 1 ELSE 0 END), 0) as new_users, '
         .'COALESCE(SUM(CASE WHEN product_type = ? THEN 1 ELSE 0 END), 0) as repeat_orders';
 
-    public function findPlatformIdBySlug(string $slug): ?int
-    {
-        return Platform::where('slug', $slug)->value('id');
-    }
-
     /**
      * Revenue, transaction count, and the number of first purchases and renewals in one query.
      *
      * @return array{revenue: float, transactions: int, new_users: int, repeat_orders: int}
      */
-    public function transactionTotals(CarbonInterface $from, CarbonInterface $to, ?int $platformId): array
+    public function transactionTotals(PerformanceFilter $filter): array
     {
-        $totals = $this->successfulTransactions($platformId)
-            ->whereBetween('paid_date', $this->range($from, $to))
+        $totals = $this->successfulTransactions($filter)
             ->toBase()
             ->selectRaw(
                 'COALESCE(SUM(nominal), 0) as revenue, COUNT(*) as transactions, '.self::PRODUCT_TYPE_COUNTS,
@@ -52,22 +48,18 @@ class PerformanceRepository
         ];
     }
 
-    public function countUniqueCustomers(CarbonInterface $from, CarbonInterface $to, ?int $platformId): int
+    public function countUniqueCustomers(PerformanceFilter $filter): int
     {
-        return (int) $this->successfulTransactions($platformId)
+        return (int) $this->successfulTransactions($filter)
             ->withCustomerEmail()
-            ->whereBetween('paid_date', $this->range($from, $to))
             ->toBase()
             ->selectRaw('COUNT(DISTINCT '.self::NORMALIZED_EMAIL.') as total')
             ->value('total');
     }
 
-    public function totalDownloaders(CarbonInterface $from, CarbonInterface $to, ?int $platformId): int
+    public function totalDownloaders(PerformanceFilter $filter): int
     {
-        return (int) Downloader::query()
-            ->when($platformId, fn (Builder $query) => $query->where('platform_id', $platformId))
-            ->whereBetween('date', $this->range($from, $to))
-            ->sum('total');
+        return (int) $this->downloaders($filter)->sum('total');
     }
 
     /**
@@ -75,10 +67,9 @@ class PerformanceRepository
      *
      * @return Collection<int, object{day: string, revenue: string|float, transactions: int, new_users: int, repeat_orders: int}>
      */
-    public function dailyTransactionTotals(CarbonInterface $from, CarbonInterface $to, ?int $platformId): Collection
+    public function dailyTransactionTotals(PerformanceFilter $filter): Collection
     {
-        return $this->successfulTransactions($platformId)
-            ->whereBetween('paid_date', $this->range($from, $to))
+        return $this->successfulTransactions($filter)
             ->toBase()
             ->selectRaw(
                 'DATE(paid_date) as day, SUM(nominal) as revenue, COUNT(*) as transactions, '.self::PRODUCT_TYPE_COUNTS,
@@ -93,11 +84,9 @@ class PerformanceRepository
      *
      * @return Collection<int, object{day: string, total: int}>
      */
-    public function dailyDownloaderTotals(CarbonInterface $from, CarbonInterface $to, ?int $platformId): Collection
+    public function dailyDownloaderTotals(PerformanceFilter $filter): Collection
     {
-        return Downloader::query()
-            ->when($platformId, fn (Builder $query) => $query->where('platform_id', $platformId))
-            ->whereBetween('date', $this->range($from, $to))
+        return $this->downloaders($filter)
             ->toBase()
             ->selectRaw('DATE(date) as day, SUM(total) as total')
             ->groupByRaw('DATE(date)')
@@ -105,25 +94,20 @@ class PerformanceRepository
     }
 
     /**
+     * Successful transactions in the filter's periods and platforms.
+     *
      * @return Builder<Transaction>
      */
-    private function successfulTransactions(?int $platformId): Builder
+    private function successfulTransactions(PerformanceFilter $filter): Builder
     {
-        return Transaction::query()
-            ->successful()
-            ->when($platformId, fn (Builder $query) => $query->where('platform_id', $platformId));
+        return $this->applyPerformanceFilter(Transaction::query()->successful(), $filter, 'paid_date', 'platform_id');
     }
 
     /**
-     * Full-day bounds so date columns compare correctly on every database driver.
-     *
-     * @return array{0: string, 1: string}
+     * @return Builder<Downloader>
      */
-    private function range(CarbonInterface $from, CarbonInterface $to): array
+    private function downloaders(PerformanceFilter $filter): Builder
     {
-        return [
-            $from->copy()->startOfDay()->toDateTimeString(),
-            $to->copy()->endOfDay()->toDateTimeString(),
-        ];
+        return $this->applyPerformanceFilter(Downloader::query(), $filter, 'date', 'platform_id');
     }
 }

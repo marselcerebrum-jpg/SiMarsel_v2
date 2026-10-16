@@ -3,7 +3,7 @@
 namespace App\Services;
 
 use App\Repositories\PlatformContributionRepository;
-use Carbon\CarbonImmutable;
+use App\Support\PerformanceFilter;
 
 class PlatformContributionService
 {
@@ -14,10 +14,10 @@ class PlatformContributionService
      *
      * @return array<string, mixed>
      */
-    public function contribution(CarbonImmutable $from, CarbonImmutable $to, ?string $platformSlug): array
+    public function contribution(PerformanceFilter $filter): array
     {
         $platforms = $this->platformContributionRepository
-            ->totalsPerPlatform($from, $to, $platformSlug)
+            ->totalsPerPlatform($filter)
             ->map(fn (object $row) => [
                 'slug' => $row->slug,
                 'name' => $row->name,
@@ -31,27 +31,26 @@ class PlatformContributionService
         $totalRevenue = round($platforms->sum('revenue'), 2);
         $totalTransactions = $platforms->sum('transactions');
 
-        $platforms = $platforms->map(fn (array $platform) => [
+        // The percentage is null (shown as N/A) when there is no revenue to divide by.
+        $platforms = $platforms->map(fn (array $platform, int $index) => [
+            'rank' => $index + 1,
             ...$platform,
             'contribution_percentage' => $totalRevenue > 0
-                ? round($platform['revenue'] / $totalRevenue * 100, 2)
-                : 0,
+                ? round($platform['revenue'] / $totalRevenue * 100, 1)
+                : null,
         ]);
 
         $isEmpty = $totalTransactions === 0;
 
         return [
-            'filter' => [
-                'date_from' => $from->toDateString(),
-                'date_to' => $to->toDateString(),
-                'platform' => $platformSlug,
-            ],
+            'filter' => $filter->toArray(),
             'is_empty' => $isEmpty,
-            'message' => $isEmpty ? 'Data tidak tersedia untuk filter yang dipilih.' : null,
+            'message' => $isEmpty ? 'Tidak ada data kontribusi platform untuk filter yang dipilih.' : null,
             'totals' => [
                 'revenue' => $totalRevenue,
                 'transactions' => $totalTransactions,
                 'users' => $platforms->sum('users'),
+                'platforms' => $platforms->count(),
             ],
             'platforms' => $platforms->all(),
             'labels' => $platforms->pluck('name')->all(),

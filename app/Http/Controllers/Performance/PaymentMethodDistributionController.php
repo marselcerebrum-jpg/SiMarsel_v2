@@ -3,10 +3,9 @@
 namespace App\Http\Controllers\Performance;
 
 use App\Http\Controllers\Controller;
-use App\Http\Requests\Performance\PerformanceSummaryRequest;
+use App\Http\Requests\Performance\PerformanceFilterRequest;
 use App\Http\Resources\PaymentMethodDistributionResource;
 use App\Services\PaymentMethodDistributionService;
-use Carbon\CarbonImmutable;
 
 class PaymentMethodDistributionController extends Controller
 {
@@ -15,13 +14,9 @@ class PaymentMethodDistributionController extends Controller
     /**
      * Uses the same filters as the performance summary so every widget shows the same data.
      */
-    public function __invoke(PerformanceSummaryRequest $request): PaymentMethodDistributionResource
+    public function __invoke(PerformanceFilterRequest $request): PaymentMethodDistributionResource
     {
-        $distribution = $this->paymentMethodDistributionService->distribution(
-            CarbonImmutable::createFromFormat('Y-m-d', $request->validated('date_from'))->startOfDay(),
-            CarbonImmutable::createFromFormat('Y-m-d', $request->validated('date_to'))->startOfDay(),
-            $request->validated('platform'),
-        );
+        $distribution = $this->paymentMethodDistributionService->distribution($request->filter());
 
         return PaymentMethodDistributionResource::make($distribution);
     }
