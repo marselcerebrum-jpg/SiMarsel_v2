@@ -8,22 +8,24 @@ Wajib login. Semua role (Manager dan Employee) boleh mengakses. Aturan header da
 
 ### Query parameter
 
-| Parameter | Wajib | Format | Keterangan |
-|---|---|---|---|
-| `date_from` | Ya | `YYYY-MM-DD` | Tanggal mulai (inklusif) |
-| `date_to` | Ya | `YYYY-MM-DD` | Tanggal akhir (inklusif), tidak boleh sebelum `date_from` |
-| `platform` | Tidak | slug platform | Kosongkan untuk menghitung semua platform |
+Memakai [filter Ringkasan Performa](performance-filter.md): beberapa platform (`platforms[]`) dan satu mode periode (default bulan berjalan, rentang tanggal, bulan, beberapa tahun, atau rentang tahun). Tanpa parameter, data bulan berjalan sampai hari ini yang ditampilkan.
 
-Contoh: `GET /api/performance/summary?date_from=2026-09-01&date_to=2026-09-30&platform=app-a`
+Contoh:
+
+- `GET /api/performance/summary?date_from=2026-09-01&date_to=2026-09-30&platforms[]=app-a`
+- `GET /api/performance/summary?years[]=2025&years[]=2026`
 
 ### Periode pembanding
 
-Periode sebelumnya memiliki jumlah hari yang sama dan berakhir tepat sehari sebelum `date_from`.
+Setiap mode filter punya periode pembanding sendiri, misalnya rentang tanggal dibandingkan dengan jumlah hari yang sama tepat sebelumnya, bulan dibandingkan dengan bulan sebelumnya, dan setiap tahun dibandingkan dengan tahun sebelumnya. Tabel lengkapnya ada di [filter Ringkasan Performa](performance-filter.md#perbandingan-periode-naik--turun--sama).
 
 | Periode dipilih | Periode sebelumnya |
 |---|---|
 | 1-30 Sep 2026 (30 hari) | 2-31 Agu 2026 |
 | 10 Sep 2026 (1 hari) | 9 Sep 2026 |
+| Tahun 2025 + 2026 | Tahun 2024 + 2025 |
+
+Jika beberapa tahun dipilih, setiap KPI adalah **gabungan** semua tahun tersebut.
 
 ### Rumus KPI
 
@@ -58,8 +60,21 @@ Semua KPI hanya memakai transaksi dengan `status_message` = `Success`.
 ```json
 {
     "data": {
-        "filter": { "date_from": "2026-09-01", "date_to": "2026-09-30", "platform": "app-a" },
-        "previous_period": { "date_from": "2026-08-02", "date_to": "2026-08-31" },
+        "filter": {
+            "mode": "date_range",
+            "date_from": "2026-09-01",
+            "date_to": "2026-09-30",
+            "platform": "app-a",
+            "platforms": ["app-a"],
+            "years": [],
+            "month": null,
+            "ranges": [{ "date_from": "2026-09-01", "date_to": "2026-09-30" }]
+        },
+        "previous_period": {
+            "date_from": "2026-08-02",
+            "date_to": "2026-08-31",
+            "ranges": [{ "date_from": "2026-08-02", "date_to": "2026-08-31" }]
+        },
         "is_empty": false,
         "message": null,
         "kpis": {
@@ -94,16 +109,11 @@ Tampilkan `message` sebagai kondisi kosong di halaman.
 
 ### 422 Validasi gagal
 
-| Kondisi | Pesan |
-|---|---|
-| `date_from` atau `date_to` kosong | `Tanggal mulai wajib diisi.` / `Tanggal akhir wajib diisi.` |
-| Format tanggal salah | `Tanggal mulai harus berformat YYYY-MM-DD.` |
-| `date_to` sebelum `date_from` | `Tanggal akhir tidak boleh sebelum tanggal mulai.` |
-| Slug platform tidak ada | `Platform tidak ditemukan.` |
+Lihat [filter Ringkasan Performa](performance-filter.md#422-validasi-gagal), misalnya lebih dari satu mode periode, format tanggal salah, atau slug platform tidak ditemukan.
 
 ## `GET /api/performance/trend`
 
-Data deret waktu untuk grafik dan tabel Analisa Tren & Performa. Filter-nya sama dengan Ringkasan Performa. Wajib login, dan semua role boleh mengakses.
+Data deret waktu untuk grafik dan tabel Analisa Tren & Performa. Filter-nya sama dengan Ringkasan Performa ([filter Ringkasan Performa](performance-filter.md)). Wajib login, dan semua role boleh mengakses.
 
 Backend mengirim data yang sama untuk semua bentuk visualisasi (Bar, Line, Area, Pie, Table). Pilihan bentuk visualisasi diatur di frontend lewat dropdown, tanpa request ulang ke backend.
 
@@ -111,11 +121,15 @@ Backend mengirim data yang sama untuk semua bentuk visualisasi (Bar, Line, Area,
 
 | Parameter | Wajib | Nilai |
 |---|---|---|
-| `date_from`, `date_to`, `platform` | Sama seperti `/summary` | |
+| Platform dan periode | Tidak | Sama seperti `/summary`, lihat [filter Ringkasan Performa](performance-filter.md) |
 | `metric` | Ya | `revenue`, `transactions`, `downloaders`, `conversion`, `new_users`, `repeat_orders` |
-| `period` | Ya | `daily`, `weekly`, `monthly` |
+| `period` | Tidak | `daily`, `weekly`, `monthly`. Jika kosong: `daily` untuk default, rentang tanggal, dan bulan; `monthly` untuk tahun dan rentang tahun. |
 
-Contoh: `GET /api/performance/trend?date_from=2026-09-01&date_to=2026-09-30&platform=app-a&metric=revenue&period=weekly`
+Contoh:
+
+- `GET /api/performance/trend?date_from=2026-09-01&date_to=2026-09-30&platforms[]=app-a&metric=revenue&period=weekly`
+- `GET /api/performance/trend?year=2026&month=9&metric=revenue` (rincian harian)
+- `GET /api/performance/trend?years[]=2025&years[]=2026&metric=revenue` (perbandingan per bulan)
 
 ### Pembagian periode
 
@@ -128,6 +142,33 @@ Contoh: `GET /api/performance/trend?date_from=2026-09-01&date_to=2026-09-30&plat
 - Minggu dan bulan pertama atau terakhir **dipotong mengikuti rentang filter**. Contohnya, filter mulai Selasa 1 Sep menghasilkan minggu pertama 1 - 6 Sep.
 - Periode tanpa data tetap muncul dengan nilai `0`, supaya grafik tidak bolong.
 - Tanggal mengikuti timezone aplikasi `Asia/Jakarta`.
+- Batas 366 hari dihitung dari jumlah hari semua tahun yang dipilih. Contohnya, `year_from=2024&year_to=2026` hanya bisa memakai `monthly`.
+
+### Perbandingan beberapa tahun
+
+Jika lebih dari satu tahun dipilih lewat `years[]`, periodenya selalu `monthly`, dan grafik membandingkan tahun-tahun tersebut bulan per bulan:
+
+- `labels` berisi nama bulan: `["Jan", "Feb", ..., "Dec"]`.
+- `datasets` berisi **satu dataset per tahun**, dengan `label` berupa tahunnya.
+- `rows` tetap berurutan per bulan dari tahun pertama sampai tahun terakhir (`Jan 2025` ... `Dec 2026`). `change_percentage` dibandingkan dengan baris sebelumnya, termasuk Jan tahun berikutnya dibanding Dec tahun yang dipilih sebelumnya.
+
+```json
+{
+    "data": {
+        "period": "monthly",
+        "labels": ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"],
+        "datasets": [
+            { "label": "2025", "data": [0, 0, 200000, 0, 0, 0, 50000, 0, 0, 0, 0, 0] },
+            { "label": "2026", "data": [0, 0, 400000, 0, 0, 0, 0, 0, 470000, 30000, 0, 0] }
+        ],
+        "rows": [
+            { "label": "Jan 2025", "period_start": "2025-01-01", "period_end": "2025-01-31", "value": 0, "change_percentage": null, "trend": null }
+        ]
+    }
+}
+```
+
+Jika hanya satu tahun dipilih, bentuknya sama seperti biasa: label `Jan 2026` ... `Dec 2026` dengan satu dataset.
 
 ### Rumus per titik data
 
@@ -149,7 +190,7 @@ Untuk `revenue`, `transactions`, `downloaders`, `new_users`, dan `repeat_orders`
 ```json
 {
     "data": {
-        "filter": { "date_from": "2026-09-01", "date_to": "2026-09-30", "platform": "app-a" },
+        "filter": { "mode": "date_range", "date_from": "2026-09-01", "date_to": "2026-09-30", "platform": "app-a", "platforms": ["app-a"], "...": "lihat performance-filter.md" },
         "metric": { "key": "revenue", "label": "Revenue", "unit": "currency" },
         "period": "weekly",
         "is_empty": false,
@@ -179,7 +220,7 @@ Untuk `revenue`, `transactions`, `downloaders`, `new_users`, dan `repeat_orders`
 |---|---|
 | `label` | Label periode, sama dengan `labels` |
 | `period_start`, `period_end` | Rentang tanggal periode itu (`YYYY-MM-DD`) |
-| `value` | Nilai metric di periode itu, sama dengan `datasets[0].data` |
+| `value` | Nilai metric di periode itu, sama dengan `datasets[0].data` (atau dataset tahunnya saat membandingkan beberapa tahun) |
 | `change_percentage` | `(value - value baris sebelumnya) ÷ value baris sebelumnya × 100`, dibulatkan 2 desimal. `null` untuk baris pertama, atau jika nilai baris sebelumnya `0`/`null`. |
 | `trend` | `up`, `down`, atau `same` dibanding baris sebelumnya; nilai `null` dihitung sebagai `0`. `null` untuk baris pertama. |
 
@@ -189,10 +230,11 @@ Jika rentang tidak punya data sama sekali, respons tetap **200** dengan `is_empt
 
 ### 422 Validasi gagal
 
-Selain validasi filter di `/summary`:
+Selain validasi [filter Ringkasan Performa](performance-filter.md#422-validasi-gagal):
 
 | Kondisi | Pesan |
 |---|---|
-| `metric` atau `period` kosong | `Metric wajib diisi.` / `Periode wajib diisi.` |
+| `metric` kosong | `Metric wajib diisi.` |
 | Nilai di luar pilihan | `Metric tidak valid.` / `Periode tidak valid.` |
 | Rentang lebih dari 366 hari untuk `daily` atau `weekly` | `Rentang tanggal untuk periode daily maksimal 366 hari.` |
+| Beberapa tahun dipilih dengan `period` selain `monthly` | `Perbandingan beberapa tahun hanya mendukung periode monthly.` |
