@@ -4,6 +4,7 @@ use App\Http\Controllers\Account\AccountController;
 use App\Http\Controllers\Auth\AuthController;
 use App\Http\Controllers\Division\DivisionController;
 use App\Http\Controllers\Performance\PaymentMethodDistributionController;
+use App\Http\Controllers\Performance\PerformanceExportController;
 use App\Http\Controllers\Performance\PerformanceSummaryController;
 use App\Http\Controllers\Performance\PerformanceTrendController;
 use App\Http\Controllers\Performance\PlatformContributionController;
@@ -64,4 +65,6 @@ Route::middleware('auth')->group(function () {
         ->name('api.performance.platform-contribution');
     Route::get('/performance/purchase-times', PurchaseTimeDistributionController::class)
         ->name('api.performance.purchase-times');
+    Route::get('/performance/export', PerformanceExportController::class)
+        ->name('api.performance.export');
 });
