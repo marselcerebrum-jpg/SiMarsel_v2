@@ -139,7 +139,8 @@ class PageAccessTest extends TestCase
             ->assertOk()
             ->assertSee('Manajemen Divisi')
             ->assertSeeInOrder(['Total Divisi', 'Anggota Divisi', 'Divisi Kosong'])
-            ->assertSeeInOrder(['Buat Divisi', 'Daftar Divisi'])
+            ->assertSeeInOrder(['Daftar Divisi', 'Buat Divisi'])
+            ->assertSee('id="create-division-title"', false)
             ->assertSee('Hapus Divisi?');
     }
 
@@ -162,5 +163,39 @@ class PageAccessTest extends TestCase
                 ->assertSee('Manajemen divisi')
                 ->assertSee('href="'.route('divisions.index').'"', false);
         }
+    }
+
+    public function test_guest_cannot_open_product_overview_page(): void
+    {
+        $this->get('/performance/products')->assertRedirect(route('login'));
+    }
+
+    public function test_every_role_can_open_product_overview_page_with_filters_and_cards(): void
+    {
+        foreach ([$this->manager, $this->employee] as $account) {
+            $this->actingAs($account)
+                ->get('/performance/products')
+                ->assertOk()
+                ->assertSee('Ringkasan Produk')
+                ->assertSeeInOrder(['Source App / Platform', 'Tahun', 'Bulan'])
+                ->assertSeeInOrder([
+                    'Top Paket Berdasarkan Pendapatan',
+                    'Top Paket Berdasarkan Volume Transaksi',
+                    'Detail Performa Paket',
+                ])
+                ->assertSee('Cari nama paket')
+                ->assertSeeInOrder(['Excel', 'CSV'])
+                ->assertSee('Data belum tersedia');
+        }
+    }
+
+    public function test_sidebar_links_product_overview_inside_performance_folder(): void
+    {
+        $this->actingAs($this->employee)
+            ->get('/performance/products')
+            ->assertOk()
+            ->assertSeeInOrder(['Analisis performa', 'Produk'])
+            ->assertSee('href="'.route('performance.products').'"', false)
+            ->assertSee('aria-current="page"', false);
     }
 }

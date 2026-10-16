@@ -11,6 +11,7 @@ Route::view('/login', 'pages.auth.index')->middleware('guest')->name('login');
 
 Route::middleware('auth')->group(function () {
     Route::view('/dashboard', 'pages.dashboard.index')->name('dashboard');
+    Route::view('/performance/products', 'pages.performance.products')->name('performance.products');
     Route::get('/settings', AccountPageController::class)
         ->can('viewAny', Account::class)
         ->name('settings.index');
