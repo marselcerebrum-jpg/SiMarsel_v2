@@ -36,6 +36,25 @@ const packageLabel = (item, max) => {
 
 const activePeriod = (item) => item.active_period ?? '-';
 
+// Pecah teks per kata menjadi beberapa baris; baris terakhir dipotong jika masih terlalu panjang.
+const wrap = (text, width, maxLines) => {
+    const lines = [];
+
+    for (const word of text.split(' ')) {
+        const last = lines.at(-1);
+
+        if (last !== undefined && `${last} ${word}`.length <= width) lines[lines.length - 1] = `${last} ${word}`;
+        else lines.push(word);
+    }
+
+    if (lines.length <= maxLines) return lines;
+
+    return [...lines.slice(0, maxLines - 1), truncate(lines.slice(maxLines - 1).join(' '), width)];
+};
+
+// Label sumbu diagram vertikal: nama paket (maks. 2 baris) lalu masa aktif di baris terakhir.
+const packageLines = (item) => [...wrap(item.name, 18, 2), ...(item.active_period ? [`(${item.active_period})`] : [])];
+
 const currentYear = new Date().getFullYear();
 
 /**
@@ -130,7 +149,7 @@ function remoteData(fetcher) {
  * Kartu diagram batang. Instance Chart.js disimpan di luar state Alpine
  * agar tidak dibungkus Proxy reaktif.
  */
-function barChartCard(fetcher, { horizontal, value, valueTick, tooltipLines }) {
+function barChartCard(fetcher, { horizontal, value, valueTick, valueTitle, tooltipLines }) {
     let chart = null;
 
     return {
@@ -141,7 +160,7 @@ function barChartCard(fetcher, { horizontal, value, valueTick, tooltipLines }) {
         },
 
         get chartHeight() {
-            return horizontal ? `${Math.max(240, this.items.length * 48 + 56)}px` : '340px';
+            return horizontal ? `${Math.max(240, this.items.length * 48 + 56)}px` : '400px';
         },
 
         render() {
@@ -163,6 +182,7 @@ function barChartCard(fetcher, { horizontal, value, valueTick, tooltipLines }) {
                 grid: { color: '#dde4ec' },
                 border: { display: false },
                 ticks: { color: '#6b7f99', font: { size: 11 }, callback: valueTick, maxTicksLimit: 6, precision: 0 },
+                title: { display: Boolean(valueTitle), text: valueTitle, color: '#6b7f99', font: { size: 11, weight: 600 } },
             };
             const labelAxis = {
                 grid: { display: false },
@@ -172,7 +192,7 @@ function barChartCard(fetcher, { horizontal, value, valueTick, tooltipLines }) {
                     autoSkip: false,
                     maxRotation: 40,
                     callback(tick) {
-                        return horizontal ? packageLabel(items()[tick], 40) : truncate(this.getLabelForValue(tick), 16);
+                        return horizontal ? packageLabel(items()[tick], 40) : packageLines(items()[tick]);
                     },
                 },
             };
@@ -232,6 +252,7 @@ Alpine.data('topPackagesByVolume', () =>
         horizontal: false,
         value: (item) => item.transactions,
         valueTick: (tick) => number(tick),
+        valueTitle: 'Jumlah Transaksi',
         tooltipLines: (item) => [`Masa Aktif: ${activePeriod(item)}`, `Total Transaksi: ${number(item.transactions)}`],
     }),
 );
