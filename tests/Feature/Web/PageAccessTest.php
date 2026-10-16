@@ -165,13 +165,37 @@ class PageAccessTest extends TestCase
         }
     }
 
-    public function test_sidebar_shows_performance_folder_with_upcoming_product_menu(): void
+    public function test_guest_cannot_open_product_overview_page(): void
+    {
+        $this->get('/performance/products')->assertRedirect(route('login'));
+    }
+
+    public function test_every_role_can_open_product_overview_page_with_filters_and_cards(): void
     {
         foreach ([$this->manager, $this->employee] as $account) {
             $this->actingAs($account)
-                ->get('/dashboard')
+                ->get('/performance/products')
                 ->assertOk()
-                ->assertSeeInOrder(['Analisis', 'Analisis performa', 'Produk', 'Segera', 'Sistem']);
+                ->assertSee('Ringkasan Produk')
+                ->assertSeeInOrder(['Source App / Platform', 'Tahun', 'Bulan'])
+                ->assertSeeInOrder([
+                    'Top Paket Berdasarkan Pendapatan',
+                    'Top Paket Berdasarkan Volume Transaksi',
+                    'Detail Performa Paket',
+                ])
+                ->assertSee('Cari nama paket')
+                ->assertSeeInOrder(['Excel', 'CSV'])
+                ->assertSee('Data belum tersedia');
         }
+    }
+
+    public function test_sidebar_links_product_overview_inside_performance_folder(): void
+    {
+        $this->actingAs($this->employee)
+            ->get('/performance/products')
+            ->assertOk()
+            ->assertSeeInOrder(['Analisis performa', 'Produk'])
+            ->assertSee('href="'.route('performance.products').'"', false)
+            ->assertSee('aria-current="page"', false);
     }
 }

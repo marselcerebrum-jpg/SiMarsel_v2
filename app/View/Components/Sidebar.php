@@ -24,7 +24,7 @@ class Sidebar extends Component
         $this->sections = [
             'Analisis' => [
                 $this->group('Analisis performa', 'chart', [
-                    $this->link('Produk', 'cube'),
+                    $this->link('Produk', 'cube', 'performance.products'),
                 ]),
             ],
             'Sistem' => [
