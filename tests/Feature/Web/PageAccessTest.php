@@ -164,4 +164,14 @@ class PageAccessTest extends TestCase
                 ->assertSee('href="'.route('divisions.index').'"', false);
         }
     }
+
+    public function test_sidebar_shows_performance_folder_with_upcoming_product_menu(): void
+    {
+        foreach ([$this->manager, $this->employee] as $account) {
+            $this->actingAs($account)
+                ->get('/dashboard')
+                ->assertOk()
+                ->assertSeeInOrder(['Analisis', 'Analisis performa', 'Produk', 'Segera', 'Sistem']);
+        }
+    }
 }
