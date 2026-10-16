@@ -35,7 +35,7 @@ File langsung diunduh dengan nama `performa_{date_from}_{date_to}.xlsx` atau `.c
 | Waktu Pembelian | Rentang Waktu, Jam Mulai, Jam Akhir, Jumlah Transaksi, Persentase (%) | `/purchase-times` |
 
 - Rincian sheet **Tren** mengikuti rincian default filter: harian untuk default, rentang tanggal, dan bulan; bulanan untuk tahun dan rentang tahun. Rentang tanggal yang lebih dari 366 hari diekspor per bulan.
-- Angka disimpan sebagai angka (bukan teks), jadi bisa langsung dijumlahkan di Excel. Nilai kosong (misalnya konversi tanpa downloader) dibiarkan kosong.
+- Angka disimpan sebagai angka (bukan teks), jadi bisa langsung dijumlahkan di Excel. Nilai kosong (misalnya konversi tanpa downloader, atau periode setelah hari ini) dibiarkan kosong.
 - Persentase kontribusi platform yang tidak bisa dihitung (total revenue 0) ditulis `N/A`.
 - Jika filter tidak punya data, file tetap diunduh dengan semua sheet dan nilai `0`.
 
