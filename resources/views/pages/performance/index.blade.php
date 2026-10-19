@@ -60,6 +60,13 @@
         ],
     ];
 
+    $paymentMethod = [
+        'parameters' => [
+            ['value' => 'revenue', 'label' => 'Revenue'],
+            ['value' => 'transactions', 'label' => 'Transactions'],
+        ],
+    ];
+
     $delay = 120;
 @endphp
 
@@ -111,6 +118,10 @@
 
         <section class="{{ $card }} performance-rise relative mt-4 overflow-hidden p-5 sm:p-7" style="--delay: {{ $delay + 60 }}ms" aria-labelledby="performance-contribution-title">
             @include('pages.performance.components.performance-contribution')
+        </section>
+
+        <section class="{{ $card }} performance-rise relative mt-4 overflow-hidden p-5 sm:p-7" style="--delay: {{ $delay + 120 }}ms" aria-labelledby="performance-payment-method-title">
+            @include('pages.performance.components.performance-payment-method')
         </section>
     </div>
 @endsection

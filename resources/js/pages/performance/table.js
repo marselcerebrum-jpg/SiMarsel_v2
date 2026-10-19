@@ -1,3 +1,4 @@
+import { pieColor } from './chart';
 import { formatShare, formatValue, trendBadge } from './format';
 
 /**
@@ -34,4 +35,23 @@ export function contributionRows(platforms, totalRevenue) {
             contribution: formatShare(share),
         };
     });
+}
+
+/**
+ * Rows for the payment method pie chart and its legend. Colors follow the backend order
+ * (largest revenue first) so a method keeps its color when the parameter changes; rows are
+ * then sorted by the selected parameter, largest first.
+ */
+export function paymentMethodRows(methods, { value, share }) {
+    return methods
+        .map((method, index) => ({
+            key: method.name,
+            name: method.name,
+            color: pieColor(index),
+            value: Number(method[value]) || 0,
+            percentage: formatValue(method[share] ?? 0, 'percent'),
+            transactions: formatValue(method.transactions, 'number'),
+            revenue: formatValue(method.revenue, 'currency'),
+        }))
+        .sort((a, b) => b.value - a.value);
 }

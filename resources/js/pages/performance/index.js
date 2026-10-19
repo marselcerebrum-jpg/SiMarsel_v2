@@ -5,6 +5,7 @@ import { fetchSummary } from './api';
 import { PERIOD_PRESETS, defaultFilter, filterFromUrl, presetRange, syncUrl, toQuery, today, validateRange } from './filter';
 import { formatDateTime, formatValue } from './format';
 import performanceContribution from './contribution';
+import performancePaymentMethod from './payment-method';
 import performanceTrend from './trend';
 
 const COUNT_DURATION = 900;
@@ -177,3 +178,4 @@ Alpine.data('performanceSummary', (definitions = [], platforms = []) => ({
 
 Alpine.data('performanceTrend', performanceTrend);
 Alpine.data('performanceContribution', performanceContribution);
+Alpine.data('performancePaymentMethod', performancePaymentMethod);

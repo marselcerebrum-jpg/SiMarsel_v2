@@ -13,11 +13,25 @@ const BRAND = {
 
 const PIE_COLORS = ['#5d60a2', '#5da29f', '#5d83a2', '#3d4760', '#9a9cd0', '#94c9c6', '#97b4cc', '#7a849e'];
 
-function pieColor(index) {
+export function pieColor(index) {
     return PIE_COLORS[index % PIE_COLORS.length];
 }
 
+const TOOLTIP = {
+    backgroundColor: '#1f2639',
+    padding: 12,
+    cornerRadius: 12,
+    titleColor: '#ffffff',
+    titleFont: { weight: '600' },
+    bodyColor: '#e2e8f0',
+    usePointStyle: true,
+};
+
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+
+function animation() {
+    return reducedMotion.matches ? false : { duration: 700, easing: 'easeOutQuart' };
+}
 
 Chart.defaults.font.family = "'Instrument Sans', ui-sans-serif, system-ui, sans-serif";
 Chart.defaults.color = BRAND.label;
@@ -95,7 +109,7 @@ export function chartConfig({ type, rows, metric }) {
         options: {
             responsive: true,
             maintainAspectRatio: false,
-            animation: reducedMotion.matches ? false : { duration: 700, easing: 'easeOutQuart' },
+            animation: animation(),
             interaction: isPie ? { mode: 'nearest', intersect: true } : { mode: 'index', intersect: false },
             layout: { padding: { top: 8 } },
             plugins: {
@@ -105,14 +119,8 @@ export function chartConfig({ type, rows, metric }) {
                     labels: { usePointStyle: true, pointStyle: 'circle', boxWidth: 8, padding: 16, color: BRAND.ink },
                 },
                 tooltip: {
-                    backgroundColor: '#1f2639',
-                    padding: 12,
-                    cornerRadius: 12,
-                    titleColor: '#ffffff',
-                    titleFont: { weight: '600' },
-                    bodyColor: '#e2e8f0',
+                    ...TOOLTIP,
                     displayColors: isPie,
-                    usePointStyle: true,
                     callbacks: {
                         title: (items) => rows[items[0].dataIndex].label,
                         label: (item) => ` ${metric.label}: ${formatValue(rows[item.dataIndex].value, metric.format)}`,
@@ -136,6 +144,62 @@ export function chartConfig({ type, rows, metric }) {
                 },
         },
     };
+}
+
+/**
+ * Pie chart for a distribution such as payment methods. Rows bring their own color so the
+ * HTML legend beside the chart matches the slices; hovering a slice shows the full detail.
+ */
+export function distributionChartConfig({ rows, metric }) {
+    return {
+        type: 'pie',
+        data: {
+            labels: rows.map((row) => row.name),
+            datasets: [{
+                label: metric.label,
+                data: rows.map((row) => row.value),
+                backgroundColor: rows.map((row) => row.color),
+                borderColor: BRAND.surface,
+                borderWidth: 2,
+                hoverOffset: 10,
+            }],
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            animation: animation(),
+            layout: { padding: 12 },
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    ...TOOLTIP,
+                    callbacks: {
+                        title: (items) => rows[items[0].dataIndex].name,
+                        label: (item) => ` Contribution: ${rows[item.dataIndex].percentage}`,
+                        afterLabel: (item) => [
+                            `   Transactions: ${rows[item.dataIndex].transactions}`,
+                            `   Revenue: ${rows[item.dataIndex].revenue}`,
+                        ],
+                    },
+                },
+            },
+        },
+    };
+}
+
+/**
+ * Highlights one slice and opens its tooltip, e.g. while the matching legend row is hovered.
+ * A null index clears the highlight.
+ */
+export function highlightSlice(chart, index) {
+    if (!chart) return;
+
+    const active = index === null ? [] : [{ datasetIndex: 0, index }];
+    const arc = index === null ? null : chart.getDatasetMeta(0).data[index];
+
+    chart.setActiveElements(active);
+    chart.tooltip.setActiveElements(active, arc ? arc.tooltipPosition() : { x: 0, y: 0 });
+    chart.update();
 }
 
 /**

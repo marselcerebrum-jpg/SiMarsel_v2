@@ -12,9 +12,6 @@ Alpine.data('accountSettings', (roles = [], divisions = [], canManage = false) =
     canManage,
     users: [],
 
-    // Employee only has the list, so it opens there directly.
-    tab: canManage ? 'create' : 'list',
-
     draft: emptyForm(),
     draftErrors: {},
     draftError: '',
@@ -108,6 +105,13 @@ Alpine.data('accountSettings', (roles = [], divisions = [], canManage = false) =
         this.showDraftPassword = false;
     },
 
+    openCreate() {
+        if (!this.canManage) return;
+
+        this.resetDraft();
+        this.modal = 'create';
+    },
+
     openEdit(user) {
         this.form = {
             fullname: user.fullname,
@@ -130,7 +134,7 @@ Alpine.data('accountSettings', (roles = [], divisions = [], canManage = false) =
     },
 
     closeModal() {
-        if (this.saving) return;
+        if (this.saving || this.creating) return;
 
         this.modal = null;
         this.editingId = null;
@@ -180,6 +184,7 @@ Alpine.data('accountSettings', (roles = [], divisions = [], canManage = false) =
 
             this.users.push(data);
             this.resetDraft();
+            this.modal = null;
             showToast({ title: 'Account Created', text: `${data.fullname} sudah ditambahkan.` });
         } catch (error) {
             if (error.status === 422 && error.data?.errors) {

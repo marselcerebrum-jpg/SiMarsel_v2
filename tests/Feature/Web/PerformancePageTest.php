@@ -127,6 +127,37 @@ class PerformancePageTest extends TestCase
             ->assertSee('@click="retryContribution()"', false);
     }
 
+    public function test_performance_page_has_payment_method_section_after_platform_contribution(): void
+    {
+        $this->actingAs($this->employee)
+            ->get('/performance')
+            ->assertOk()
+            ->assertSee('Payment Methods')
+            ->assertSee('x-data="performancePaymentMethod(', false)
+            ->assertSee('@performance-filter.window="loadPayment($event.detail)"', false)
+            ->assertSee('aria-label="Payment Method Parameter"', false)
+            ->assertSeeInOrder(["setPaymentParameter('revenue')", "setPaymentParameter('transactions')"], false)
+            ->assertSeeInOrder(['Platform Contribution', 'Payment Methods'], false);
+    }
+
+    public function test_payment_method_section_shows_pie_chart_legend_and_states(): void
+    {
+        $this->actingAs($this->employee)
+            ->get('/performance')
+            ->assertOk()
+            ->assertSee('x-ref="paymentCanvas"', false)
+            ->assertSee(':aria-label="paymentChartLabel"', false)
+            ->assertSeeInOrder(['>Payment Method</th>', '>Transactions</th>', '>Revenue</th>', '>Contribution (%)</th>'], false)
+            ->assertSee('@mouseenter="highlightPayment(index)"', false)
+            ->assertSee('x-text="paymentTotals.revenue"', false)
+            ->assertSee("paymentState === 'loading'", false)
+            ->assertSee("paymentState === 'empty'", false)
+            ->assertSee("paymentState === 'error'", false)
+            ->assertSee("paymentState === 'unavailable'", false)
+            ->assertSee('Data belum tersedia')
+            ->assertSee('@click="retryPayment()"', false);
+    }
+
     public function test_sidebar_links_performance_page_and_marks_it_active(): void
     {
         $this->actingAs($this->employee)

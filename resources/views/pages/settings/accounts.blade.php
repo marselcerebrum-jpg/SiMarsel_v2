@@ -15,11 +15,6 @@
 
     // Every role can read the account list; only Manager can create, edit, and delete.
     $canManage = auth()->user()->can('create', App\Models\Account::class);
-
-    $tabs = array_filter([
-        'create' => $canManage ? ['label' => 'Create Account', 'icon' => 'user-plus'] : null,
-        'list' => ['label' => 'Account List', 'icon' => 'list'],
-    ]);
 @endphp
 
 @section('page')
@@ -72,47 +67,29 @@
             </article>
         </section>
 
-        {{-- Tab (hidden when only the list is available) --}}
-        @if (count($tabs) > 1)
-            <div class="mt-6 inline-flex max-w-full gap-1 overflow-x-auto rounded-2xl border border-white/30 bg-white/15 p-1.5 backdrop-blur" role="tablist" aria-label="Settings Menu">
-                @foreach ($tabs as $key => $tab)
+        <section class="{{ $card }} mt-6 p-5 sm:p-8" aria-labelledby="account-list-title">
+            <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                <div class="border-l-4 border-brand-indigo pl-4">
+                    <p class="text-[11px] font-bold tracking-[.2em] text-label uppercase">Registered Accounts</p>
+                    <h2 id="account-list-title" class="mt-1 flex items-center gap-2 text-xl font-bold tracking-tight text-ink">
+                        <x-icon name="list" class="size-5 text-brand-indigo" />
+                        Account List
+                    </h2>
+                    <p class="mt-1 text-sm text-muted">
+                        {{ $canManage ? 'Tambah, ubah, atau hapus akun anggota tim beserta role dan divisinya.' : 'Cari akun anggota tim dan saring berdasarkan divisi.' }}
+                    </p>
+                </div>
+
+                @if ($canManage)
                     <button
                         type="button"
-                        role="tab"
-                        id="tab-{{ $key }}"
-                        aria-controls="panel-{{ $key }}"
-                        :aria-selected="(tab === @js($key)).toString()"
-                        class="inline-flex h-11 shrink-0 items-center gap-2 rounded-xl px-5 text-xs font-bold tracking-widest uppercase transition"
-                        :class="tab === @js($key) ? 'bg-surface text-brand-indigo shadow-lg' : 'text-white/85 hover:bg-white/10 hover:text-white'"
-                        @click="tab = @js($key)"
+                        class="inline-flex h-11 shrink-0 items-center justify-center gap-2 self-start rounded-xl bg-linear-135 from-brand-indigo via-brand-blue to-brand-teal px-5 text-xs font-bold tracking-widest text-white uppercase shadow-[0_8px_18px_rgba(93,96,162,0.3)] [text-shadow:0_1px_2px_rgba(20,30,50,0.35)] transition hover:brightness-95"
+                        @click="openCreate()"
                     >
-                        <x-icon :name="$tab['icon']" class="size-4" />
-                        {{ $tab['label'] }}
+                        <x-icon name="user-plus" class="size-4" />
+                        Create Account
                     </button>
-                @endforeach
-            </div>
-        @endif
-
-        @if ($canManage)
-            <section id="panel-create" role="tabpanel" aria-labelledby="tab-create" x-show="tab === 'create'" class="{{ $card }} mt-4 p-5 sm:p-8">
-                @include('pages.settings.components.account-create-form')
-            </section>
-        @endif
-
-        <section
-            id="panel-list"
-            @if ($canManage) role="tabpanel" aria-labelledby="tab-list" x-show="tab === 'list'" x-cloak @endif
-            @class([$card, 'p-5 sm:p-8', 'mt-4' => $canManage, 'mt-6' => ! $canManage])
-        >
-            <div class="border-l-4 border-brand-indigo pl-4">
-                <p class="text-[11px] font-bold tracking-[.2em] text-label uppercase">Registered Accounts</p>
-                <h2 class="mt-1 flex items-center gap-2 text-xl font-bold tracking-tight text-ink">
-                    <x-icon name="list" class="size-5 text-brand-indigo" />
-                    Account List
-                </h2>
-                <p class="mt-1 text-sm text-muted">
-                    {{ $canManage ? 'Ubah data, role, dan divisi akun, atau hapus akun yang tidak lagi digunakan.' : 'Cari akun anggota tim dan saring berdasarkan divisi.' }}
-                </p>
+                @endif
             </div>
 
             @include('pages.settings.components.account-filter')
@@ -120,6 +97,7 @@
         </section>
 
         @if ($canManage)
+            @include('pages.settings.components.account-create-modal')
             @include('pages.settings.components.account-edit-modal')
             @include('pages.settings.components.account-delete-modal')
         @endif
