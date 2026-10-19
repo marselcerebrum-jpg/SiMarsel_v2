@@ -1,37 +1,44 @@
 import '../../../css/pages/performance.css';
 import Alpine from 'alpinejs';
 import { errorMessage, validationErrors } from '../../http';
-import { fetchSummary } from './api';
-import { PERIOD_PRESETS, defaultFilter, filterFromUrl, presetRange, syncUrl, toQuery, today, validateRange } from './filter';
+import { exportUrl, fetchSummary } from './api';
+import {
+    MAX_YEARS,
+    MONTHS,
+    PERIOD_MODES,
+    canPickMonth,
+    defaultFilter,
+    filterErrorField,
+    filterFromUrl,
+    syncUrl,
+    toQueryString,
+    today,
+    validateFilter,
+} from './filter';
 import { formatDateTime, formatValue } from './format';
 import performanceContribution from './contribution';
 import performancePaymentMethod from './payment-method';
 import performanceTrend from './trend';
 
-const COUNT_DURATION = 900;
-const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
-
-// Backend field names for the date filter, mapped to the form fields.
-const ERROR_FIELDS = { date_from: 'start_date', date_to: 'end_date' };
-
-Alpine.data('performanceSummary', (definitions = [], platforms = []) => ({
-    definitions,
-    presets: PERIOD_PRESETS,
+Alpine.data('performanceSummary', (platforms = [], years = []) => ({
     platforms,
+    years,
+    modes: PERIOD_MODES,
+    months: MONTHS,
+    maxYears: MAX_YEARS,
 
     filter: filterFromUrl(),
+    query: '',
     errors: {},
 
     summary: null,
-    display: {},
     loading: true,
     loadError: '',
     loadedAt: null,
     requestId: 0,
-    frame: null,
 
     init() {
-        this.load();
+        this.apply();
     },
 
     get maxDate() {
@@ -54,8 +61,33 @@ Alpine.data('performanceSummary', (definitions = [], platforms = []) => ({
         return this.loading && !this.summary;
     },
 
+    get monthEnabled() {
+        return canPickMonth(this.filter);
+    },
+
+    get filterInvalid() {
+        return Object.keys(this.errors).length > 0;
+    },
+
+    get platformSummary() {
+        const selected = this.platforms.filter(({ value }) => this.filter.platforms.includes(value));
+        if (selected.length === 0) return 'All Platforms';
+
+        return selected.length <= 2 ? selected.map(({ label }) => label).join(', ') : `${selected.length} platforms`;
+    },
+
+    get yearSummary() {
+        if (this.filter.years.length === 0) return 'Select year';
+
+        return [...this.filter.years].sort().join(', ');
+    },
+
+    exportLink(format) {
+        return exportUrl(format, this.query);
+    },
+
     value(key, format, compact = false) {
-        return this.summary ? formatValue(this.display[key], format, { compact }) : '—';
+        return this.summary ? formatValue(this.metrics[key]?.value ?? null, format, { compact }) : '—';
     },
 
     isUnavailable(key) {
@@ -84,61 +116,61 @@ Alpine.data('performanceSummary', (definitions = [], platforms = []) => ({
      * Bar width for percentage KPIs, clamped to 0–100.
      */
     progress(key) {
-        return `${Math.min(Math.max(Number(this.display[key]) || 0, 0), 100)}%`;
+        return `${Math.min(Math.max(Number(this.metrics[key]?.value) || 0, 0), 100)}%`;
     },
 
-    changePreset() {
-        this.errors = {};
+    togglePlatform(slug) {
+        const selected = this.filter.platforms;
+        this.filter.platforms = selected.includes(slug) ? selected.filter((value) => value !== slug) : [...selected, slug];
+        this.apply();
+    },
 
-        if (this.filter.preset !== 'custom') {
-            Object.assign(this.filter, presetRange(this.filter.preset));
-            this.load();
+    toggleYear(year) {
+        const selected = this.filter.years;
+
+        if (selected.includes(year)) {
+            this.filter.years = selected.filter((value) => value !== year);
+        } else if (selected.length < MAX_YEARS) {
+            this.filter.years = [...selected, year];
         }
+
+        // A month only applies to a single year; the API rejects a month with several years.
+        if (!canPickMonth(this.filter)) this.filter.month = '';
+        this.apply();
     },
 
-    changeDate() {
-        this.filter.preset = 'custom';
-        this.applyCustomRange();
+    isYearDisabled(year) {
+        return !this.filter.years.includes(year) && this.filter.years.length >= MAX_YEARS;
     },
 
-    applyCustomRange() {
-        this.errors = validateRange(this.filter);
-        if (Object.keys(this.errors).length === 0) this.load();
+    changeMode() {
+        const { platforms, mode } = this.filter;
+        this.filter = { ...defaultFilter(), platforms, mode };
+
+        // Start each mode on a valid period so the change shows data right away.
+        const latest = this.years[0] ?? new Date().getFullYear();
+        if (mode === 'years') this.filter.years = [latest];
+        if (mode === 'year_range') Object.assign(this.filter, { year_from: this.years[this.years.length - 1] ?? latest, year_to: latest });
+        if (mode === 'date_range') Object.assign(this.filter, { date_from: `${today().slice(0, 8)}01`, date_to: today() });
+        this.apply();
     },
 
     resetFilter() {
         this.filter = defaultFilter();
-        this.load();
+        this.apply();
     },
 
     /**
-     * Counts every KPI from its currently displayed value to the new one.
+     * Validates the filter, then reloads the summary and tells every other card the new query.
      */
-    countTo(metrics) {
-        cancelAnimationFrame(this.frame);
+    apply() {
+        this.errors = validateFilter(this.filter);
+        if (this.filterInvalid) return;
 
-        const targets = Object.fromEntries(this.definitions.map(({ key }) => [key, metrics?.[key]?.value ?? null]));
-        const starts = Object.fromEntries(Object.keys(targets).map((key) => [key, Number(this.display[key]) || 0]));
-
-        if (reducedMotion.matches) {
-            this.display = targets;
-            return;
-        }
-
-        const startedAt = performance.now();
-        const step = (now) => {
-            const progress = Math.min((now - startedAt) / COUNT_DURATION, 1);
-            const eased = 1 - (1 - progress) ** 3;
-
-            this.display = Object.fromEntries(Object.entries(targets).map(([key, target]) => [
-                key,
-                target === null ? null : starts[key] + (target - starts[key]) * eased,
-            ]));
-
-            if (progress < 1) this.frame = requestAnimationFrame(step);
-        };
-
-        this.frame = requestAnimationFrame(step);
+        this.query = toQueryString(this.filter);
+        syncUrl(this.query);
+        this.$nextTick(() => this.$dispatch('performance-filter', this.query));
+        this.load();
     },
 
     async load() {
@@ -146,26 +178,19 @@ Alpine.data('performanceSummary', (definitions = [], platforms = []) => ({
 
         this.loading = true;
         this.loadError = '';
-        this.errors = {};
-        syncUrl(this.filter);
-
-        // Let the trend section (and any other widget) reload with the same filter.
-        const query = toQuery(this.filter);
-        this.$nextTick(() => this.$dispatch('performance-filter', query));
 
         try {
-            const { data } = await fetchSummary(query);
+            const { data } = await fetchSummary(this.query);
             if (requestId !== this.requestId) return;
 
             this.summary = data;
             this.loadedAt = new Date();
-            this.countTo(data.kpis);
         } catch (error) {
             if (requestId !== this.requestId) return;
 
             if (error.status === 422 && error.data?.errors) {
                 this.errors = Object.fromEntries(
-                    Object.entries(validationErrors(error)).map(([field, message]) => [ERROR_FIELDS[field] ?? field, message]),
+                    Object.entries(validationErrors(error)).map(([field, message]) => [filterErrorField(field), message]),
                 );
             } else {
                 this.loadError = errorMessage(error, 'Gagal memuat ringkasan performa.');

@@ -4,39 +4,29 @@
 @endphp
 
 <article
-    @class([
-        'performance-rise group relative isolate flex flex-col min-h-40 overflow-hidden rounded-2xl border border-white/60 py-5 pr-6 pl-7 bg-surface shadow-[0_16px_40px_rgba(30,41,70,0.22)] transition duration-300 hover:-translate-y-1 hover:shadow-[0_24px_56px_rgba(30,41,70,0.3)] dark:border-white/25 dark:bg-surface-dim',
-        'sm:min-h-44' => $primary,
-    ])
-    style="--delay: {{ $delay }}ms"
+    class="flex min-h-36 flex-col rounded-panel border border-line bg-surface p-5 shadow-sm"
     :class="loading && summary && 'opacity-70'"
 >
-    {{-- Soft brand glow in the corner, brighter on hover --}}
-    <span class="pointer-events-none absolute -top-12 -right-12 -z-10 size-36 rounded-full bg-radial from-brand-indigo/10 to-transparent to-70% transition-opacity duration-500 group-hover:opacity-100 sm:opacity-70" aria-hidden="true"></span>
+    <h3 class="text-sm font-semibold text-label">{{ $metric['label'] }}</h3>
 
-    {{-- Left accent, stretches on hover --}}
-    <span class="absolute inset-y-6 left-0 w-1 rounded-r-full bg-linear-to-b from-brand-indigo to-brand-teal transition-all duration-500 group-hover:inset-y-3" aria-hidden="true"></span>
-
-    <div class="flex items-start justify-between gap-3">
-        <h3 @class(['font-bold tracking-wider text-label uppercase', 'text-[13px]' => $primary, 'text-xs' => ! $primary])>{{ $metric['label'] }}</h3>
-    </div>
-
-    <div x-show="skeleton" class="mt-1.5 space-y-1.5" aria-hidden="true">
-        <span @class(['performance-shimmer block rounded-lg', 'mt-1 h-10 w-40' => $primary, 'mt-1 h-9 w-28' => ! $primary])></span>
-        <span class="performance-shimmer block h-4 w-36 rounded-md"></span>
+    <div x-show="skeleton" class="mt-2 space-y-2" aria-hidden="true">
+        <span @class(['block animate-pulse rounded-md bg-soft', 'h-9 w-40' => $primary, 'h-8 w-28' => ! $primary])></span>
+        <span class="block h-4 w-36 animate-pulse rounded-md bg-soft"></span>
     </div>
 
     <div x-show="!skeleton" x-cloak>
         <p
-            @class(['performance-value font-extrabold tracking-tight text-ink', 'mt-1.5 text-[2rem] leading-tight' => $primary, 'mt-1.5 text-[1.75rem] leading-tight' => ! $primary])
+            @class(['performance-value mt-1.5 leading-tight font-bold tracking-tight text-ink', 'text-[1.75rem]' => $primary, 'text-2xl' => ! $primary])
             x-text="value({{ $key }}, @js($metric['format']), @js($metric['compact'] ?? false))"
         >—</p>
         <p class="mt-1 text-[13px] text-muted" x-text="detail({{ $key }}, @js($metric['hint']))">{{ $metric['hint'] }}</p>
     </div>
 
     @if ($metric['progress'] ?? false)
-        <div class="mt-3 h-1.5 overflow-hidden rounded-full bg-soft" role="presentation">
-            <div class="h-full rounded-full bg-linear-to-r from-brand-indigo to-brand-teal" :style="{ width: progress({{ $key }}) }"></div>
+        <div class="mt-auto pt-3">
+            <div class="h-2 overflow-hidden rounded-full bg-soft" role="presentation">
+                <div class="h-full rounded-full bg-primary" :style="{ width: progress({{ $key }}) }"></div>
+            </div>
         </div>
     @endif
 </article>

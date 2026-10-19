@@ -24,7 +24,6 @@ export default (parameters = []) => {
         payment: null,
         paymentLoading: true,
         paymentError: '',
-        paymentUnavailable: false,
         paymentRequestId: 0,
         paymentQuery: null,
 
@@ -51,7 +50,6 @@ export default (parameters = []) => {
         get paymentState() {
             if (this.payment !== null && !this.paymentError && !this.paymentNoData && !this.paymentZeroTotal) return 'ready';
             if (this.paymentLoading) return 'loading';
-            if (this.paymentUnavailable) return 'unavailable';
             if (this.paymentError) return 'error';
 
             return 'empty';
@@ -98,7 +96,6 @@ export default (parameters = []) => {
             this.paymentQuery = query;
             this.paymentLoading = true;
             this.paymentError = '';
-            this.paymentUnavailable = false;
 
             try {
                 const { data } = await fetchPaymentMethods(query);
@@ -109,8 +106,7 @@ export default (parameters = []) => {
                 if (requestId !== this.paymentRequestId) return;
 
                 this.payment = null;
-                if (error?.unavailable) this.paymentUnavailable = true;
-                else this.paymentError = errorMessage(error, 'Gagal memuat distribusi metode pembayaran.');
+                this.paymentError = errorMessage(error, 'Gagal memuat distribusi metode pembayaran.');
             } finally {
                 if (requestId === this.paymentRequestId) {
                     this.paymentLoading = false;
@@ -120,7 +116,7 @@ export default (parameters = []) => {
         },
 
         retryPayment() {
-            if (this.paymentQuery) this.loadPayment(this.paymentQuery);
+            if (this.paymentQuery !== null) this.loadPayment(this.paymentQuery);
         },
 
         drawPayment() {

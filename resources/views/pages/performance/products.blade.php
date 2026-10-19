@@ -1,26 +1,22 @@
 @extends('layouts.dashboard')
 
-@section('title', 'Ringkasan Produk')
+@section('title', 'Product Overview')
 @push('scripts')
     @vite('resources/js/pages/performance/products.js')
 @endpush
 
 @php
-    $card = 'rounded-3xl border border-white/60 bg-surface shadow-[0_24px_60px_rgba(30,41,70,0.25)] dark:border-white/25 dark:bg-surface-dim';
+    $card = 'rounded-panel border border-line bg-surface shadow-sm';
 @endphp
 
 @section('page')
     <div x-data="productOverview" class="min-w-0">
-        <header class="text-white">
-            <p class="flex items-center gap-2 text-[11px] font-bold tracking-[.2em] text-white/75 uppercase">
-                <span class="size-1.5 rounded-full bg-white/80" aria-hidden="true"></span>
-                Analisis Performa
-            </p>
-            <h1 class="mt-2 text-3xl font-extrabold tracking-tight sm:text-4xl">Ringkasan Produk</h1>
-            <p class="mt-1.5 text-sm text-white/80">Pantau performa paket produk berdasarkan platform dan periode.</p>
+        <header>
+            <h1 class="text-2xl font-bold tracking-tight text-ink">Product Overview</h1>
+            <p class="mt-1 text-sm text-muted">Pantau performa paket produk berdasarkan platform dan periode.</p>
         </header>
 
-        <section class="{{ $card }} mt-6 p-5 sm:p-6" aria-label="Filter ringkasan produk">
+        <section class="{{ $card }} mt-6 p-5" aria-label="Filter ringkasan produk">
             @include('pages.performance.components.product-filter')
         </section>
 
@@ -28,9 +24,7 @@
             @include('pages.performance.components.bar-chart-card', [
                 'component' => 'topPackagesByRevenue',
                 'id' => 'top-revenue-title',
-                'eyebrow' => 'Pendapatan Paket',
-                'title' => 'Top Paket Berdasarkan Pendapatan',
-                'icon' => 'chart',
+                'title' => 'Top Packages by Revenue',
                 'placeholder' => 'bars-x',
                 'emptyText' => 'Tidak ada data pendapatan paket',
                 'chartLabel' => 'Diagram batang pendapatan per paket',
@@ -39,9 +33,7 @@
             @include('pages.performance.components.bar-chart-card', [
                 'component' => 'topPackagesByVolume',
                 'id' => 'top-volume-title',
-                'eyebrow' => 'Volume Transaksi',
-                'title' => 'Top Paket Berdasarkan Volume Transaksi',
-                'icon' => 'ticket',
+                'title' => 'Top Packages by Transaction Volume',
                 'placeholder' => 'bars-y',
                 'emptyText' => 'Tidak ada data transaksi paket',
                 'chartLabel' => 'Diagram batang jumlah transaksi per paket',

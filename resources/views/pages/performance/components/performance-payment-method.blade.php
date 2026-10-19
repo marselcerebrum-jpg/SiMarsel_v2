@@ -6,14 +6,12 @@
         ['label' => 'Contribution (%)', 'class' => 'text-right'],
     ];
 
-    $group = 'inline-flex max-w-full shrink-0 items-center gap-1 overflow-x-auto rounded-2xl border border-line bg-soft p-1.5';
-    $pill = 'inline-flex h-10 shrink-0 items-center gap-1.5 rounded-xl px-4 text-xs font-bold tracking-wider uppercase transition duration-200 focus-visible:outline-2 focus-visible:outline-brand-indigo';
-    $pillActive = "'bg-linear-135 from-brand-indigo via-brand-blue to-brand-teal text-white shadow-md shadow-brand-indigo/30'";
-    $pillIdle = "'text-muted hover:bg-white hover:text-brand-indigo'";
+    $group = 'inline-flex h-9 max-w-full shrink-0 items-center gap-0.5 overflow-x-auto rounded-lg border border-line bg-soft p-0.5';
+    $pill = 'inline-flex h-8 shrink-0 items-center rounded-md px-3 text-xs font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-40';
+    $pillActive = "'bg-white text-ink shadow-sm'";
+    $pillIdle = "'text-muted hover:text-ink'";
     $dot = 'size-3 shrink-0 rounded-full';
 @endphp
-
-<span class="absolute top-0 left-6 h-1 w-16 rounded-b-full bg-linear-to-r from-brand-indigo to-brand-teal" aria-hidden="true"></span>
 
 <div
     x-data="performancePaymentMethod(@js($paymentMethod['parameters']))"
@@ -22,13 +20,13 @@
 >
     <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
-            <h2 id="performance-payment-method-title" class="text-2xl leading-tight font-extrabold tracking-tight text-ink">Payment Methods</h2>
-            <p class="mt-1.5 text-sm text-muted">Distribusi metode pembayaran beserta jumlah transaksi, revenue, dan kontribusinya sesuai filter aktif.</p>
+            <h2 id="performance-payment-method-title" class="text-base font-semibold text-ink">Payment Methods</h2>
+            <p class="mt-1 text-sm text-muted">Distribusi metode pembayaran beserta jumlah transaksi, revenue, dan kontribusinya sesuai filter aktif.</p>
         </div>
 
         <div class="flex flex-wrap items-center gap-3">
             <p x-show="paymentLoading && paymentState === 'ready'" x-cloak class="inline-flex items-center gap-2 text-xs font-semibold text-label" role="status">
-                <span class="size-3.5 animate-spin rounded-full border-2 border-brand-indigo/25 border-t-brand-indigo" aria-hidden="true"></span>
+                <span class="size-3.5 animate-spin rounded-full border-2 border-primary/25 border-t-primary" aria-hidden="true"></span>
                 Memuat data…
             </p>
 
@@ -47,65 +45,34 @@
         </div>
     </div>
 
-    <div class="mt-6 border-t border-line"></div>
+    <div class="mt-5 border-t border-line"></div>
 
     {{-- Loading --}}
-    <div x-show="paymentState === 'loading'" class="grid gap-6 pt-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] lg:items-center" aria-hidden="true">
-        <span class="performance-shimmer mx-auto block size-56 rounded-full sm:size-64"></span>
+    <div x-show="paymentState === 'loading'" class="grid gap-6 pt-5 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] lg:items-center" aria-hidden="true">
+        <span class="mx-auto block size-56 animate-pulse rounded-full bg-soft sm:size-64"></span>
         <div class="space-y-3">
             @foreach (range(1, 4) as $row)
-                <span class="performance-shimmer block h-12 rounded-xl"></span>
+                <span class="block h-11 animate-pulse rounded-lg bg-soft"></span>
             @endforeach
         </div>
     </div>
 
     {{-- Empty --}}
-    <div x-show="paymentState === 'empty'" x-cloak class="grid min-h-56 place-items-center pt-6 text-center" role="status">
+    <div x-show="paymentState === 'empty'" x-cloak class="grid min-h-56 place-items-center pt-5 text-center" role="status">
         <div class="flex max-w-md flex-col items-center gap-2 text-label">
-            <x-icon name="chart" class="size-8" />
             <p class="text-sm" x-text="paymentMessage"></p>
         </div>
     </div>
 
-    {{-- Backend not integrated yet: blurred outline without numbers --}}
-    <div x-show="paymentState === 'unavailable'" x-cloak class="relative pt-6">
-        <div class="pointer-events-none grid gap-6 blur-[3px] select-none lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] lg:items-center" aria-hidden="true">
-            <span class="mx-auto block size-56 rounded-full bg-conic from-brand-indigo/30 via-brand-teal/30 to-brand-indigo/30 sm:size-64"></span>
-            <div class="space-y-3">
-                @foreach (range(1, 4) as $row)
-                    <div class="flex items-center gap-3 rounded-xl border border-line px-4 py-3.5">
-                        <span class="{{ $dot }} bg-brand-indigo/30"></span>
-                        <span class="h-3 flex-1 rounded bg-line"></span>
-                        <span class="h-3 w-12 rounded bg-soft"></span>
-                    </div>
-                @endforeach
-            </div>
-        </div>
-
-        <div class="absolute inset-0 grid place-items-center p-4">
-            <div class="max-w-sm rounded-2xl border border-line bg-white/90 px-5 py-4 text-center shadow-lg backdrop-blur" role="status">
-                <span class="mx-auto grid size-10 place-items-center rounded-xl bg-brand-indigo/10 text-brand-indigo">
-                    <x-icon name="clipboard" class="size-5" />
-                </span>
-                <p class="mt-2 text-sm font-bold text-ink">Data belum tersedia</p>
-                <p class="mt-1 text-[13px] text-muted">Data akan tampil otomatis setelah API backend terhubung.</p>
-            </div>
-        </div>
-    </div>
-
     {{-- Error --}}
-    <div x-show="paymentState === 'error'" x-cloak class="grid min-h-56 place-items-center pt-6 text-center" role="alert">
+    <div x-show="paymentState === 'error'" x-cloak class="grid min-h-56 place-items-center pt-5 text-center" role="alert">
         <div class="flex flex-col items-center gap-3">
-            <span class="grid size-12 place-items-center rounded-2xl bg-red-50 text-red-600">
-                <x-icon name="chart" class="size-6" />
-            </span>
             <p class="text-sm font-semibold text-red-600" x-text="paymentMessage"></p>
             <button
                 type="button"
-                class="inline-flex h-10 items-center gap-2 rounded-xl border border-line bg-white px-4 text-xs font-bold tracking-wider text-brand-indigo uppercase transition hover:bg-soft focus-visible:outline-2 focus-visible:outline-brand-indigo"
+                class="inline-flex h-9 items-center justify-center rounded-lg border border-line bg-white px-3 text-sm font-semibold text-ink hover:bg-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
                 @click="retryPayment()"
             >
-                <x-icon name="repeat" class="size-4" />
                 Reload
             </button>
         </div>
@@ -115,29 +82,29 @@
     <div
         x-show="paymentState === 'ready'"
         x-cloak
-        class="grid gap-6 pt-6 transition-opacity lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] lg:items-center"
+        class="grid gap-6 pt-5 transition-opacity lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] lg:items-center"
         :class="paymentLoading && 'opacity-60'"
     >
         <div class="relative mx-auto h-64 w-full max-w-sm sm:h-72">
             <canvas x-ref="paymentCanvas" role="img" :aria-label="paymentChartLabel"></canvas>
         </div>
 
-        <div class="overflow-hidden rounded-2xl border border-line bg-white/70 dark:bg-white/40">
+        <div class="overflow-hidden rounded-lg border border-line">
             {{-- Table: tablet and larger --}}
             <div class="hidden overflow-x-auto md:block">
                 <table class="w-full min-w-[520px] text-left text-sm">
                     <caption class="sr-only">Distribusi transaksi dan revenue per metode pembayaran</caption>
-                    <thead class="bg-[#eaf0f8] text-[11px] font-bold tracking-widest text-label uppercase dark:bg-[#dbe3ee]">
+                    <thead class="bg-soft text-xs font-semibold text-label">
                         <tr>
                             @foreach ($columns as $column)
-                                <th scope="col" class="px-4 py-3.5 {{ $column['class'] }}">{{ $column['label'] }}</th>
+                                <th scope="col" class="px-4 py-3 {{ $column['class'] }}">{{ $column['label'] }}</th>
                             @endforeach
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-line">
                         <template x-for="(row, index) in paymentRows" :key="row.key">
                             <tr
-                                class="transition hover:bg-soft/70 focus-visible:bg-soft/70 focus-visible:outline-none"
+                                class="transition hover:bg-soft/60 focus-visible:bg-soft/70 focus-visible:outline-none"
                                 tabindex="0"
                                 @mouseenter="highlightPayment(index)"
                                 @mouseleave="highlightPayment(null)"
@@ -170,7 +137,7 @@
             {{-- Legend list: phones --}}
             <ul class="divide-y divide-line md:hidden" aria-label="Distribusi metode pembayaran">
                 <template x-for="(row, index) in paymentRows" :key="row.key">
-                    <li class="space-y-2 px-4 py-3.5" @click="highlightPayment(index)">
+                    <li class="space-y-2 px-4 py-3" @click="highlightPayment(index)">
                         <div class="flex items-center gap-3">
                             <span class="{{ $dot }}" :style="{ backgroundColor: row.color }" aria-hidden="true"></span>
                             <span class="min-w-0 flex-1 font-semibold break-words text-ink" x-text="row.name"></span>
@@ -178,24 +145,24 @@
                         </div>
                         <dl class="grid grid-cols-2 gap-x-4 pl-6 text-sm">
                             <div>
-                                <dt class="text-[11px] font-bold tracking-widest text-label uppercase">Transactions</dt>
+                                <dt class="text-xs font-semibold text-label">Transactions</dt>
                                 <dd class="performance-value text-muted" x-text="row.transactions"></dd>
                             </div>
                             <div>
-                                <dt class="text-[11px] font-bold tracking-widest text-label uppercase">Revenue</dt>
+                                <dt class="text-xs font-semibold text-label">Revenue</dt>
                                 <dd class="performance-value text-muted" x-text="row.revenue"></dd>
                             </div>
                         </dl>
                     </li>
                 </template>
-                <li class="bg-soft/60 px-4 py-3.5">
+                <li class="bg-soft/60 px-4 py-3">
                     <dl class="grid grid-cols-2 gap-x-4 text-sm font-bold text-ink">
                         <div>
-                            <dt class="text-[11px] tracking-widest text-label uppercase">Total Transactions</dt>
+                            <dt class="text-xs text-label">Total Transactions</dt>
                             <dd class="performance-value" x-text="paymentTotals.transactions"></dd>
                         </div>
                         <div>
-                            <dt class="text-[11px] tracking-widest text-label uppercase">Total Revenue</dt>
+                            <dt class="text-xs text-label">Total Revenue</dt>
                             <dd class="performance-value" x-text="paymentTotals.revenue"></dd>
                         </div>
                     </dl>

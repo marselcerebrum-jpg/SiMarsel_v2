@@ -144,11 +144,11 @@ class PageAccessTest extends TestCase
         $this->actingAs($this->manager)
             ->get('/divisions')
             ->assertOk()
-            ->assertSee('Manajemen Divisi')
-            ->assertSeeInOrder(['Total Divisi', 'Anggota Divisi', 'Divisi Kosong'])
-            ->assertSeeInOrder(['Daftar Divisi', 'Buat Divisi'])
+            ->assertSee('Division Management')
+            ->assertSeeInOrder(['Total Divisions', 'Division Members', 'Empty Divisions'])
+            ->assertSeeInOrder(['Division List', 'Create Division'])
             ->assertSee('id="create-division-title"', false)
-            ->assertSee('Hapus Divisi?');
+            ->assertSee('Delete Division?');
     }
 
     public function test_employee_can_open_division_page_read_only(): void
@@ -156,9 +156,9 @@ class PageAccessTest extends TestCase
         $this->actingAs($this->employee)
             ->get('/divisions')
             ->assertOk()
-            ->assertSee('Daftar Divisi')
-            ->assertDontSee('Buat Divisi')
-            ->assertDontSee('Hapus Divisi?');
+            ->assertSee('Division List')
+            ->assertDontSee('Create Division')
+            ->assertDontSee('Delete Division?');
     }
 
     public function test_sidebar_links_division_page_for_every_role(): void
@@ -183,12 +183,12 @@ class PageAccessTest extends TestCase
             $this->actingAs($account)
                 ->get('/performance/products')
                 ->assertOk()
-                ->assertSee('Ringkasan Produk')
-                ->assertSeeInOrder(['Source App / Platform', 'Tahun', 'Bulan'])
+                ->assertSee('Product Overview')
+                ->assertSeeInOrder(['Source App / Platform', 'Year', 'Month'])
                 ->assertSeeInOrder([
-                    'Top Paket Berdasarkan Pendapatan',
-                    'Top Paket Berdasarkan Volume Transaksi',
-                    'Detail Performa Paket',
+                    'Top Packages by Revenue',
+                    'Top Packages by Transaction Volume',
+                    'Package Performance Details',
                 ])
                 ->assertSee('Cari nama paket')
                 ->assertSeeInOrder(['Excel', 'CSV'])

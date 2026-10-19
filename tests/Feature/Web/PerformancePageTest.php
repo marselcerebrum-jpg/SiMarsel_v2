@@ -5,6 +5,7 @@ namespace Tests\Feature\Web;
 use App\Models\Account;
 use App\Models\Platform;
 use App\Models\Role;
+use App\Models\Transaction;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -56,16 +57,59 @@ class PerformancePageTest extends TestCase
             ->assertDontSee('Period Comparison');
     }
 
-    public function test_performance_page_has_period_and_platform_filters(): void
+    public function test_performance_page_has_overview_filters(): void
     {
         $this->actingAs($this->employee)
             ->get('/dashboard')
             ->assertOk()
-            ->assertSee('id="filter-preset"', false)
+            ->assertSee('id="filter-platforms-label"', false)
+            ->assertSee('aria-multiselectable="true"', false)
+            ->assertSee('togglePlatform(platform.value)', false)
+            ->assertSee('All Platforms')
+            ->assertSee('id="filter-mode"', false)
+            ->assertSee('toggleYear(year)', false)
+            ->assertSee('id="filter-month"', false)
+            ->assertSee(':disabled="!monthEnabled"', false)
+            ->assertSee('id="filter-year-from"', false)
+            ->assertSee('id="filter-year-to"', false)
             ->assertSee('id="filter-start"', false)
             ->assertSee('id="filter-end"', false)
-            ->assertSee('id="filter-platform"', false)
-            ->assertSee('All Platforms');
+            ->assertSeeInOrder(['Platforms', 'Period', 'Years', 'Month', 'From Year', 'To Year', 'Start Date', 'End Date'])
+            ->assertDontSee('id="filter-preset"', false);
+    }
+
+    public function test_filter_offers_at_least_the_last_five_years(): void
+    {
+        $this->travelTo(now()->setDate(2026, 10, 19));
+        Transaction::factory()->create(['paid_date' => '2026-03-05']);
+
+        $this->actingAs($this->employee)
+            ->get('/dashboard')
+            ->assertOk()
+            ->assertSee('[2026,2025,2024,2023,2022]', false);
+    }
+
+    public function test_filter_offers_years_back_to_the_first_transaction(): void
+    {
+        $this->travelTo(now()->setDate(2026, 10, 19));
+        Transaction::factory()->create(['paid_date' => '2019-03-05']);
+
+        $this->actingAs($this->employee)
+            ->get('/dashboard')
+            ->assertOk()
+            ->assertSee('[2026,2025,2024,2023,2022,2021,2020,2019]', false);
+    }
+
+    public function test_export_buttons_link_to_the_export_endpoint_with_the_filter_query(): void
+    {
+        $this->actingAs($this->employee)
+            ->get('/dashboard')
+            ->assertOk()
+            ->assertSee(":href=\"exportLink('xlsx')\"", false)
+            ->assertSee(":href=\"exportLink('csv')\"", false)
+            ->assertSee('href="'.route('api.performance.export', ['format' => 'xlsx']).'"', false)
+            ->assertSee('href="'.route('api.performance.export', ['format' => 'csv']).'"', false)
+            ->assertSeeInOrder(['Export Excel', 'Export CSV']);
     }
 
     public function test_platform_filter_lists_platforms_from_database(): void
@@ -90,7 +134,7 @@ class PerformancePageTest extends TestCase
             ->assertSee('aria-label="Metric"', false)
             ->assertSee('aria-label="Data Period"', false)
             ->assertSee('id="trend-chart"', false)
-            ->assertSeeInOrder(['Revenue', 'Transactions', 'Downloader', 'Conversion', 'User Baru', 'Repeat Order'])
+            ->assertSeeInOrder(['Revenue', 'Transactions', 'Downloader', 'Conversion', 'New Users', 'Repeat Order'])
             ->assertSeeInOrder(["setMetric('revenue')", "setMetric('transactions')", "setMetric('downloaders')", "setMetric('conversion')", "setMetric('new_users')", "setMetric('repeat_orders')"], false)
             ->assertSeeInOrder(["setPeriod('daily')", "setPeriod('weekly')", "setPeriod('monthly')"], false)
             ->assertSeeInOrder(['>Bar<', '>Line<', '>Area<', '>Pie<', '>Table<'], false)
@@ -153,8 +197,7 @@ class PerformancePageTest extends TestCase
             ->assertSee("paymentState === 'loading'", false)
             ->assertSee("paymentState === 'empty'", false)
             ->assertSee("paymentState === 'error'", false)
-            ->assertSee("paymentState === 'unavailable'", false)
-            ->assertSee('Data belum tersedia')
+            ->assertDontSee("paymentState === 'unavailable'", false)
             ->assertSee('@click="retryPayment()"', false);
     }
 

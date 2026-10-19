@@ -27,7 +27,7 @@ const truncate = (text, max) => (text.length > max ? `${text.slice(0, max - 1)}â
 const currentYear = new Date().getFullYear();
 
 /**
- * Induk halaman Ringkasan Produk: menyimpan filter yang dipakai bersama oleh semua kartu.
+ * Induk halaman Product Overview: menyimpan filter yang dipakai bersama oleh semua kartu.
  */
 Alpine.data('productOverview', () => ({
     months: MONTHS,
@@ -148,9 +148,9 @@ function barChartCard(fetcher, { horizontal, value, valueTick, tooltipLines }) {
             const items = () => this.items;
             const valueAxis = {
                 beginAtZero: true,
-                grid: { color: '#dde4ec' },
+                grid: { color: '#e3e6ea' },
                 border: { display: false },
-                ticks: { color: '#6b7f99', font: { size: 11 }, callback: valueTick, maxTicksLimit: 6, precision: 0 },
+                ticks: { color: '#6b7685', font: { size: 11 }, callback: valueTick, maxTicksLimit: 6, precision: 0 },
             };
             const labelAxis = {
                 grid: { display: false },
@@ -173,9 +173,9 @@ function barChartCard(fetcher, { horizontal, value, valueTick, tooltipLines }) {
                     labels,
                     datasets: [{
                         data: values,
-                        backgroundColor: horizontal ? '#5d60a2' : '#5d83a2',
-                        hoverBackgroundColor: '#5da29f',
-                        borderRadius: 8,
+                        backgroundColor: '#059669',
+                        hoverBackgroundColor: '#047857',
+                        borderRadius: 4,
                         maxBarThickness: horizontal ? 28 : 48,
                     }],
                 },
@@ -188,9 +188,9 @@ function barChartCard(fetcher, { horizontal, value, valueTick, tooltipLines }) {
                     plugins: {
                         legend: { display: false },
                         tooltip: {
-                            backgroundColor: '#1f2639',
+                            backgroundColor: '#0f2340',
                             padding: 12,
-                            cornerRadius: 10,
+                            cornerRadius: 8,
                             displayColors: false,
                             titleFont: { size: 13, weight: 700 },
                             bodyFont: { size: 12 },
@@ -225,7 +225,7 @@ Alpine.data('topPackagesByVolume', () =>
 );
 
 const PERFORMANCE_COLUMNS = [
-    { key: 'name', header: 'Nama Paket', width: 34 },
+    { key: 'name', header: 'Package Name', width: 34 },
     { key: 'revenue', header: 'Revenue', type: 'number', format: rupiah },
     { key: 'trx', header: 'Trx', type: 'number', format: number },
     { key: 'low_price', header: 'Low Price', type: 'number', format: rupiah },

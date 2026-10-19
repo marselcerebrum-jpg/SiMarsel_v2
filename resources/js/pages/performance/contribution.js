@@ -78,7 +78,7 @@ export default () => ({
     },
 
     retryContribution() {
-        if (this.contributionQuery) this.loadContribution(this.contributionQuery);
+        if (this.contributionQuery !== null) this.loadContribution(this.contributionQuery);
     },
 
     /**

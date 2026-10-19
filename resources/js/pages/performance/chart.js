@@ -1,129 +1,107 @@
 import Chart from 'chart.js/auto';
 import { formatAxis, formatValue } from './format';
 
-const BRAND = {
-    indigo: '#5d60a2',
-    teal: '#5da29f',
-    logo: '#3d4760',
+const COLORS = {
+    primary: '#059669',
+    primaryHover: '#047857',
+    navy: '#0f2340',
     ink: '#1e293b',
-    label: '#6b7f99',
-    line: 'rgba(221, 228, 236, 0.9)',
-    surface: '#f7f9fb',
+    label: '#6b7685',
+    line: '#e3e6ea',
+    surface: '#ffffff',
 };
 
-const PIE_COLORS = ['#5d60a2', '#5da29f', '#5d83a2', '#3d4760', '#9a9cd0', '#94c9c6', '#97b4cc', '#7a849e'];
+const PIE_COLORS = ['#059669', '#0f2340', '#34d399', '#3b5b8c', '#f59e0b', '#94a3b8', '#065f46', '#7dd3fc'];
+
+// One colour per compared year (at most five).
+const SERIES_COLORS = ['#059669', '#0f2340', '#f59e0b', '#3b82f6', '#94a3b8'];
 
 export function pieColor(index) {
     return PIE_COLORS[index % PIE_COLORS.length];
 }
 
 const TOOLTIP = {
-    backgroundColor: '#1f2639',
-    padding: 12,
-    cornerRadius: 12,
+    backgroundColor: COLORS.navy,
+    padding: 10,
+    cornerRadius: 8,
     titleColor: '#ffffff',
     titleFont: { weight: '600' },
     bodyColor: '#e2e8f0',
     usePointStyle: true,
 };
 
-const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
-
-function animation() {
-    return reducedMotion.matches ? false : { duration: 700, easing: 'easeOutQuart' };
-}
-
 Chart.defaults.font.family = "'Instrument Sans', ui-sans-serif, system-ui, sans-serif";
-Chart.defaults.color = BRAND.label;
+Chart.defaults.color = COLORS.label;
 
-/**
- * Vertical gradient that follows the chart area, used for bar and area fills.
- */
-function verticalGradient(context, top, bottom) {
-    const { ctx, chartArea } = context.chart;
-    if (!chartArea) return top;
-
-    const gradient = ctx.createLinearGradient(0, chartArea.top, 0, chartArea.bottom);
-    gradient.addColorStop(0, top);
-    gradient.addColorStop(1, bottom);
-
-    return gradient;
-}
-
-function dataset(type, metric, values) {
-    const base = { label: metric.label, data: values };
+function dataset(type, { label, data }, index, single) {
+    const color = single ? COLORS.primary : SERIES_COLORS[index % SERIES_COLORS.length];
+    const base = { label, data };
 
     if (type === 'pie') {
         return {
             ...base,
-            backgroundColor: values.map((_, index) => pieColor(index)),
-            borderColor: BRAND.surface,
+            backgroundColor: data.map((_, slice) => pieColor(slice)),
+            borderColor: COLORS.surface,
             borderWidth: 2,
-            hoverOffset: 10,
         };
     }
 
     if (type === 'bar') {
         return {
             ...base,
-            backgroundColor: (context) => verticalGradient(context, BRAND.indigo, BRAND.teal),
-            hoverBackgroundColor: BRAND.logo,
-            borderRadius: values.length > 60 ? 2 : 8,
-            borderSkipped: false,
-            maxBarThickness: 42,
+            backgroundColor: color,
+            hoverBackgroundColor: single ? COLORS.primaryHover : color,
+            borderRadius: data.length > 60 ? 1 : 4,
+            maxBarThickness: 36,
         };
     }
 
     return {
         ...base,
-        borderColor: BRAND.indigo,
-        borderWidth: 2.5,
-        tension: 0.35,
+        borderColor: color,
+        borderWidth: 2,
+        tension: 0.3,
         fill: type === 'area' ? 'origin' : false,
-        backgroundColor: type === 'area'
-            ? (context) => verticalGradient(context, 'rgba(93, 96, 162, 0.35)', 'rgba(93, 162, 159, 0.02)')
-            : BRAND.indigo,
-        pointRadius: values.length > 31 ? 0 : 3,
-        pointHoverRadius: 6,
-        pointBackgroundColor: '#ffffff',
-        pointBorderColor: BRAND.indigo,
-        pointBorderWidth: 2,
+        backgroundColor: type === 'area' ? `${color}26` : color,
+        pointRadius: data.length > 31 ? 0 : 2.5,
+        pointHoverRadius: 5,
+        pointBackgroundColor: color,
     };
 }
 
 /**
- * Chart.js config for one metric over time, built from the backend `rows`.
- * "area" is a filled line chart. A null value (conversion without downloaders)
- * leaves a gap in the chart and shows as "—" in the tooltip.
+ * Chart.js config for one metric over time, built from the backend `labels` and `datasets`.
+ * Several datasets (one per compared year) get a legend; "area" is a filled line chart.
+ * A null value (conversion without downloaders, or a period after today) leaves a gap and shows as "—".
  */
-export function chartConfig({ type, rows, metric }) {
+export function chartConfig({ type, labels, datasets, metric }) {
     const isPie = type === 'pie';
-    const values = rows.map((row) => row.value);
+    const single = datasets.length === 1;
 
     return {
         type: type === 'area' ? 'line' : type,
         data: {
-            labels: rows.map((row) => row.label),
-            datasets: [dataset(type, metric, values)],
+            labels,
+            datasets: datasets.map((set, index) => dataset(type, set, index, single)),
         },
         options: {
             responsive: true,
             maintainAspectRatio: false,
-            animation: animation(),
+            animation: false,
             interaction: isPie ? { mode: 'nearest', intersect: true } : { mode: 'index', intersect: false },
             layout: { padding: { top: 8 } },
             plugins: {
                 legend: {
-                    display: isPie && rows.length <= 12,
+                    display: (isPie && labels.length <= 12) || !single,
                     position: 'bottom',
-                    labels: { usePointStyle: true, pointStyle: 'circle', boxWidth: 8, padding: 16, color: BRAND.ink },
+                    labels: { usePointStyle: true, pointStyle: 'circle', boxWidth: 8, padding: 16, color: COLORS.ink },
                 },
                 tooltip: {
                     ...TOOLTIP,
-                    displayColors: isPie,
+                    displayColors: isPie || !single,
                     callbacks: {
-                        title: (items) => rows[items[0].dataIndex].label,
-                        label: (item) => ` ${metric.label}: ${formatValue(rows[item.dataIndex].value, metric.format)}`,
+                        title: (items) => labels[items[0].dataIndex],
+                        label: (item) => ` ${single ? metric.label : item.dataset.label}: ${formatValue(item.raw, metric.format)}`,
                     },
                 },
             },
@@ -137,7 +115,7 @@ export function chartConfig({ type, rows, metric }) {
                     },
                     y: {
                         beginAtZero: true,
-                        grid: { color: BRAND.line },
+                        grid: { color: COLORS.line },
                         border: { display: false },
                         ticks: { maxTicksLimit: 8, padding: 8, callback: (value) => formatAxis(value, metric.format) },
                     },
@@ -159,15 +137,14 @@ export function distributionChartConfig({ rows, metric }) {
                 label: metric.label,
                 data: rows.map((row) => row.value),
                 backgroundColor: rows.map((row) => row.color),
-                borderColor: BRAND.surface,
+                borderColor: COLORS.surface,
                 borderWidth: 2,
-                hoverOffset: 10,
             }],
         },
         options: {
             responsive: true,
             maintainAspectRatio: false,
-            animation: animation(),
+            animation: false,
             layout: { padding: 12 },
             plugins: {
                 legend: { display: false },

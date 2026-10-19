@@ -6,7 +6,8 @@
 @endpush
 
 @php
-    $card = 'rounded-3xl border border-white/60 bg-surface shadow-[0_24px_60px_rgba(30,41,70,0.25)] dark:border-white/25 dark:bg-surface-dim';
+    $card = 'rounded-panel border border-line bg-surface shadow-sm';
+    $exportButton = 'inline-flex h-9 items-center justify-center rounded-lg border border-line bg-white px-3 text-sm font-semibold text-ink hover:bg-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary';
 
     // Display metadata only. Every value, comparison and formula comes from the backend.
     $rows = [
@@ -32,18 +33,13 @@
 
     $platformOptions = $platforms->map(fn ($platform) => ['value' => $platform->slug, 'label' => $platform->name])->values();
 
-    $definitions = collect($rows)
-        ->flatMap(fn (array $row) => $row['metrics'])
-        ->map(fn (array $metric) => Arr::only($metric, ['key', 'label', 'format']))
-        ->values();
-
     $trend = [
         'metrics' => [
             ['value' => 'revenue', 'label' => 'Revenue', 'format' => 'currency'],
             ['value' => 'transactions', 'label' => 'Transactions', 'format' => 'number'],
             ['value' => 'downloaders', 'label' => 'Downloader', 'format' => 'number'],
             ['value' => 'conversion', 'label' => 'Conversion', 'format' => 'percent'],
-            ['value' => 'new_users', 'label' => 'User Baru', 'format' => 'number'],
+            ['value' => 'new_users', 'label' => 'New Users', 'format' => 'number'],
             ['value' => 'repeat_orders', 'label' => 'Repeat Order', 'format' => 'number'],
         ],
         'charts' => [
@@ -66,38 +62,30 @@
             ['value' => 'transactions', 'label' => 'Transactions'],
         ],
     ];
-
-    $delay = 120;
 @endphp
 
 @section('page')
-    <div x-data="performanceSummary(@js($definitions), @js($platformOptions))" class="min-w-0">
-        <header class="performance-rise flex flex-col gap-3 text-white sm:flex-row sm:items-center sm:justify-between">
+    <div x-data="performanceSummary(@js($platformOptions), @js($years))" class="min-w-0">
+        <header class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <div>
-                <h1 class="text-3xl font-extrabold tracking-tight sm:text-4xl">Performance Summary</h1>
-                <p class="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-white/80">
+                <h1 class="text-2xl font-bold tracking-tight text-ink">Performance Summary</h1>
+                <p class="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted">
                     <span>Data keseluruhan performa perusahaan</span>
-                    <span x-show="loadedLabel" x-cloak class="size-1 rounded-full bg-white/60" aria-hidden="true"></span>
+                    <span x-show="loadedLabel" x-cloak aria-hidden="true">·</span>
                     <span x-show="loadedLabel" x-cloak>Dimuat <span x-text="loadedLabel"></span></span>
                 </p>
             </div>
 
-            <div class="flex items-center gap-2 self-start sm:self-auto">
-                <button
-                    type="button"
-                    x-show="!loading && loadError"
-                    x-cloak
-                    class="grid size-11 place-items-center rounded-xl border border-white/30 bg-white/15 backdrop-blur transition hover:bg-white/25"
-                    title="Muat ulang data"
-                    aria-label="Reload Data"
-                    @click="load()"
-                >
-                    <x-icon name="repeat" class="size-4" />
-                </button>
+            <div class="flex flex-wrap items-center gap-2">
+                <button type="button" x-show="!loading && loadError" x-cloak class="{{ $exportButton }}" @click="load()">Reload</button>
+                <a :href="exportLink('xlsx')" href="{{ route('api.performance.export', ['format' => 'xlsx']) }}" class="{{ $exportButton }}" :class="filterInvalid && 'pointer-events-none opacity-50'" :aria-disabled="filterInvalid.toString()">Export Excel</a>
+                <a :href="exportLink('csv')" href="{{ route('api.performance.export', ['format' => 'csv']) }}" class="{{ $exportButton }}" :class="filterInvalid && 'pointer-events-none opacity-50'" :aria-disabled="filterInvalid.toString()">Export CSV</a>
             </div>
         </header>
 
-        <section class="{{ $card }} performance-rise relative mt-5 overflow-hidden px-5 py-5 sm:px-6" style="--delay: 60ms" aria-labelledby="filter-title">
+        <p x-show="loadError" x-cloak x-text="loadError" class="mt-4 rounded-lg border border-red-200 bg-red-50 px-4 py-2.5 text-sm text-red-700" role="alert"></p>
+
+        <section class="{{ $card }} relative mt-5 p-5" aria-labelledby="filter-title">
             @include('pages.performance.components.performance-filter')
         </section>
 
@@ -105,22 +93,21 @@
             @foreach ($rows as $size => $row)
                 <div class="mt-4 grid gap-4 {{ $row['grid'] }}">
                     @foreach ($row['metrics'] as $metric)
-                        @include('pages.performance.components.performance-card', ['metric' => $metric, 'size' => $size, 'delay' => $delay])
-                        @php($delay += 60)
+                        @include('pages.performance.components.performance-card', ['metric' => $metric, 'size' => $size])
                     @endforeach
                 </div>
             @endforeach
         </section>
 
-        <section class="{{ $card }} performance-rise relative mt-4 overflow-hidden p-5 sm:p-7" style="--delay: {{ $delay }}ms" aria-labelledby="performance-trend-title">
+        <section class="{{ $card }} mt-4 p-5" aria-labelledby="performance-trend-title">
             @include('pages.performance.components.performance-trend')
         </section>
 
-        <section class="{{ $card }} performance-rise relative mt-4 overflow-hidden p-5 sm:p-7" style="--delay: {{ $delay + 60 }}ms" aria-labelledby="performance-contribution-title">
+        <section class="{{ $card }} mt-4 p-5" aria-labelledby="performance-contribution-title">
             @include('pages.performance.components.performance-contribution')
         </section>
 
-        <section class="{{ $card }} performance-rise relative mt-4 overflow-hidden p-5 sm:p-7" style="--delay: {{ $delay + 120 }}ms" aria-labelledby="performance-payment-method-title">
+        <section class="{{ $card }} mt-4 p-5" aria-labelledby="performance-payment-method-title">
             @include('pages.performance.components.performance-payment-method')
         </section>
     </div>
