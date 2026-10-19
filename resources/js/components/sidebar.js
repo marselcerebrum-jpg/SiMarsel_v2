@@ -14,10 +14,10 @@ export default () => ({
     },
 
     soon(label) {
-        showToast({ type: 'info', title: 'Fitur belum tersedia', text: `Menu "${label}" belum dibuat.` });
+        showToast({ type: 'info', title: 'Feature Unavailable', text: `Menu "${label}" belum dibuat.` });
     },
 
     locked(label) {
-        showToast({ type: 'info', title: 'Akses terbatas', text: `Anda tidak memiliki akses ke menu "${label}".` });
+        showToast({ type: 'info', title: 'Restricted Access', text: `Anda tidak memiliki akses ke menu "${label}".` });
     },
 });

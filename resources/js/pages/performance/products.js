@@ -11,7 +11,7 @@ import {
 
 Chart.register(BarController, BarElement, CategoryScale, LinearScale, Tooltip);
 
-const MONTHS = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
 const rupiahFormat = new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 });
 const numberFormat = new Intl.NumberFormat('id-ID');
@@ -58,7 +58,7 @@ const packageLines = (item) => [...wrap(item.name, 18, 2), ...(item.active_perio
 const currentYear = new Date().getFullYear();
 
 /**
- * Induk halaman Ringkasan Produk: menyimpan filter yang dipakai bersama oleh semua kartu.
+ * Induk halaman Product Overview: menyimpan filter yang dipakai bersama oleh semua kartu.
  */
 Alpine.data('productOverview', () => ({
     months: MONTHS,
@@ -179,10 +179,10 @@ function barChartCard(fetcher, { horizontal, value, valueTick, valueTitle, toolt
             const items = () => this.items;
             const valueAxis = {
                 beginAtZero: true,
-                grid: { color: '#dde4ec' },
+                grid: { color: '#e3e6ea' },
                 border: { display: false },
-                ticks: { color: '#6b7f99', font: { size: 11 }, callback: valueTick, maxTicksLimit: 6, precision: 0 },
-                title: { display: Boolean(valueTitle), text: valueTitle, color: '#6b7f99', font: { size: 11, weight: 600 } },
+                ticks: { color: '#6b7685', font: { size: 11 }, callback: valueTick, maxTicksLimit: 6, precision: 0 },
+                title: { display: Boolean(valueTitle), text: valueTitle, color: '#6b7685', font: { size: 11, weight: 600 } },
             };
             const labelAxis = {
                 grid: { display: false },
@@ -205,9 +205,9 @@ function barChartCard(fetcher, { horizontal, value, valueTick, valueTitle, toolt
                     labels,
                     datasets: [{
                         data: values,
-                        backgroundColor: horizontal ? '#5d60a2' : '#5d83a2',
-                        hoverBackgroundColor: '#5da29f',
-                        borderRadius: 8,
+                        backgroundColor: '#059669',
+                        hoverBackgroundColor: '#047857',
+                        borderRadius: 4,
                         maxBarThickness: horizontal ? 28 : 48,
                     }],
                 },
@@ -220,9 +220,9 @@ function barChartCard(fetcher, { horizontal, value, valueTick, valueTitle, toolt
                     plugins: {
                         legend: { display: false },
                         tooltip: {
-                            backgroundColor: '#1f2639',
+                            backgroundColor: '#0f2340',
                             padding: 12,
-                            cornerRadius: 10,
+                            cornerRadius: 8,
                             displayColors: false,
                             titleFont: { size: 13, weight: 700 },
                             bodyFont: { size: 12 },
@@ -260,7 +260,7 @@ Alpine.data('topPackagesByVolume', () =>
 // `hint` = definisi metrik (sama dengan docs/api/products.md), tampil saat judul kolom di-hover.
 // `excelFormat` dipakai untuk kolom rata-rata agar nilai desimalnya tidak dibulatkan di Excel.
 const PERFORMANCE_COLUMNS = [
-    { key: 'name', header: 'Nama Paket', width: 34, hint: 'Nama produk lengkap, termasuk masa aktif' },
+    { key: 'name', header: 'Package Name', width: 34, hint: 'Nama produk lengkap, termasuk masa aktif' },
     { key: 'revenue', header: 'Revenue', type: 'number', format: rupiah, hint: 'Total nominal transaksi berhasil' },
     { key: 'trx', header: 'Trx', type: 'number', format: number, hint: 'Jumlah transaksi berhasil' },
     { key: 'low_price', header: 'Low Price', type: 'number', format: rupiah, hint: 'Nominal terendah dari satu transaksi' },

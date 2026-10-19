@@ -22,14 +22,15 @@ class Sidebar extends Component
     public function __construct()
     {
         $this->sections = [
-            'Analisis' => [
-                $this->group('Analisis performa', 'chart', [
-                    $this->link('Produk', 'cube', 'performance.products'),
+            'Analytics' => [
+                $this->group('Performance Analysis', 'chart', [
+                    $this->link('Summary', 'chart', 'dashboard'),
+                    $this->link('Products', 'cube', 'performance.products'),
                 ]),
             ],
-            'Sistem' => [
-                $this->link('Manajemen akun', 'gear', 'settings.index', ['viewAny', Account::class]),
-                $this->link('Manajemen divisi', 'building', 'divisions.index', ['viewAny', Division::class]),
+            'System' => [
+                $this->link('Account Management', 'gear', 'settings.index', ['viewAny', Account::class]),
+                $this->link('Division Management', 'building', 'divisions.index', ['viewAny', Division::class]),
             ],
         ];
     }
