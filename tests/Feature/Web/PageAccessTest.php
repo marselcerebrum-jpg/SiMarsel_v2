@@ -46,8 +46,9 @@ class PageAccessTest extends TestCase
         $this->get('/login')
             ->assertOk()
             ->assertSee(route('api.login'), false)
-            ->assertDontSee('Mode demo')
-            ->assertDontSee('Lupa password?');
+            ->assertDontSee('Forgot Password?')
+            ->assertSee('data-redirect="'.route('dashboard').'"', false)
+            ->assertDontSee('Mode demo');
     }
 
     public function test_authenticated_account_is_redirected_away_from_login(): void
@@ -57,7 +58,7 @@ class PageAccessTest extends TestCase
             ->assertRedirect(route('dashboard'));
     }
 
-    public function test_dashboard_shows_logged_in_account(): void
+    public function test_landing_page_shows_logged_in_account(): void
     {
         $this->actingAs($this->employee)
             ->get('/dashboard')
@@ -74,11 +75,15 @@ class PageAccessTest extends TestCase
         $this->actingAs($this->manager)
             ->get('/settings')
             ->assertOk()
-            ->assertSee('Pengaturan')
-            ->assertSeeInOrder(['Total Akun', 'Manager', 'Employee', 'Divisi'])
-            ->assertSeeInOrder(['Buat Akun', 'Daftar Akun'])
+            ->assertSee('Settings')
+            ->assertSeeInOrder(['Total Accounts', 'Manager', 'Employee', 'Divisions'])
+            ->assertSeeInOrder(['Account List', 'Create Account'])
+            ->assertSee('@click="openCreate()"', false)
+            ->assertSee('id="create-user-title"', false)
+            ->assertDontSee('role="tablist"', false)
+            ->assertDontSee('id="panel-create"', false)
             ->assertSee('Operasional')
-            ->assertSee('>Aksi</th>', false)
+            ->assertSee('>Actions</th>', false)
             ->assertSee('openEdit(user)', false)
             ->assertSee('id="edit-user-title"', false)
             ->assertDontSee('>Status</th>', false);
@@ -89,9 +94,9 @@ class PageAccessTest extends TestCase
         $this->actingAs($this->manager)
             ->get('/dashboard')
             ->assertOk()
-            ->assertSeeInOrder(['Manajemen akun', 'Keluar'])
+            ->assertSeeInOrder(['Account Management', 'Logout'])
             ->assertSee('href="'.route('settings.index').'"', false)
-            ->assertDontSee('Manajemen Akun')
+            ->assertDontSee('Manajemen akun')
             ->assertDontSee("soon('Tasklist')", false);
     }
 
@@ -109,7 +114,7 @@ class PageAccessTest extends TestCase
             ->get('/dashboard')
             ->assertOk()
             ->assertSee('href="'.route('settings.index').'"', false)
-            ->assertDontSee("locked('Manajemen akun')", false);
+            ->assertDontSee("locked('Account Management')", false);
     }
 
     public function test_employee_can_open_settings_page_as_read_only(): void
@@ -117,14 +122,16 @@ class PageAccessTest extends TestCase
         $this->actingAs($this->employee)
             ->get('/settings')
             ->assertOk()
-            ->assertSee('Daftar Akun')
+            ->assertSee('Account List')
             ->assertSee('Lihat daftar akun anggota tim beserta role dan divisinya.')
             ->assertSee('Cari akun anggota tim dan saring berdasarkan divisi.')
             ->assertSee('accountSettings(', false)
-            ->assertDontSee('Buat Akun')
+            ->assertDontSee('Create Account')
+            ->assertDontSee('openCreate()', false)
+            ->assertDontSee('id="create-user-title"', false)
             ->assertDontSee('id="panel-create"', false)
             ->assertDontSee('role="tablist"', false)
-            ->assertDontSee('>Aksi</th>', false)
+            ->assertDontSee('>Actions</th>', false)
             ->assertDontSee('openEdit(user)', false)
             ->assertDontSee('openDelete(user)', false)
             ->assertDontSee('id="edit-user-title"', false)
@@ -137,11 +144,11 @@ class PageAccessTest extends TestCase
         $this->actingAs($this->manager)
             ->get('/divisions')
             ->assertOk()
-            ->assertSee('Manajemen Divisi')
-            ->assertSeeInOrder(['Total Divisi', 'Anggota Divisi', 'Divisi Kosong'])
-            ->assertSeeInOrder(['Daftar Divisi', 'Buat Divisi'])
+            ->assertSee('Division Management')
+            ->assertSeeInOrder(['Total Divisions', 'Division Members', 'Empty Divisions'])
+            ->assertSeeInOrder(['Division List', 'Create Division'])
             ->assertSee('id="create-division-title"', false)
-            ->assertSee('Hapus Divisi?');
+            ->assertSee('Delete Division?');
     }
 
     public function test_employee_can_open_division_page_read_only(): void
@@ -149,9 +156,9 @@ class PageAccessTest extends TestCase
         $this->actingAs($this->employee)
             ->get('/divisions')
             ->assertOk()
-            ->assertSee('Daftar Divisi')
-            ->assertDontSee('Buat Divisi')
-            ->assertDontSee('Hapus Divisi?');
+            ->assertSee('Division List')
+            ->assertDontSee('Create Division')
+            ->assertDontSee('Delete Division?');
     }
 
     public function test_sidebar_links_division_page_for_every_role(): void
@@ -160,7 +167,7 @@ class PageAccessTest extends TestCase
             $this->actingAs($account)
                 ->get('/dashboard')
                 ->assertOk()
-                ->assertSee('Manajemen divisi')
+                ->assertSee('Division Management')
                 ->assertSee('href="'.route('divisions.index').'"', false);
         }
     }
@@ -176,12 +183,12 @@ class PageAccessTest extends TestCase
             $this->actingAs($account)
                 ->get('/performance/products')
                 ->assertOk()
-                ->assertSee('Ringkasan Produk')
-                ->assertSeeInOrder(['Source App / Platform', 'Tahun', 'Bulan'])
+                ->assertSee('Product Overview')
+                ->assertSeeInOrder(['Source App / Platform', 'Year', 'Month'])
                 ->assertSeeInOrder([
-                    'Top Paket Berdasarkan Pendapatan',
-                    'Top Paket Berdasarkan Volume Transaksi',
-                    'Detail Performa Paket',
+                    'Top Packages by Revenue',
+                    'Top Packages by Transaction Volume',
+                    'Package Performance Details',
                 ])
                 ->assertSee('Cari nama paket')
                 ->assertSeeInOrder(['Excel', 'CSV'])
@@ -194,7 +201,7 @@ class PageAccessTest extends TestCase
         $this->actingAs($this->employee)
             ->get('/performance/products')
             ->assertOk()
-            ->assertSeeInOrder(['Analisis performa', 'Produk'])
+            ->assertSeeInOrder(['Performance Analysis', 'Products'])
             ->assertSee('href="'.route('performance.products').'"', false)
             ->assertSee('aria-current="page"', false);
     }

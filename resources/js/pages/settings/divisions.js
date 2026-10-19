@@ -132,7 +132,7 @@ Alpine.data('divisionManagement', (canManage = false) => ({
             this.divisions.push(data);
             this.resetDraft();
             this.modal = null;
-            showToast({ title: 'Divisi berhasil dibuat', text: `${data.name} sudah ditambahkan.` });
+            showToast({ title: 'Division Created', text: `${data.name} sudah ditambahkan.` });
         } catch (error) {
             if (error.status === 422 && error.data?.errors) {
                 this.draftErrors = validationErrors(error);
@@ -151,7 +151,7 @@ Alpine.data('divisionManagement', (canManage = false) => ({
 
         this.divisions = this.divisions.map((division) => (division.id === id ? result.data : division));
         this.closeModal();
-        showToast({ title: 'Perubahan disimpan', text: `Divisi ${result.data.name} sudah diperbarui.` });
+        showToast({ title: 'Changes Saved', text: `Divisi ${result.data.name} sudah diperbarui.` });
     },
 
     async confirmDelete() {
@@ -163,6 +163,6 @@ Alpine.data('divisionManagement', (canManage = false) => ({
 
         this.divisions = this.divisions.filter((item) => item.id !== division.id);
         this.closeModal();
-        showToast({ title: 'Divisi dihapus', text: `${division.name} sudah dihapus.` });
+        showToast({ title: 'Division Deleted', text: `${division.name} sudah dihapus.` });
     },
 }));

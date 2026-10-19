@@ -1,0 +1,5 @@
+/* Keep KPI numbers aligned. */
+.performance-value {
+    font-variant-numeric: tabular-nums;
+    overflow-wrap: anywhere;
+}
