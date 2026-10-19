@@ -108,9 +108,9 @@ class PerformanceTrendTest extends TestCase
     {
         $this->actingAs($this->manager);
 
-        $this->getJson(self::URL)
+        $this->getJson(self::URL.'?date_from=2026-09-01')
             ->assertUnprocessable()
-            ->assertJsonValidationErrors(['date_from', 'date_to', 'metric', 'period']);
+            ->assertJsonValidationErrors(['date_to', 'metric']);
 
         $this->getJson(self::URL.'?date_from=2026-09-01&date_to=2026-09-30&metric=profit&period=yearly')
             ->assertJsonValidationErrors(['metric' => 'Metric tidak valid.', 'period' => 'Periode tidak valid.']);

@@ -13,6 +13,7 @@ export default defineConfig({
                 'resources/js/pages/settings/accounts.js',
                 'resources/js/pages/settings/divisions.js',
                 'resources/js/pages/performance/index.js',
+                'resources/js/pages/performance/products.js',
             ],
             refresh: true,
             fonts: [

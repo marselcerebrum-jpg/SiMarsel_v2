@@ -20,7 +20,7 @@
 
     {{-- 1. Logo & tombol tutup (mobile) --}}
     <div class="relative flex shrink-0 items-center justify-between px-4 pt-6 pb-5">
-        <a href="{{ route('performance.index') }}" class="group flex items-center gap-3 px-2">
+        <a href="{{ route('dashboard') }}" class="group flex items-center gap-3 px-2">
             <span class="grid size-10 place-items-center rounded-full border border-white/15 bg-white/10 text-sm font-extrabold text-white transition duration-300 group-hover:scale-105 group-hover:border-brand-teal">SM</span>
             <span>
                 <span class="block text-base leading-tight font-extrabold text-white">SiMarsel<span class="text-brand-teal">.</span></span>

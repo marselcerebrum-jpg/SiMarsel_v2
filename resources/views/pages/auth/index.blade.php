@@ -18,7 +18,7 @@
 
             <div id="login-alert" class="auth-alert" role="alert" hidden></div>
 
-            <form id="login-form" class="auth-form" method="POST" action="{{ route('api.login') }}" data-redirect="{{ route('performance.index') }}" novalidate>
+            <form id="login-form" class="auth-form" method="POST" action="{{ route('api.login') }}" data-redirect="{{ route('dashboard') }}" novalidate>
                 @csrf
 
                 <div class="auth-field">

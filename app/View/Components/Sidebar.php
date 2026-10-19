@@ -23,7 +23,10 @@ class Sidebar extends Component
     {
         $this->sections = [
             'Analytics' => [
-                $this->link('Performance Summary', 'chart', 'performance.index'),
+                $this->group('Performance Analysis', 'chart', [
+                    $this->link('Summary', 'chart', 'dashboard'),
+                    $this->link('Products', 'cube', 'performance.products'),
+                ]),
             ],
             'System' => [
                 $this->link('Account Management', 'gear', 'settings.index', ['viewAny', Account::class]),

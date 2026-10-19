@@ -4,7 +4,7 @@ namespace App\Services;
 
 use App\Repositories\PerformanceRepository;
 use App\Services\Concerns\ComparesWithPreviousValue;
-use Carbon\CarbonImmutable;
+use App\Support\PerformanceFilter;
 
 class PerformanceSummaryService
 {
@@ -13,33 +13,20 @@ class PerformanceSummaryService
     public function __construct(private PerformanceRepository $performanceRepository) {}
 
     /**
-     * Build the KPI summary for the period and compare it with the previous period of the same length.
+     * Build the KPI summary for the filter and compare it with the filter's previous period.
      *
      * @return array<string, mixed>
      */
-    public function summarize(CarbonImmutable $from, CarbonImmutable $to, ?string $platformSlug): array
+    public function summarize(PerformanceFilter $filter): array
     {
-        $platformId = $platformSlug ? $this->performanceRepository->findPlatformIdBySlug($platformSlug) : null;
-
-        $days = (int) $from->diffInDays($to) + 1;
-        $previousTo = $from->subDay();
-        $previousFrom = $previousTo->subDays($days - 1);
-
-        $current = $this->metrics($from, $to, $platformId);
-        $previous = $this->metrics($previousFrom, $previousTo, $platformId);
+        $current = $this->metrics($filter);
+        $previous = $this->metrics($filter->previous());
 
         $isEmpty = $current['total_transactions'] === 0 && $current['total_downloaders'] === 0;
 
         return [
-            'filter' => [
-                'date_from' => $from->toDateString(),
-                'date_to' => $to->toDateString(),
-                'platform' => $platformSlug,
-            ],
-            'previous_period' => [
-                'date_from' => $previousFrom->toDateString(),
-                'date_to' => $previousTo->toDateString(),
-            ],
+            'filter' => $filter->toArray(),
+            'previous_period' => $filter->previousToArray(),
             'is_empty' => $isEmpty,
             'message' => $isEmpty ? 'Data tidak tersedia untuk filter yang dipilih.' : null,
             'kpis' => collect($current)
@@ -51,16 +38,16 @@ class PerformanceSummaryService
     /**
      * @return array<string, int|float|null>
      */
-    private function metrics(CarbonImmutable $from, CarbonImmutable $to, ?int $platformId): array
+    private function metrics(PerformanceFilter $filter): array
     {
-        $totals = $this->performanceRepository->transactionTotals($from, $to, $platformId);
-        $downloaders = $this->performanceRepository->totalDownloaders($from, $to, $platformId);
+        $totals = $this->performanceRepository->transactionTotals($filter);
+        $downloaders = $this->performanceRepository->totalDownloaders($filter);
 
         return [
             'total_revenue' => round($totals['revenue'], 2),
             'total_transactions' => $totals['transactions'],
             'total_downloaders' => $downloaders,
-            'unique_users' => $this->performanceRepository->countUniqueCustomers($from, $to, $platformId),
+            'unique_users' => $this->performanceRepository->countUniqueCustomers($filter),
             'new_users' => $totals['new_users'],
             'repeat_orders' => $totals['repeat_orders'],
             'average_order_value' => $totals['transactions'] > 0

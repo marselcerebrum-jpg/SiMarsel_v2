@@ -32,13 +32,13 @@ class PerformancePageTest extends TestCase
 
     public function test_guest_is_redirected_to_login(): void
     {
-        $this->get('/performance')->assertRedirect(route('login'));
+        $this->get('/dashboard')->assertRedirect(route('login'));
     }
 
     public function test_performance_page_shows_every_kpi_in_order(): void
     {
         $this->actingAs($this->employee)
-            ->get('/performance')
+            ->get('/dashboard')
             ->assertOk()
             ->assertSee('Performance Summary')
             ->assertSee('performanceSummary', false)
@@ -59,7 +59,7 @@ class PerformancePageTest extends TestCase
     public function test_performance_page_has_period_and_platform_filters(): void
     {
         $this->actingAs($this->employee)
-            ->get('/performance')
+            ->get('/dashboard')
             ->assertOk()
             ->assertSee('id="filter-preset"', false)
             ->assertSee('id="filter-start"', false)
@@ -74,7 +74,7 @@ class PerformancePageTest extends TestCase
         Platform::factory()->create(['slug' => 'cerebrum', 'name' => 'Cerebrum']);
 
         $this->actingAs($this->employee)
-            ->get('/performance')
+            ->get('/dashboard')
             ->assertOk()
             ->assertSeeInOrder(['cerebrum', 'Cerebrum', 'jadiasn', 'JadiASN']);
     }
@@ -82,7 +82,7 @@ class PerformancePageTest extends TestCase
     public function test_performance_page_has_trend_analysis_controls(): void
     {
         $this->actingAs($this->employee)
-            ->get('/performance')
+            ->get('/dashboard')
             ->assertOk()
             ->assertSee('Trend &amp; Performance Analysis', false)
             ->assertSee('performanceTrend', false)
@@ -100,7 +100,7 @@ class PerformancePageTest extends TestCase
     public function test_performance_page_has_platform_contribution_section(): void
     {
         $this->actingAs($this->employee)
-            ->get('/performance')
+            ->get('/dashboard')
             ->assertOk()
             ->assertSee('Platform Contribution')
             ->assertSee('x-data="performanceContribution"', false)
@@ -113,7 +113,7 @@ class PerformancePageTest extends TestCase
     public function test_platform_contribution_shows_summary_progress_bar_tooltip_and_states(): void
     {
         $this->actingAs($this->employee)
-            ->get('/performance')
+            ->get('/dashboard')
             ->assertOk()
             ->assertSeeInOrder(['Total Revenue', 'Platforms', 'Jumlah platform yang tercakup dalam hasil filter'])
             ->assertSee('x-text="contributionRevenue"', false)
@@ -130,7 +130,7 @@ class PerformancePageTest extends TestCase
     public function test_performance_page_has_payment_method_section_after_platform_contribution(): void
     {
         $this->actingAs($this->employee)
-            ->get('/performance')
+            ->get('/dashboard')
             ->assertOk()
             ->assertSee('Payment Methods')
             ->assertSee('x-data="performancePaymentMethod(', false)
@@ -143,7 +143,7 @@ class PerformancePageTest extends TestCase
     public function test_payment_method_section_shows_pie_chart_legend_and_states(): void
     {
         $this->actingAs($this->employee)
-            ->get('/performance')
+            ->get('/dashboard')
             ->assertOk()
             ->assertSee('x-ref="paymentCanvas"', false)
             ->assertSee(':aria-label="paymentChartLabel"', false)
@@ -161,10 +161,10 @@ class PerformancePageTest extends TestCase
     public function test_sidebar_links_performance_page_and_marks_it_active(): void
     {
         $this->actingAs($this->employee)
-            ->get('/performance')
+            ->get('/dashboard')
             ->assertOk()
-            ->assertSeeInOrder(['Analytics', 'Performance Summary', 'System'])
-            ->assertSee('href="'.route('performance.index').'"', false)
+            ->assertSeeInOrder(['Analytics', 'Performance Analysis', 'Summary', 'Products', 'System'])
+            ->assertSee('href="'.route('dashboard').'"', false)
             ->assertSee('aria-current="page"', false);
     }
 }

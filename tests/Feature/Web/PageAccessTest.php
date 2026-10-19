@@ -35,8 +35,8 @@ class PageAccessTest extends TestCase
 
     public function test_guest_is_redirected_to_login(): void
     {
-        $this->get('/')->assertRedirect('/performance');
-        $this->get('/performance')->assertRedirect(route('login'));
+        $this->get('/')->assertRedirect('/dashboard');
+        $this->get('/dashboard')->assertRedirect(route('login'));
         $this->get('/settings')->assertRedirect(route('login'));
         $this->get('/divisions')->assertRedirect(route('login'));
     }
@@ -47,7 +47,7 @@ class PageAccessTest extends TestCase
             ->assertOk()
             ->assertSee(route('api.login'), false)
             ->assertDontSee('Forgot Password?')
-            ->assertSee('data-redirect="'.route('performance.index').'"', false)
+            ->assertSee('data-redirect="'.route('dashboard').'"', false)
             ->assertDontSee('Mode demo');
     }
 
@@ -55,20 +55,13 @@ class PageAccessTest extends TestCase
     {
         $this->actingAs($this->manager)
             ->get('/login')
-            ->assertRedirect(route('performance.index'));
-    }
-
-    public function test_old_dashboard_page_no_longer_exists(): void
-    {
-        $this->actingAs($this->manager)
-            ->get('/dashboard')
-            ->assertNotFound();
+            ->assertRedirect(route('dashboard'));
     }
 
     public function test_landing_page_shows_logged_in_account(): void
     {
         $this->actingAs($this->employee)
-            ->get('/performance')
+            ->get('/dashboard')
             ->assertOk()
             ->assertSee('Siti Employee')
             ->assertSee('"username":"employee"', false)
@@ -99,7 +92,7 @@ class PageAccessTest extends TestCase
     public function test_sidebar_links_settings_directly_for_manager(): void
     {
         $this->actingAs($this->manager)
-            ->get('/performance')
+            ->get('/dashboard')
             ->assertOk()
             ->assertSeeInOrder(['Account Management', 'Logout'])
             ->assertSee('href="'.route('settings.index').'"', false)
@@ -118,7 +111,7 @@ class PageAccessTest extends TestCase
     public function test_sidebar_links_settings_for_employee(): void
     {
         $this->actingAs($this->employee)
-            ->get('/performance')
+            ->get('/dashboard')
             ->assertOk()
             ->assertSee('href="'.route('settings.index').'"', false)
             ->assertDontSee("locked('Account Management')", false);
@@ -153,7 +146,8 @@ class PageAccessTest extends TestCase
             ->assertOk()
             ->assertSee('Manajemen Divisi')
             ->assertSeeInOrder(['Total Divisi', 'Anggota Divisi', 'Divisi Kosong'])
-            ->assertSeeInOrder(['Buat Divisi', 'Daftar Divisi'])
+            ->assertSeeInOrder(['Daftar Divisi', 'Buat Divisi'])
+            ->assertSee('id="create-division-title"', false)
             ->assertSee('Hapus Divisi?');
     }
 
@@ -171,10 +165,44 @@ class PageAccessTest extends TestCase
     {
         foreach ([$this->manager, $this->employee] as $account) {
             $this->actingAs($account)
-                ->get('/performance')
+                ->get('/dashboard')
                 ->assertOk()
                 ->assertSee('Division Management')
                 ->assertSee('href="'.route('divisions.index').'"', false);
         }
+    }
+
+    public function test_guest_cannot_open_product_overview_page(): void
+    {
+        $this->get('/performance/products')->assertRedirect(route('login'));
+    }
+
+    public function test_every_role_can_open_product_overview_page_with_filters_and_cards(): void
+    {
+        foreach ([$this->manager, $this->employee] as $account) {
+            $this->actingAs($account)
+                ->get('/performance/products')
+                ->assertOk()
+                ->assertSee('Ringkasan Produk')
+                ->assertSeeInOrder(['Source App / Platform', 'Tahun', 'Bulan'])
+                ->assertSeeInOrder([
+                    'Top Paket Berdasarkan Pendapatan',
+                    'Top Paket Berdasarkan Volume Transaksi',
+                    'Detail Performa Paket',
+                ])
+                ->assertSee('Cari nama paket')
+                ->assertSeeInOrder(['Excel', 'CSV'])
+                ->assertSee('Data belum tersedia');
+        }
+    }
+
+    public function test_sidebar_links_product_overview_inside_performance_folder(): void
+    {
+        $this->actingAs($this->employee)
+            ->get('/performance/products')
+            ->assertOk()
+            ->assertSeeInOrder(['Performance Analysis', 'Products'])
+            ->assertSee('href="'.route('performance.products').'"', false)
+            ->assertSee('aria-current="page"', false);
     }
 }
