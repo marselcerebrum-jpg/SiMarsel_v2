@@ -26,10 +26,40 @@ const truncate = (text, max) => (text.length > max ? `${text.slice(0, max - 1)}â
 
 const activePeriod = (item) => item.active_period ?? '-';
 
-// Satu warna per panel agar diagram pendapatan dan transaksi mudah dibedakan.
-const PANEL_COLORS = {
-    revenue: { bar: '#059669', hover: '#047857' },
-    volume: { bar: '#2a78d6', hover: '#1f62b8' },
+// Warna batang mengikuti masa aktif paket (bukan peringkat), dipakai bersama oleh kedua diagram
+// agar satu masa aktif selalu berwarna sama walaupun filter berubah. Tiga slot pertama lolos
+// validator palet (aman buta warna); masa aktif lain mendapat slot berikutnya sesuai urutan kemunculan.
+const PERIOD_PALETTE = [
+    { bar: '#2a78d6', hover: '#1f62b8' },
+    { bar: '#eb6834', hover: '#c9531f' },
+    { bar: '#1baf7a', hover: '#158f63' },
+    { bar: '#eda100', hover: '#c78700' },
+    { bar: '#e87ba4', hover: '#d15a87' },
+    { bar: '#008300', hover: '#006a00' },
+    { bar: '#6250d6', hover: '#4c3bbd' },
+    { bar: '#e34948', hover: '#c73433' },
+];
+const NO_PERIOD = { label: 'Tanpa masa aktif', bar: '#9aa3ae', hover: '#7f8996' };
+
+const periodColors = new Map(['6 Bulan', '1 Tahun', '2 Tahun'].map((period, index) => [period, PERIOD_PALETTE[index]]));
+
+const periodColor = (period) => {
+    if (!period) return NO_PERIOD;
+
+    if (!periodColors.has(period)) periodColors.set(period, PERIOD_PALETTE[periodColors.size] ?? NO_PERIOD);
+
+    return periodColors.get(period);
+};
+
+// Legenda: hanya masa aktif yang ada pada data, urut sesuai slot warnanya.
+const periodLegend = (items) => {
+    const present = new Set(items.map((item) => item.active_period ?? null));
+    present.forEach(periodColor);
+
+    const periods = [...periodColors.keys()].filter((period) => present.has(period));
+    if (present.has(null)) periods.push(null);
+
+    return periods.map((period) => ({ label: period ?? NO_PERIOD.label, color: periodColor(period).bar }));
 };
 
 // Pecah teks per kata menjadi beberapa baris; kata atau baris terakhir yang terlalu panjang dipotong.
@@ -50,14 +80,15 @@ const wrap = (text, width, maxLines) => {
 
 // Perkiraan lebar satu karakter label sumbu (12px, tebal), untuk menghitung muatan per batang.
 const LABEL_CHAR_PX = 7.2;
-// Di bawah lebar ini per batang, nama paket pasti bertumpuk: tampilkan nomor peringkat saja.
-const MIN_LABEL_SLOT_PX = 64;
+// Di bawah lebar ini per batang, label pasti bertumpuk: tampilkan nomor peringkat saja.
+// Cukup untuk masa aktif terpanjang yang umum, mis. "(6 Bulan)", tanpa dipotong.
+const MIN_LABEL_SLOT_PX = 72;
 
-// Label sumbu: nama paket (maks. 3 baris) lalu masa aktif di baris terakhir, selebar slot batang.
+// Label sumbu: nama paket (maks. 3 baris, selebar slot batang) lalu masa aktif utuh di baris terakhir.
 const packageLines = (item, slotWidth) => {
     const width = Math.floor((slotWidth - 12) / LABEL_CHAR_PX);
 
-    return [...wrap(item.name, width, 3), ...(item.active_period ? [truncate(`(${item.active_period})`, width)] : [])];
+    return [...wrap(item.name, width, 3), ...(item.active_period ? [`(${item.active_period})`] : [])];
 };
 
 const currentYear = new Date().getFullYear();
@@ -154,7 +185,7 @@ function remoteData(fetcher) {
  * Kartu diagram batang. Instance Chart.js disimpan di luar state Alpine
  * agar tidak dibungkus Proxy reaktif.
  */
-function barChartCard(fetcher, { color, value, valueTick, valueTitle, tooltipLines }) {
+function barChartCard(fetcher, { value, valueTick, valueTitle, tooltipLines }) {
     let chart = null;
 
     return {
@@ -164,15 +195,22 @@ function barChartCard(fetcher, { color, value, valueTick, valueTitle, tooltipLin
             chart?.destroy();
         },
 
+        get legend() {
+            return periodLegend(this.items);
+        },
+
         render() {
             if (!this.items.length) return;
 
             const labels = this.items.map((item) => item.name);
             const values = this.items.map(value);
+            const colors = this.items.map((item) => periodColor(item.active_period));
+            const backgroundColor = colors.map((color) => color.bar);
+            const hoverBackgroundColor = colors.map((color) => color.hover);
 
             if (chart) {
                 chart.data.labels = labels;
-                chart.data.datasets[0].data = values;
+                Object.assign(chart.data.datasets[0], { data: values, backgroundColor, hoverBackgroundColor });
                 chart.update();
                 return;
             }
@@ -187,8 +225,8 @@ function barChartCard(fetcher, { color, value, valueTick, valueTitle, tooltipLin
                     labels,
                     datasets: [{
                         data: values,
-                        backgroundColor: color.bar,
-                        hoverBackgroundColor: color.hover,
+                        backgroundColor,
+                        hoverBackgroundColor,
                         borderRadius: 4,
                         maxBarThickness: 64,
                     }],
@@ -224,6 +262,7 @@ function barChartCard(fetcher, { color, value, valueTick, valueTitle, tooltipLin
                         },
                     },
                     plugins: {
+                        // Legenda bawaan hanya punya satu entri per dataset; legenda masa aktif dirender di Blade.
                         legend: { display: false },
                         tooltip: {
                             backgroundColor: '#0f2340',
@@ -246,7 +285,6 @@ function barChartCard(fetcher, { color, value, valueTick, valueTitle, tooltipLin
 
 Alpine.data('topPackagesByRevenue', () =>
     barChartCard(fetchTopPackagesByRevenue, {
-        color: PANEL_COLORS.revenue,
         value: (item) => item.revenue,
         valueTick: millions,
         valueTitle: 'Total Pendapatan',
@@ -256,7 +294,6 @@ Alpine.data('topPackagesByRevenue', () =>
 
 Alpine.data('topPackagesByVolume', () =>
     barChartCard(fetchTopPackagesByVolume, {
-        color: PANEL_COLORS.volume,
         value: (item) => item.transactions,
         valueTick: (tick) => number(tick),
         valueTitle: 'Jumlah Transaksi',

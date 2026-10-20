@@ -1,6 +1,8 @@
 @php
     $exportButton = 'inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-line bg-white px-3 text-sm font-semibold text-ink hover:bg-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:opacity-50';
-    $pageButton = 'grid h-8 min-w-8 place-items-center rounded-lg border border-line bg-white px-2 text-xs font-semibold text-ink tabular-nums hover:bg-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-40';
+    // Warna latar dipisah dari kelas dasar agar tombol halaman aktif (bg-primary) tidak tertimpa bg-white.
+    $pageButton = 'grid h-8 min-w-8 place-items-center rounded-lg border px-2 text-xs font-semibold tabular-nums focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-40';
+    $pageButtonIdle = 'border-line bg-white text-ink hover:bg-soft';
 @endphp
 
 <section x-data="packagePerformance" class="{{ $card }} min-w-0 p-5" aria-labelledby="package-performance-title">
@@ -75,7 +77,7 @@
                 </p>
 
                 <nav x-show="pageCount > 1" class="flex items-center gap-1" aria-label="Package table pagination">
-                    <button type="button" class="{{ $pageButton }}" :disabled="currentPage === 1" @click="goTo(currentPage - 1)" aria-label="Previous page">
+                    <button type="button" class="{{ $pageButton }} {{ $pageButtonIdle }}" :disabled="currentPage === 1" @click="goTo(currentPage - 1)" aria-label="Previous page">
                         <x-icon name="chevron-left" />
                     </button>
 
@@ -86,7 +88,7 @@
                                 x-show="link.page !== null"
                                 type="button"
                                 class="{{ $pageButton }}"
-                                :class="link.page === currentPage && 'border-primary bg-primary text-white hover:bg-primary-hover'"
+                                :class="link.page === currentPage ? 'border-primary bg-primary text-white hover:bg-primary-hover' : @js($pageButtonIdle)"
                                 :aria-current="link.page === currentPage ? 'page' : null"
                                 :aria-label="`Page ${link.page}`"
                                 @click="goTo(link.page)"
@@ -95,7 +97,7 @@
                         </span>
                     </template>
 
-                    <button type="button" class="{{ $pageButton }}" :disabled="currentPage === pageCount" @click="goTo(currentPage + 1)" aria-label="Next page">
+                    <button type="button" class="{{ $pageButton }} {{ $pageButtonIdle }}" :disabled="currentPage === pageCount" @click="goTo(currentPage + 1)" aria-label="Next page">
                         <x-icon name="chevron-right" />
                     </button>
                 </nav>
