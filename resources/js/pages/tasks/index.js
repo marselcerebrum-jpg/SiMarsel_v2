@@ -216,17 +216,25 @@ Alpine.data('tasklist', () => ({
             this.error = taskErrorMessage(error, 'Gagal memuat daftar tugas.');
         } finally {
             this.loading = false;
+            if (this.highlightId) this.$nextTick(() => this.revealHighlight());
         }
     },
 
-    // Pencarian, prioritas, dan status difilter di browser agar Board, Table, dan ringkasan selalu sama.
-    get filteredTasks() {
+    /**
+     * Pencarian, prioritas, dan status difilter di browser. Fungsi yang sama dipakai Board, Table,
+     * ringkasan, Timeline, dan daftar deadline Calendar agar data selalu konsisten. Atribut yang tidak
+     * dimiliki item (mis. agenda tanpa prioritas) tidak menyaring item tersebut.
+     */
+    matchesFilters(item) {
         const keyword = this.filters.search.trim().toLowerCase();
 
-        return this.tasks.filter((task) =>
-            (!keyword || task.title.toLowerCase().includes(keyword))
-            && (!this.filters.priority || task.priority === this.filters.priority)
-            && (!this.filters.status || task.status === this.filters.status));
+        return (!keyword || (item.title ?? '').toLowerCase().includes(keyword))
+            && (!this.filters.priority || !item.priority || item.priority === this.filters.priority)
+            && (!this.filters.status || !item.status || item.status === this.filters.status);
+    },
+
+    get filteredTasks() {
+        return this.tasks.filter((task) => this.matchesFilters(task));
     },
 
     get summary() {
@@ -285,6 +293,23 @@ Alpine.data('tasklist', () => ({
         return `${(this.currentPage - 1) * PAGE_SIZE + 1}–${Math.min(this.currentPage * PAGE_SIZE, total)}`;
     },
 
+    // Nomor halaman: pertama, terakhir, dan sekitar halaman aktif; celah ditampilkan sebagai "…".
+    get pageLinks() {
+        const total = this.pageCount;
+        const current = this.currentPage;
+        const pages = new Set([1, total, current - 1, current, current + 1]);
+
+        if (current <= 3) [2, 3, 4].forEach((page) => pages.add(page));
+        if (current >= total - 2) [total - 3, total - 2, total - 1].forEach((page) => pages.add(page));
+
+        const sorted = [...pages].filter((page) => page >= 1 && page <= total).sort((x, y) => x - y);
+
+        return sorted.flatMap((page, index) => [
+            ...(index > 0 && page - sorted[index - 1] > 1 ? [{ key: `gap-${page}`, page: null }] : []),
+            { key: `page-${page}`, page },
+        ]);
+    },
+
     goTo(page) {
         this.page = Math.min(Math.max(1, page), this.pageCount);
     },
@@ -319,9 +344,43 @@ Alpine.data('tasklist', () => ({
     },
 
     detailFocus: null,
+    highlightId: null,
 
     closeTask() {
         this.detailId = null;
+    },
+
+    /**
+     * "Lihat Detail" dari Calendar/Timeline: pindah ke Board, buka detail berdasarkan ID tugas, dan
+     * pastikan kartunya terlihat. Filter yang menyembunyikan tugas dilonggarkan sebatas hak akses
+     * (Admin boleh ke Semua Divisi; Manajer dan Staff memang hanya menerima tugas dalam cakupannya).
+     */
+    focusTask(task) {
+        if (!this.canOpen(task)) {
+            this.openTask(task);
+            return;
+        }
+
+        const loaded = this.tasks.find((item) => item.id === task.id);
+        if (!loaded || !this.matchesFilters(loaded)) {
+            this.filters.search = '';
+            this.filters.priority = '';
+            this.filters.status = '';
+        }
+        if (!loaded && this.user.role === 'admin') this.filters.division = '';
+
+        this.highlightId = task.id;
+        this.view = 'board';
+        this.openTask(task);
+        this.$nextTick(() => this.revealHighlight());
+    },
+
+    revealHighlight() {
+        const card = this.$root.querySelector(`[data-task-card="${this.highlightId}"]`);
+        if (!card) return;
+
+        card.scrollIntoView({ block: 'nearest', inline: 'center' });
+        setTimeout(() => (this.highlightId = null), 2500);
     },
 
     // Satu tugas berubah (status, PIC, informasi): perbarui Board, Table, dan ringkasan sekaligus.
@@ -356,6 +415,17 @@ Alpine.data('tasklist', () => ({
         if (!this.draggingTask || this.draggingTask.status === status) return null;
 
         return transitionRule(this.draggingTask, status, this.user).ok ? 'allowed' : 'denied';
+    },
+
+    dropReason(status) {
+        return this.dropState(status) === 'denied' ? transitionRule(this.draggingTask, status, this.user).reason : '';
+    },
+
+    // Hanya kolom dengan transisi valid yang menerima drop; kolom lain menampilkan alasan penolakan.
+    dragOver(event, status) {
+        this.dropTarget = status;
+        if (this.dropState(status) === 'allowed') event.preventDefault();
+        else event.dataTransfer.dropEffect = 'none';
     },
 
     async drop(status) {
@@ -921,6 +991,8 @@ Alpine.data('taskTimeline', () => ({
         const total = this.length;
 
         return this.items
+            // Filter tugas (cari, prioritas, status) ikut berlaku; agenda bersama selalu tampil.
+            .filter((item) => item.type === 'event' || this.matchesFilters(item))
             .map((item) => {
                 const from = item.start_date ?? item.end_date;
                 const to = item.end_date ?? item.start_date;
@@ -932,6 +1004,7 @@ Alpine.data('taskTimeline', () => ({
                 return {
                     ...item,
                     partial: !item.start_date || !item.end_date,
+                    overdue: item.type === 'task' && Boolean(item.end_date) && item.status !== 'done' && item.end_date.slice(0, 10) < today(),
                     left: `${(startIndex / total) * 100}%`,
                     width: `${((endIndex - startIndex + 1) / total) * 100}%`,
                 };
@@ -970,8 +1043,11 @@ Alpine.data('taskCalendar', () => ({
     state: 'idle',
     message: '',
     weekdays: ['Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab', 'Min'],
+    // Ringkasan item yang dipilih: { kind: 'event' | 'task', item }.
+    picked: null,
 
     init() {
+        this.$watch('selected', () => (this.picked = null));
         this.$watch('view', (view) => view === 'calendar' && this.loadPeriod());
         this.$watch('filters.division', () => this.view === 'calendar' && this.loadPeriod());
         if (this.view === 'calendar') this.loadPeriod();
@@ -1010,8 +1086,17 @@ Alpine.data('taskCalendar', () => ({
         });
     },
 
+    // Deadline mengikuti filter tugas yang sama dengan Board/Table; agenda bersama tidak disaring.
     deadlinesOn(iso) {
-        return this.deadlines.filter((task) => task.deadline?.slice(0, 10) === iso);
+        return this.deadlines.filter((task) => task.deadline?.slice(0, 10) === iso && this.matchesFilters(task));
+    },
+
+    pick(kind, item) {
+        this.picked = this.picked?.kind === kind && this.picked.item.id === item.id ? null : { kind, item };
+    },
+
+    isPicked(kind, item) {
+        return this.picked?.kind === kind && this.picked.item.id === item.id;
     },
 
     get selectedEvents() {

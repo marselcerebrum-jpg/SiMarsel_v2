@@ -70,8 +70,9 @@ Backend **wajib** menerapkan cakupan ini di setiap endpoint. Staff yang mengubah
 
 - **Evidence**: `{ id, file_name, file_url, url, note, submitter: { id, fullname }, created_at }`. Isi `file_name`/`file_url` untuk file, atau `url` untuk tautan.
 - **Activity**: `{ id, type, label, description, before, after, causer: { id, fullname }, created_at }`. `type` mencakup `created`, `updated`, `assigned`, `status_changed`, `evidence_submitted`, `approved`, `revision_requested`, `resubmitted`. Isi `before`/`after` untuk perubahan penting. Histori hanya ditambahkan oleh sistem, tidak bisa diedit.
-- **ScheduleItem**: `{ id, type: "task"|"event", title, division, start_date, end_date, status, can_view_detail }`. Agenda bersama (`event`) dan tugas lintas divisi boleh tampil untuk semua role, tetapi `can_view_detail` hanya `true` bila user berhak membuka detailnya.
-- **Event** (Calendar): `{ id, title, division, start_date, end_date, description }`. `deadlines` hanya berisi tugas dalam cakupan user dan yang memiliki deadline.
+- **ScheduleItem**: `{ id, type: "task"|"event", title, division, start_date, end_date, status, priority, can_view_detail }`. `status` dan `priority` dipakai agar filter Tasklist ikut berlaku di Timeline (agenda bersama tidak disaring). Agenda bersama (`event`) dan tugas lintas divisi boleh tampil untuk semua role, tetapi `can_view_detail` hanya `true` bila user berhak membuka detailnya.
+- **Event** (Calendar): `{ id, title, division, start_date, end_date, description, task_id, can_view_detail }`. `task_id` diisi bila agenda terkait sebuah tugas (tombol "Lihat Detail Tugas Terkait"); `null` untuk agenda murni yang tidak dibuka di Board. `deadlines` hanya berisi tugas dalam cakupan user dan yang memiliki deadline.
+- **Lihat Detail dari Calendar**: frontend berpindah ke Board dan membuka detail lewat `GET /api/tasks/{id}`. Bila tugas tersembunyi oleh filter, filter cari/prioritas/status dikosongkan; Admin juga dipindah ke Semua Divisi. Akses tetap diputuskan backend (`403`/`404`).
 
 ## Aturan bisnis yang harus divalidasi backend
 
@@ -124,7 +125,7 @@ Backend **wajib** menerapkan cakupan ini di setiap endpoint. Staff yang mengubah
 
 ## Ringkasan (TASK-09)
 
-Ringkasan dihitung di frontend dari respons `GET /api/tasks` yang sama dengan Board/Table, sehingga angkanya selalu konsisten:
+Ringkasan dihitung di frontend dari respons `GET /api/tasks` yang sama dengan Board/Table, sehingga angkanya selalu konsisten. Halaman menonjolkan empat metrik utama (Total Tasks, In Progress = status On Process, Overdue, Due Today); Completed, Unfinished, Urgent, dan Completion Rate tampil sebagai informasi tambahan, dan jumlah per status tampil di kolom Board:
 
 - **Total Tasks**: semua tugas dalam cakupan dan filter.
 - **Back Log, To Do, On Process, Ready for QA, On QA**: jumlah per status.

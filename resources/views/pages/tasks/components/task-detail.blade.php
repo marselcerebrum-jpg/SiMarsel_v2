@@ -43,18 +43,37 @@
 
             <template x-if="state === 'ready' && task">
                 <div class="flex flex-col gap-6">
-                    {{-- Judul, status, aksi --}}
-                    <header>
-                        <div class="flex flex-wrap items-center gap-1.5">
-                            <span class="{{ $badge }}" :class="statusOf(task.status).badge" x-text="statusOf(task.status).label"></span>
-                            <span class="{{ $badge }}" :class="priorityOf(task.priority).badge" x-text="priorityOf(task.priority).label"></span>
-                            <span x-show="task.requires_review" class="{{ $badge }} bg-violet-50 text-violet-700">Wajib QA</span>
-                            <span x-show="isOverdue(task)" class="{{ $badge }} bg-red-50 text-red-700">Terlambat</span>
+                    {{-- Informasi utama dan aksi: judul, status, prioritas, deadline, PIC, tombol workflow --}}
+                    <header class="flex flex-col gap-4">
+                        <div>
+                            <div class="flex flex-wrap items-center gap-1.5" x-show="task.requires_review || isOverdue(task)">
+                                <span x-show="task.requires_review" class="{{ $badge }} bg-violet-50 text-violet-700">Wajib QA</span>
+                                <span x-show="isOverdue(task)" class="{{ $badge }} bg-red-50 text-red-700">Terlambat</span>
+                            </div>
+                            <h2 id="task-detail-title" class="mt-1.5 text-xl font-bold break-words text-ink" x-text="task.title"></h2>
+                            <p class="mt-0.5 text-sm text-muted"><span x-text="task.division?.name ?? '-'"></span> · <span x-text="task.category?.name ?? 'Tanpa kategori'"></span></p>
                         </div>
-                        <h2 id="task-detail-title" class="mt-2 text-xl font-bold text-ink" x-text="task.title"></h2>
-                        <p class="mt-1 text-sm text-muted"><span x-text="task.division?.name ?? '-'"></span> · <span x-text="task.category?.name ?? 'Tanpa kategori'"></span></p>
 
-                        <div class="mt-4 flex flex-wrap gap-2">
+                        <dl class="grid grid-cols-2 gap-px overflow-hidden rounded-lg border border-line bg-line sm:grid-cols-4" data-testid="detail-key-facts">
+                            <div class="bg-surface px-3 py-2.5">
+                                <dt class="{{ $dt }}">Status</dt>
+                                <dd class="mt-1"><span class="{{ $badge }}" :class="statusOf(task.status).badge" x-text="statusOf(task.status).label"></span></dd>
+                            </div>
+                            <div class="bg-surface px-3 py-2.5">
+                                <dt class="{{ $dt }}">Prioritas</dt>
+                                <dd class="mt-1"><span class="{{ $badge }}" :class="priorityOf(task.priority).badge" x-text="priorityOf(task.priority).label"></span></dd>
+                            </div>
+                            <div class="bg-surface px-3 py-2.5">
+                                <dt class="{{ $dt }}">Deadline</dt>
+                                <dd class="mt-1 text-sm" :class="!task.deadline ? @js($empty) : (isOverdue(task) ? 'font-semibold text-red-700' : 'font-semibold text-ink')" x-text="task.deadline ? formatDate(task.deadline) : 'Tanpa deadline'"></dd>
+                            </div>
+                            <div class="min-w-0 bg-surface px-3 py-2.5">
+                                <dt class="{{ $dt }}">PIC</dt>
+                                <dd class="mt-1 truncate text-sm" :class="task.pic ? 'font-semibold text-ink' : @js($empty)" x-text="task.pic?.fullname ?? 'Belum ada PIC'" :title="task.pic?.fullname"></dd>
+                            </div>
+                        </dl>
+
+                        <div class="flex flex-wrap gap-2">
                             <template x-for="transition in transitions" :key="transition.to">
                                 <button type="button"
                                     class="{{ $button }}"
@@ -65,10 +84,10 @@
                                 </button>
                             </template>
                             <button x-show="canEditThis && !editing" type="button" class="{{ $button }}" @click="startEdit()">Edit Tugas</button>
+                            <p x-show="!transitions.length && task.status !== 'done'" class="self-center text-xs text-muted">
+                                Tidak ada perubahan status yang dapat Anda lakukan pada tahap ini.
+                            </p>
                         </div>
-                        <p x-show="!transitions.length && task.status !== 'done'" class="mt-3 text-xs text-muted">
-                            Tidak ada perubahan status yang dapat Anda lakukan pada tahap ini.
-                        </p>
                     </header>
 
                     {{-- Keputusan review (TASK-07) --}}
@@ -104,12 +123,8 @@
                             </div>
                             <div><dt class="{{ $dt }}">Kategori / Jenis Tugas</dt><dd class="{{ $dd }}" :class="!task.category && @js($empty)" x-text="task.category?.name ?? 'Belum ditentukan'"></dd></div>
                             <div><dt class="{{ $dt }}">Divisi</dt><dd class="{{ $dd }}" x-text="task.division?.name ?? '-'"></dd></div>
-                            <div><dt class="{{ $dt }}">PIC</dt><dd class="{{ $dd }}" :class="!task.pic && @js($empty)" x-text="task.pic?.fullname ?? 'Belum ada PIC'"></dd></div>
                             <div><dt class="{{ $dt }}">Platform</dt><dd class="{{ $dd }}" :class="!task.platform && @js($empty)" x-text="task.platform?.name ?? 'Tidak terkait platform'"></dd></div>
-                            <div><dt class="{{ $dt }}">Prioritas</dt><dd class="{{ $dd }}" x-text="priorityOf(task.priority).label"></dd></div>
-                            <div><dt class="{{ $dt }}">Status</dt><dd class="{{ $dd }}" x-text="statusOf(task.status).label"></dd></div>
                             <div><dt class="{{ $dt }}">Tanggal Mulai</dt><dd class="{{ $dd }}" :class="!task.start_date && @js($empty)" x-text="task.start_date ? formatDate(task.start_date) : 'Belum ditentukan'"></dd></div>
-                            <div><dt class="{{ $dt }}">Deadline</dt><dd class="{{ $dd }}" :class="!task.deadline ? @js($empty) : (isOverdue(task) && 'font-semibold text-red-700')" x-text="task.deadline ? formatDate(task.deadline) : 'Tanpa deadline'"></dd></div>
                             <div><dt class="{{ $dt }}">Kewajiban QA</dt><dd class="{{ $dd }}" x-text="task.requires_review ? 'Ya, wajib melewati QA sebelum Done' : 'Tidak, PIC dapat langsung menyelesaikan'"></dd></div>
                             <div><dt class="{{ $dt }}">Dibuat oleh</dt><dd class="{{ $dd }}"><span x-text="task.creator?.fullname ?? '-'"></span> <span class="text-muted" x-show="task.created_at" x-text="`· ${formatDateTime(task.created_at)}`"></span></dd></div>
                             <div x-show="task.completed_at"><dt class="{{ $dt }}">Selesai</dt><dd class="{{ $dd }}" x-text="formatDateTime(task.completed_at)"></dd></div>

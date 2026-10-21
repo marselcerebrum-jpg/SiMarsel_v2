@@ -37,6 +37,7 @@
                             <p class="truncate text-xs text-muted">
                                 <span x-text="item.division?.name ?? 'Lintas divisi'"></span>
                                 <span x-show="item.type === 'event'"> · Agenda bersama</span>
+                                <span x-show="item.type === 'task' && item.end_date" :class="item.overdue && 'font-semibold text-red-700'" x-text="` · Deadline ${formatDate(item.end_date)}`"></span>
                             </p>
                         </div>
                         <div class="relative h-8">
@@ -48,13 +49,14 @@
                             <button
                                 type="button"
                                 class="absolute top-1 bottom-1 flex min-w-0 items-center gap-1.5 rounded-md px-2 text-left text-[11px] font-semibold text-white shadow-xs focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary"
-                                :class="item.type === 'event' ? 'bg-navy' : (item.status === 'done' ? 'bg-emerald-600' : 'bg-primary')"
+                                :class="item.type === 'event' ? 'bg-navy' : (item.overdue ? 'bg-red-600' : (item.status === 'done' ? 'bg-emerald-600' : 'bg-primary'))"
                                 :style="`left: ${item.left}; width: ${item.width}`"
                                 :title="`${item.title} · ${formatDate(item.start_date)} – ${formatDate(item.end_date)}`"
                                 @click="select(item)"
                             >
                                 <span x-show="item.status" class="size-1.5 shrink-0 rounded-full bg-white/80" aria-hidden="true"></span>
                                 <span class="truncate" x-text="item.status ? statusOf(item.status).label : 'Agenda'"></span>
+                                <span x-show="item.overdue" class="shrink-0 font-bold">· Terlambat</span>
                                 <span x-show="item.partial" class="shrink-0 opacity-80">· 1 hari</span>
                             </button>
                         </div>
@@ -85,6 +87,7 @@
 
     <div x-show="state === 'ready'" x-cloak class="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted">
         <span class="inline-flex items-center gap-1.5"><span class="size-2.5 rounded-sm bg-primary"></span> Tugas aktif</span>
+        <span class="inline-flex items-center gap-1.5"><span class="size-2.5 rounded-sm bg-red-600"></span> Terlambat (aktif, lewat deadline)</span>
         <span class="inline-flex items-center gap-1.5"><span class="size-2.5 rounded-sm bg-emerald-600"></span> Tugas selesai</span>
         <span class="inline-flex items-center gap-1.5"><span class="size-2.5 rounded-sm bg-navy"></span> Agenda bersama</span>
         <span>"1 hari" = hanya memiliki tanggal mulai atau deadline.</span>
