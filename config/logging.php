@@ -135,6 +135,14 @@ return [
             'path' => storage_path('logs/laravel.log'),
         ],
 
+        // Promo code data from Markaz that needs review, e.g. more than two codes in one transaction.
+        'promo_code_anomalies' => [
+            'driver' => 'single',
+            'path' => storage_path('logs/promo-code-anomalies.log'),
+            'level' => 'warning',
+            'replace_placeholders' => true,
+        ],
+
     ],
 
 ];
