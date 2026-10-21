@@ -1,0 +1,73 @@
+# Kode Promo: Penggunaan dan Riwayat Metadata
+
+Menyimpan penggunaan kode promo dari transaksi Markaz dalam bentuk yang bisa ditelusuri, beserta funnel dan source yang berlaku pada tanggal transaksi. Dengan begitu analisis penggunaan, atribusi revenue, dan riwayat perubahan metadata selalu dihitung dengan benar.
+
+Struktur tabel dan aturan hapus relasi ada di [database.md](database.md).
+
+## Alur
+
+```
+transactions.promo_code (data mentah Markaz, tidak pernah diubah)
+        │  disimpan / diperbarui  →  TransactionObserver
+        │  backfill               →  php artisan promo-codes:normalize
+        ▼
+PromoCodeUsageService::normalize()
+        │  cocokkan master: platform_id + kode yang dinormalisasi
+        │  ambil versi metadata yang berlaku pada waktu bayar transaksi
+        ▼
+transaction_promo_codes (1 baris per posisi kode, dengan snapshot funnel/source)
+```
+
+## Master kode promo (`promo_codes`)
+
+- Unik per `platform_id` + `code`. Kode yang sama di platform lain adalah kode promo yang **berbeda**.
+- `funnel_id` dan `source_id` boleh kosong.
+- Tidak ada kolom `type` maupun status aktif/nonaktif.
+- `code` disimpan dalam bentuk ternormalisasi: tanpa spasi di awal/akhir dan huruf besar, jadi ` cpns26 ` dan `CPNS26` dianggap kode yang sama.
+- Buat dan ubah kode promo **selalu lewat `PromoCodeService`**, supaya riwayat versinya ikut tercatat. Factory `PromoCode` hanya membuat baris master, tanpa versi.
+
+## Normalisasi penggunaan kode (`transaction_promo_codes`)
+
+| Aturan | Perilaku |
+|---|---|
+| Kapan dijalankan | Setiap transaksi disimpan atau `promo_code`, `platform_id`, `paid_date`, `paid_time`-nya berubah (observer), dan lewat command backfill |
+| Bentuk `promo_code` | Array teks dari Markaz, misalnya `["CPNS26", "RESELLER01"]`. Satu teks (`"CPNS26"`) dianggap posisi 1. |
+| Posisi | Mengikuti urutan array Markaz: `1` = kode utama, `2` = kode kedua/reseller. Entri kosong tidak dibuatkan baris, tapi posisinya tetap dihitung (`["", "X"]` → `X` di posisi 2). |
+| Transaksi tanpa kode | Tidak dibuatkan baris |
+| `raw_code` | Nilai asli dari Markaz, apa adanya |
+| `code_snapshot` | Kode yang sudah dinormalisasi, dipakai untuk pencocokan dan pengelompokan |
+| Kode belum ada di master | Tetap disimpan dengan `promo_code_id = NULL`, transaksi tidak gagal. Bisa dihitung lewat scope `TransactionPromoCode::unmapped()` untuk analisis dan alert. |
+| Proses ulang / sinkronisasi ulang | Upsert per `transaction_id` + `code_position`, sehingga tidak pernah ada baris ganda. Posisi yang sudah tidak ada di Markaz dihapus. |
+| Lebih dari 2 kode | **Anomali**: transaksi itu tidak dibuatkan baris penggunaan sama sekali, supaya atribusi dua kode tidak diterapkan diam-diam. Dicatat di `storage/logs/promo-code-anomalies.log` beserta `trx_id`, platform, dan isi `promo_code`. |
+| Format tidak dikenali | Misalnya objek, bukan array teks. Diperlakukan sama seperti anomali di atas. |
+
+## Riwayat metadata (`promo_code_versions`)
+
+- Membuat kode promo membuka versi pertama dengan `effective_from` = saat disimpan.
+- Mengubah funnel/source menutup versi aktif (`effective_until` = saat disimpan) dan membuka versi baru dari detik yang sama. User **tidak pernah** mengisi tanggal efektif.
+- Menyimpan funnel/source yang sama tidak membuat versi baru. Dua perubahan di detik yang sama memperbarui versi detik itu.
+- Setiap versi menyimpan nama funnel/source saat itu (`*_name_snapshot`), jadi tetap terbaca walaupun master funnel/source diganti namanya.
+
+## Snapshot di setiap penggunaan
+
+- Waktu transaksi = `paid_date` + `paid_time` (WIB; `paid_time` kosong dianggap 00:00:00).
+- Snapshot diambil dari versi yang berlaku pada waktu itu: `effective_from` ≤ waktu transaksi < `effective_until`.
+- **Tidak ada versi** untuk waktu itu (misalnya transaksi sebelum kode didaftarkan): snapshot dibiarkan kosong. Sistem tidak mengarang funnel/source. Nilai kosong dikelompokkan sebagai **Tanpa Funnel** / **Tanpa Sumber** di analisis (scope `TransactionPromoCode::unclassified()`).
+- Penggunaan yang **sudah punya klasifikasi tidak pernah ditimpa**, baik saat master diedit maupun saat transaksi disinkronkan ulang. Hanya transaksi setelah waktu efektif versi baru yang memakai metadata baru.
+
+## Pendaftaran kode dari alert
+
+`PromoCodeService::registerFromAlert(platformId, code, funnelId, sourceId)`:
+
+1. Membuat kode promo beserta versi pertamanya.
+2. Menghubungkan penggunaan lama dengan platform + kode yang sama yang **belum terpetakan** (`promo_code_id` kosong) dan **belum terklasifikasi**, lalu melengkapinya dengan metadata yang didaftarkan.
+3. Penggunaan yang sudah punya klasifikasi/snapshot tidak disentuh.
+
+## Command
+
+```bash
+php artisan promo-codes:normalize            # backfill semua transaksi yang punya kode promo
+php artisan promo-codes:normalize --chunk=1000
+```
+
+Aman dijalankan berkali-kali. Jalankan setelah import massal atau seeder, karena insert massal tidak memicu observer.
