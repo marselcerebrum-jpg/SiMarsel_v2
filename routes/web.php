@@ -13,6 +13,7 @@ Route::view('/login', 'pages.auth.index')->middleware('guest')->name('login');
 Route::middleware('auth')->group(function () {
     Route::get('/dashboard', PerformancePageController::class)->name('dashboard');
     Route::view('/performance/products', 'pages.performance.products')->name('performance.products');
+    Route::view('/tasks', 'pages.tasks.index')->name('tasks.index');
     Route::get('/settings', AccountPageController::class)
         ->can('viewAny', Account::class)
         ->name('settings.index');

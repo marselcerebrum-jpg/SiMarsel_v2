@@ -28,6 +28,9 @@ class Sidebar extends Component
                     $this->link('Products', 'cube', 'performance.products'),
                 ]),
             ],
+            'Work' => [
+                $this->link('Tasklist', 'checklist', 'tasks.index'),
+            ],
             'System' => [
                 $this->link('Account Management', 'gear', 'settings.index', ['viewAny', Account::class]),
                 $this->link('Division Management', 'building', 'divisions.index', ['viewAny', Division::class]),

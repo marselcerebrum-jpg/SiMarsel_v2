@@ -14,6 +14,7 @@ export default defineConfig({
                 'resources/js/pages/settings/divisions.js',
                 'resources/js/pages/performance/index.js',
                 'resources/js/pages/performance/products.js',
+                'resources/js/pages/tasks/index.js',
             ],
             refresh: true,
             fonts: [
