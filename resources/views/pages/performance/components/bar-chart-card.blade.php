@@ -8,8 +8,20 @@
         </p>
     </div>
 
-    <div class="relative mt-5" :aria-busy="loading.toString()">
-        <div x-show="status === 'ready'" x-cloak class="relative" :style="{ height: chartHeight }">
+    <div x-show="status === 'ready'" x-cloak class="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-muted">
+        <span class="font-semibold text-label">Masa aktif:</span>
+        <ul class="contents" aria-label="Legenda warna masa aktif">
+            <template x-for="entry in legend" :key="entry.label">
+                <li class="inline-flex items-center gap-1.5">
+                    <span class="size-2.5 rounded-sm" :style="{ backgroundColor: entry.color }" aria-hidden="true"></span>
+                    <span class="text-ink" x-text="entry.label"></span>
+                </li>
+            </template>
+        </ul>
+    </div>
+
+    <div class="relative mt-4" :aria-busy="loading.toString()">
+        <div x-show="status === 'ready'" x-cloak class="relative h-[480px]">
             <canvas x-ref="canvas" role="img" aria-label="{{ $chartLabel }}"></canvas>
 
             {{-- Loading saat filter berubah: overlay di atas chart lama --}}
