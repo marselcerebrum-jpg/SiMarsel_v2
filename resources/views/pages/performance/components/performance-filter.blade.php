@@ -169,3 +169,7 @@
 </div>
 
 <p x-show="errors.filter" x-cloak x-text="errors.filter" class="{{ $error }}" role="alert"></p>
+
+<p x-show="periodLabel && !filterInvalid && !loading" x-cloak class="mt-4 text-xs text-muted">
+    Menampilkan data <span x-text="periodLabel" class="font-semibold text-ink"></span>
+</p>

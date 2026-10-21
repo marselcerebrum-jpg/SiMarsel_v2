@@ -101,6 +101,8 @@
             @include('pages.performance.components.performance-filter')
         </section>
 
+        <p x-show="emptyMessage" x-cloak x-text="emptyMessage" class="mt-4 rounded-lg border border-line bg-soft px-4 py-2.5 text-sm text-muted" role="status"></p>
+
         <section aria-label="Key Performance Indicators" :aria-busy="loading.toString()">
             @foreach ($rows as $size => $row)
                 <div class="mt-4 grid gap-4 {{ $row['grid'] }}">
