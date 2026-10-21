@@ -62,6 +62,18 @@
             ['value' => 'transactions', 'label' => 'Transactions'],
         ],
     ];
+
+    // English labels for the backend time range keys.
+    $purchaseTime = [
+        'labels' => [
+            'dawn' => 'Early Morning',
+            'morning' => 'Morning',
+            'midday' => 'Midday',
+            'afternoon' => 'Afternoon',
+            'night' => 'Night',
+            'unknown' => 'Unknown',
+        ],
+    ];
 @endphp
 
 @section('page')
@@ -109,6 +121,10 @@
 
         <section class="{{ $card }} mt-4 p-5" aria-labelledby="performance-payment-method-title">
             @include('pages.performance.components.performance-payment-method')
+        </section>
+
+        <section class="{{ $card }} mt-4 p-5" aria-labelledby="performance-purchase-time-title">
+            @include('pages.performance.components.performance-purchase-time')
         </section>
     </div>
 @endsection

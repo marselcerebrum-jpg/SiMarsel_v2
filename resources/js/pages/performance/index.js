@@ -18,6 +18,7 @@ import {
 import { formatDateTime, formatValue } from './format';
 import performanceContribution from './contribution';
 import performancePaymentMethod from './payment-method';
+import performancePurchaseTime from './purchase-time';
 import performanceTrend from './trend';
 
 Alpine.data('performanceSummary', (platforms = [], years = []) => ({
@@ -204,3 +205,4 @@ Alpine.data('performanceSummary', (platforms = [], years = []) => ({
 Alpine.data('performanceTrend', performanceTrend);
 Alpine.data('performanceContribution', performanceContribution);
 Alpine.data('performancePaymentMethod', performancePaymentMethod);
+Alpine.data('performancePurchaseTime', performancePurchaseTime);
