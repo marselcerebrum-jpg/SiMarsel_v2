@@ -21,6 +21,17 @@
     --color-label: #6b7685;
 
     --radius-panel: 14px;
+
+    --animate-shimmer: shimmer 1.4s ease-in-out infinite;
+
+    @keyframes shimmer {
+        from {
+            transform: translateX(-100%);
+        }
+        to {
+            transform: translateX(100%);
+        }
+    }
 }
 
 [x-cloak] {
