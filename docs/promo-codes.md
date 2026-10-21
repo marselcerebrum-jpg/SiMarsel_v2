@@ -55,13 +55,21 @@ transaction_promo_codes (1 baris per posisi kode, dengan snapshot funnel/source)
 - **Tidak ada versi** untuk waktu itu (misalnya transaksi sebelum kode didaftarkan): snapshot dibiarkan kosong. Sistem tidak mengarang funnel/source. Nilai kosong dikelompokkan sebagai **Tanpa Funnel** / **Tanpa Sumber** di analisis (scope `TransactionPromoCode::unclassified()`).
 - Penggunaan yang **sudah punya klasifikasi tidak pernah ditimpa**, baik saat master diedit maupun saat transaksi disinkronkan ulang. Hanya transaksi setelah waktu efektif versi baru yang memakai metadata baru.
 
-## Pendaftaran kode dari alert
+## Pendaftaran kode (Single Entry dan alert)
 
-`PromoCodeService::registerFromAlert(platformId, code, funnelId, sourceId)`:
+`PromoCodeService::register(platformId, code, funnelId, sourceId)`, dipakai oleh `POST /api/promo-codes` dan `registerFromAlert()`:
 
 1. Membuat kode promo beserta versi pertamanya.
 2. Menghubungkan penggunaan lama dengan platform + kode yang sama yang **belum terpetakan** (`promo_code_id` kosong) dan **belum terklasifikasi**, lalu melengkapinya dengan metadata yang didaftarkan.
 3. Penggunaan yang sudah punya klasifikasi/snapshot tidak disentuh.
+
+## Edit dan hapus kode
+
+`PromoCodeService::update()` dan `delete()`, dipakai oleh API [api/promo-codes.md](api/promo-codes.md):
+
+- **Funnel/source** selalu bisa diubah dan membuka versi baru.
+- **Kode/platform** hanya bisa diubah selama kode belum pernah dipakai transaksi, karena penggunaan transaksi dicocokkan dari platform + kode. Setelah diubah, penggunaan lama yang belum terpetakan untuk kode baru ikut dihubungkan.
+- **Hapus** hanya untuk kode yang belum pernah dipakai. Riwayat versinya dihapus secara eksplisit di service, karena hanya menjelaskan kode itu sendiri. Penggunaan transaksi tidak pernah ikut terhapus: relasinya `restrict` di database.
 
 ## Command
 
