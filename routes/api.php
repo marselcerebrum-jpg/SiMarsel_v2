@@ -12,10 +12,12 @@ use App\Http\Controllers\Performance\PurchaseTimeDistributionController;
 use App\Http\Controllers\Platform\PlatformController;
 use App\Http\Controllers\Product\ProductOverviewController;
 use App\Http\Controllers\Promo\FunnelController;
+use App\Http\Controllers\Promo\PromoCodeController;
 use App\Http\Controllers\Promo\PromoSourceController;
 use App\Models\Account;
 use App\Models\Division;
 use App\Models\Funnel;
+use App\Models\PromoCode;
 use App\Models\PromoSource;
 use Illuminate\Support\Facades\Route;
 
@@ -96,6 +98,24 @@ Route::middleware('auth')->group(function () {
             ->name('update');
         Route::delete('/{promoSource}', [PromoSourceController::class, 'destroy'])
             ->can('delete', 'promoSource')
+            ->name('destroy');
+    });
+
+    Route::prefix('promo-codes')->name('api.promo-codes.')->group(function () {
+        Route::get('/', [PromoCodeController::class, 'index'])
+            ->can('viewAny', PromoCode::class)
+            ->name('index');
+        Route::post('/', [PromoCodeController::class, 'store'])
+            ->can('create', PromoCode::class)
+            ->name('store');
+        Route::get('/{promoCode}', [PromoCodeController::class, 'show'])
+            ->can('view', 'promoCode')
+            ->name('show');
+        Route::match(['put', 'patch'], '/{promoCode}', [PromoCodeController::class, 'update'])
+            ->can('update', 'promoCode')
+            ->name('update');
+        Route::delete('/{promoCode}', [PromoCodeController::class, 'destroy'])
+            ->can('delete', 'promoCode')
             ->name('destroy');
     });
 
