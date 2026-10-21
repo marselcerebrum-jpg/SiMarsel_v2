@@ -17,7 +17,7 @@
         <header class="flex flex-wrap items-center justify-between gap-3">
             <div class="min-w-0">
                 <h1 class="text-2xl font-bold tracking-tight text-ink">Tasklist</h1>
-                <p class="mt-0.5 text-sm text-muted">Pantau dan kelola tugas berdasarkan status, prioritas, dan deadline.</p>
+                <p class="mt-0.5 hidden text-sm text-muted sm:block">Pantau dan kelola tugas berdasarkan status, prioritas, dan deadline.</p>
             </div>
 
             <button x-show="canCreate" x-cloak type="button" class="{{ $primaryButton }}" @click="createOpen = true">
@@ -30,11 +30,11 @@
 
         @include('pages.tasks.components.task-summary')
 
-        <section class="{{ $card }} mt-4 p-3 sm:p-4" aria-label="Tampilan dan filter tugas">
+        <section class="{{ $card }} mt-3 p-2.5 sm:p-3" aria-label="Tampilan dan filter tugas">
             @include('pages.tasks.components.task-filter')
         </section>
 
-        <div class="mt-4">
+        <div class="mt-3">
             <div x-show="view === 'board'">@include('pages.tasks.components.task-board')</div>
             <div x-show="view === 'table'" x-cloak>@include('pages.tasks.components.task-table')</div>
             <div x-show="view === 'timeline'" x-cloak>@include('pages.tasks.components.task-timeline')</div>

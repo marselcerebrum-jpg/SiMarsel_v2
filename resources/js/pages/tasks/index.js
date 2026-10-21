@@ -125,12 +125,22 @@ Alpine.data('tasklist', () => ({
             history.replaceState(null, '', url);
         });
 
+        // ?task=ID membuka detail tugas tersebut di Board; parameter mengikuti panel detail yang terbuka.
+        const requestedTask = Number(new URLSearchParams(location.search).get('task'));
+        this.$watch('detailId', (id) => {
+            const url = new URL(location.href);
+            if (id === null) url.searchParams.delete('task');
+            else url.searchParams.set('task', id);
+            history.replaceState(null, '', url);
+        });
+
         this.filters.division = this.defaultDivision();
         this.$watch('filters.division', () => this.load());
         this.$watch('filters', () => (this.page = 1));
 
         await this.loadMeta();
-        this.load();
+        await this.load();
+        if (Number.isInteger(requestedTask) && requestedTask > 0) this.focusTask({ id: requestedTask });
     },
 
     async loadMeta() {
@@ -375,8 +385,9 @@ Alpine.data('tasklist', () => ({
         this.$nextTick(() => this.revealHighlight());
     },
 
+    // Dipanggil juga dari scope Calendar/detail, jadi kartu dicari di dokumen, bukan $root komponen pemanggil.
     revealHighlight() {
-        const card = this.$root.querySelector(`[data-task-card="${this.highlightId}"]`);
+        const card = document.querySelector(`[data-task-card="${this.highlightId}"]`);
         if (!card) return;
 
         card.scrollIntoView({ block: 'nearest', inline: 'center' });
@@ -643,11 +654,14 @@ Alpine.data('taskDetail', () => ({
             this.task = data;
             this.state = 'ready';
             this.syncTask(data);
+            // Tugas yang belum ada di daftar baru masuk Board setelah detailnya dimuat.
+            if (this.highlightId === data.id) this.$nextTick(() => this.revealHighlight());
             this.loadEvidences();
             this.loadActivities();
             if (this.detailFocus === 'revision') this.startReview('revision');
             if (this.detailFocus === 'edit' && this.canEditThis) this.startEdit();
         } catch (error) {
+            if (this.highlightId === id) this.highlightId = null;
             this.state = error?.unavailable ? 'unavailable' : { 403: 'forbidden', 404: 'not_found' }[error?.status] ?? 'error';
             this.message = taskErrorMessage(error, 'Detail tugas gagal dimuat.');
         } finally {

@@ -62,6 +62,16 @@ class TaskPageTest extends TestCase
         }
     }
 
+    public function test_board_has_six_workflow_columns_and_table_follows_review_column_order(): void
+    {
+        $this->actingAs($this->manager)
+            ->get('/tasks')
+            ->assertOk()
+            ->assertSee('x-for="column in statuses"', false)
+            ->assertSee('data-task-card', false)
+            ->assertSeeInOrder(['Judul Tugas', 'Status', 'Prioritas', 'PIC', 'Deadline', 'Divisi', 'Aksi']);
+    }
+
     public function test_create_task_form_lists_required_fields_without_points(): void
     {
         $this->actingAs($this->manager)

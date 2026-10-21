@@ -1,10 +1,10 @@
 @php
-    $selectClass = 'h-9 w-full rounded-lg border border-line bg-white px-3 text-sm text-ink focus:border-primary focus:ring-2 focus:ring-primary/20 focus:outline-none disabled:bg-soft disabled:text-muted';
+    $selectClass = 'h-9 w-full rounded-lg border border-line bg-white pr-8 pl-3 sm:w-auto text-sm text-ink focus:border-primary focus:ring-2 focus:ring-primary/20 focus:outline-none disabled:bg-soft disabled:text-muted';
 @endphp
 
 {{-- Toolbar ringkas: pilihan tampilan + pencarian + filter dalam satu baris (desktop). Filter berlaku di semua tampilan. --}}
-<div class="flex flex-col gap-3 xl:flex-row xl:items-center">
-    <div class="inline-flex shrink-0 overflow-x-auto rounded-lg border border-line bg-soft p-1" role="tablist" aria-label="Pilih tampilan">
+<div class="flex flex-col gap-2 2xl:flex-row 2xl:items-center 2xl:gap-3">
+    <div class="inline-flex shrink-0 self-start overflow-x-auto rounded-lg border border-line bg-soft p-1" role="tablist" aria-label="Pilih tampilan">
         <template x-for="item in views" :key="item.key">
             <button
                 type="button"
@@ -18,16 +18,16 @@
         </template>
     </div>
 
-    <div class="grid flex-1 gap-2 sm:grid-cols-2 lg:grid-cols-[minmax(0,1.6fr)_repeat(3,minmax(0,1fr))_auto]"
-        :class="user.role === 'staff' && 'lg:grid-cols-[minmax(0,1.6fr)_repeat(2,minmax(0,1fr))_auto]'">
-        <label class="relative block sm:col-span-2 lg:col-span-1">
+    {{-- Lebar tiap filter mengikuti isinya agar teks tidak terpotong; baris membungkus bila tidak muat. --}}
+    <div class="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+        <label class="relative block min-w-0 basis-full sm:min-w-48 sm:flex-1 sm:basis-auto">
             <span class="sr-only">Cari judul tugas</span>
             <x-icon name="search" class="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-label" />
             <input id="task-search" type="search" x-model.debounce.200ms="filters.search" placeholder="Cari judul tugas…"
                 class="h-9 w-full rounded-lg border border-line bg-white pr-3 pl-9 text-sm text-ink placeholder:text-label focus:border-primary focus:ring-2 focus:ring-primary/20 focus:outline-none">
         </label>
 
-        <label x-show="user.role !== 'staff'" class="block">
+        <label x-show="user.role !== 'staff'" class="block min-w-0 flex-1 sm:max-w-60 sm:flex-none">
             <span class="sr-only">Divisi</span>
             <select id="task-division" x-model="filters.division" class="{{ $selectClass }}" :disabled="user.role === 'manager'" title="Divisi">
                 <template x-if="user.role === 'admin'"><option value="">Semua Divisi</option></template>
@@ -38,7 +38,7 @@
             </select>
         </label>
 
-        <label class="block">
+        <label class="block flex-1 sm:flex-none">
             <span class="sr-only">Prioritas</span>
             <select id="task-priority" x-model="filters.priority" class="{{ $selectClass }}" title="Prioritas">
                 <option value="">Semua Prioritas</option>
@@ -48,7 +48,7 @@
             </select>
         </label>
 
-        <label class="block">
+        <label class="block flex-1 sm:flex-none">
             <span class="sr-only">Status</span>
             <select id="task-status" x-model="filters.status" class="{{ $selectClass }}" title="Status">
                 <option value="">Semua Status</option>
@@ -58,6 +58,6 @@
             </select>
         </label>
 
-        <button type="button" class="{{ $button }} sm:col-span-2 lg:col-span-1" :disabled="!hasActiveFilter" @click="resetFilters()">Reset Filter</button>
+        <button type="button" class="{{ $button }} shrink-0" :disabled="!hasActiveFilter" @click="resetFilters()">Reset Filter</button>
     </div>
 </div>
