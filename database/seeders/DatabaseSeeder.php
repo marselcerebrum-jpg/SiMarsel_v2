@@ -17,6 +17,8 @@ class DatabaseSeeder extends Seeder
         $this->call([
             RoleSeeder::class,
             AccountSeeder::class,
+            FunnelSeeder::class,
+            PromoSourceSeeder::class,
         ]);
 
         // Demo performance data for local development only, so tests keep a clean database.
