@@ -81,7 +81,9 @@
     </div>
 
     {{-- Table --}}
-    <div x-show="chartType === 'table'" x-cloak class="mt-5 overflow-hidden rounded-lg border border-line">
+    <div x-show="chartType === 'table'" x-cloak class="relative mt-5 overflow-hidden rounded-lg border border-line">
+        @include('pages.performance.components.loading-spinner', ['show' => 'trendLoading'])
+
         <div class="max-h-[26rem] overflow-auto">
             <table class="w-full min-w-[560px] text-left text-sm">
                 <thead class="sticky top-0 bg-soft text-xs font-semibold text-label">
@@ -91,7 +93,7 @@
                         <th scope="col" class="px-5 py-3 text-right">Change</th>
                     </tr>
                 </thead>
-                <tbody class="divide-y divide-line transition-opacity" :class="trendLoading && 'opacity-60'">
+                <tbody class="divide-y divide-line">
                     <template x-for="row in trendTableRows" :key="row.key">
                         <tr class="transition hover:bg-soft/60">
                             <th scope="row" class="px-5 py-3 font-semibold whitespace-nowrap text-ink" x-text="row.period"></th>

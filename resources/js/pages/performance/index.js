@@ -15,7 +15,7 @@ import {
     today,
     validateFilter,
 } from './filter';
-import { formatDateTime, formatValue } from './format';
+import { formatDateRange, formatDateTime, formatValue } from './format';
 import performanceContribution from './contribution';
 import performancePaymentMethod from './payment-method';
 import performancePurchaseTime from './purchase-time';
@@ -54,12 +54,22 @@ Alpine.data('performanceSummary', (platforms = [], years = []) => ({
         return this.summary?.is_empty === true;
     },
 
-    get loadedLabel() {
-        return this.loadedAt ? formatDateTime(this.loadedAt) : '';
+    get emptyMessage() {
+        if (this.loading || !this.isEmpty) return '';
+
+        return this.summary.message || 'Data tidak ditemukan untuk filter yang dipilih.';
     },
 
-    get skeleton() {
-        return this.loading && !this.summary;
+    /**
+     * The period actually counted, from the backend's filter block. Several ranges appear when the
+     * selected years are not consecutive.
+     */
+    get periodLabel() {
+        return (this.summary?.filter?.ranges ?? []).map(formatDateRange).join(', ');
+    },
+
+    get loadedLabel() {
+        return this.loadedAt ? formatDateTime(this.loadedAt) : '';
     },
 
     get monthEnabled() {
