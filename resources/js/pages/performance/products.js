@@ -26,25 +26,10 @@ const truncate = (text, max) => (text.length > max ? `${text.slice(0, max - 1)}â
 
 const activePeriod = (item) => item.active_period ?? '-';
 
-// Warna batang mengikuti masa aktif paket (bukan peringkat), jadi warnanya tetap saat filter berubah.
-// Tiga warna pertama lolos validator palet (aman buta warna); masa aktif lain memakai slot berikutnya.
-const PERIOD_COLORS = new Map([
-    ['6 Bulan', '#2a78d6'],
-    ['1 Tahun', '#eb6834'],
-    ['2 Tahun', '#1baf7a'],
-]);
-const EXTRA_PERIOD_COLORS = ['#eda100', '#e87ba4', '#008300', '#6250d6', '#e34948'];
-const NO_PERIOD_COLOR = '#9aa3ae';
-const NO_PERIOD_LABEL = 'Tanpa masa aktif';
-
-const periodColor = (period) => {
-    if (!period) return NO_PERIOD_COLOR;
-
-    if (!PERIOD_COLORS.has(period)) {
-        PERIOD_COLORS.set(period, EXTRA_PERIOD_COLORS[PERIOD_COLORS.size - 3] ?? NO_PERIOD_COLOR);
-    }
-
-    return PERIOD_COLORS.get(period);
+// Satu warna per panel agar diagram pendapatan dan transaksi mudah dibedakan.
+const PANEL_COLORS = {
+    revenue: { bar: '#059669', hover: '#047857' },
+    volume: { bar: '#2a78d6', hover: '#1f62b8' },
 };
 
 // Pecah teks per kata menjadi beberapa baris; kata atau baris terakhir yang terlalu panjang dipotong.
@@ -169,7 +154,7 @@ function remoteData(fetcher) {
  * Kartu diagram batang. Instance Chart.js disimpan di luar state Alpine
  * agar tidak dibungkus Proxy reaktif.
  */
-function barChartCard(fetcher, { value, valueTick, valueTitle, tooltipLines }) {
+function barChartCard(fetcher, { color, value, valueTick, valueTitle, tooltipLines }) {
     let chart = null;
 
     return {
@@ -179,27 +164,15 @@ function barChartCard(fetcher, { value, valueTick, valueTitle, tooltipLines }) {
             chart?.destroy();
         },
 
-        // Legenda warna: masa aktif yang ada di data, urut sesuai urutan warnanya.
-        get legend() {
-            const periods = new Set(this.items.map((item) => item.active_period ?? null));
-            periods.forEach(periodColor);
-
-            const ordered = [...PERIOD_COLORS.keys()].filter((period) => periods.has(period));
-            if (periods.has(null)) ordered.push(null);
-
-            return ordered.map((period) => ({ label: period ?? NO_PERIOD_LABEL, color: periodColor(period) }));
-        },
-
         render() {
             if (!this.items.length) return;
 
             const labels = this.items.map((item) => item.name);
             const values = this.items.map(value);
-            const colors = this.items.map((item) => periodColor(item.active_period));
 
             if (chart) {
                 chart.data.labels = labels;
-                Object.assign(chart.data.datasets[0], { data: values, backgroundColor: colors, hoverBackgroundColor: colors });
+                chart.data.datasets[0].data = values;
                 chart.update();
                 return;
             }
@@ -214,8 +187,8 @@ function barChartCard(fetcher, { value, valueTick, valueTitle, tooltipLines }) {
                     labels,
                     datasets: [{
                         data: values,
-                        backgroundColor: colors,
-                        hoverBackgroundColor: colors,
+                        backgroundColor: color.bar,
+                        hoverBackgroundColor: color.hover,
                         borderRadius: 4,
                         maxBarThickness: 64,
                     }],
@@ -273,6 +246,7 @@ function barChartCard(fetcher, { value, valueTick, valueTitle, tooltipLines }) {
 
 Alpine.data('topPackagesByRevenue', () =>
     barChartCard(fetchTopPackagesByRevenue, {
+        color: PANEL_COLORS.revenue,
         value: (item) => item.revenue,
         valueTick: millions,
         valueTitle: 'Total Pendapatan',
@@ -282,6 +256,7 @@ Alpine.data('topPackagesByRevenue', () =>
 
 Alpine.data('topPackagesByVolume', () =>
     barChartCard(fetchTopPackagesByVolume, {
+        color: PANEL_COLORS.volume,
         value: (item) => item.transactions,
         valueTick: (tick) => number(tick),
         valueTitle: 'Jumlah Transaksi',
