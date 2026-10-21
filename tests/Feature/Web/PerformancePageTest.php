@@ -83,7 +83,7 @@ class PerformancePageTest extends TestCase
         $this->actingAs($this->employee)
             ->get('/dashboard')
             ->assertOk()
-            ->assertSee('x-show="periodLabel && !filterInvalid"', false)
+            ->assertSee('x-show="periodLabel && !filterInvalid && !loading"', false)
             ->assertSee('x-text="periodLabel"', false)
             ->assertSee('x-show="emptyMessage"', false)
             ->assertSee('x-text="emptyMessage"', false)

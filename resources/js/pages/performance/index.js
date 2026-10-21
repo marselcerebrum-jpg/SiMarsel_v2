@@ -199,6 +199,10 @@ Alpine.data('performanceSummary', (platforms = [], years = []) => ({
         } catch (error) {
             if (requestId !== this.requestId) return;
 
+            // Drop the previous filter's result so the cards, period and loaded time do not show it as this one.
+            this.summary = null;
+            this.loadedAt = null;
+
             if (error.status === 422 && error.data?.errors) {
                 this.errors = Object.fromEntries(
                     Object.entries(validationErrors(error)).map(([field, message]) => [filterErrorField(field), message]),
