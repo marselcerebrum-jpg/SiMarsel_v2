@@ -24,6 +24,37 @@ const millions = (value) => `${(value / 1_000_000).toLocaleString('id-ID', { max
 
 const truncate = (text, max) => (text.length > max ? `${text.slice(0, max - 1)}…` : text);
 
+// "Bimbel CPNS 2026… (1 Tahun)": nama dipotong lebih dulu agar masa aktif tetap terlihat,
+// karena satu paket bisa dijual dengan beberapa masa aktif.
+const packageLabel = (item, max) => {
+    if (!item.active_period) return truncate(item.name, max);
+
+    const suffix = ` (${item.active_period})`;
+
+    return `${truncate(item.name, Math.max(8, max - suffix.length))}${suffix}`;
+};
+
+const activePeriod = (item) => item.active_period ?? '-';
+
+// Pecah teks per kata menjadi beberapa baris; baris terakhir dipotong jika masih terlalu panjang.
+const wrap = (text, width, maxLines) => {
+    const lines = [];
+
+    for (const word of text.split(' ')) {
+        const last = lines.at(-1);
+
+        if (last !== undefined && `${last} ${word}`.length <= width) lines[lines.length - 1] = `${last} ${word}`;
+        else lines.push(word);
+    }
+
+    if (lines.length <= maxLines) return lines;
+
+    return [...lines.slice(0, maxLines - 1), truncate(lines.slice(maxLines - 1).join(' '), width)];
+};
+
+// Label sumbu diagram vertikal: nama paket (maks. 2 baris) lalu masa aktif di baris terakhir.
+const packageLines = (item) => [...wrap(item.name, 18, 2), ...(item.active_period ? [`(${item.active_period})`] : [])];
+
 const currentYear = new Date().getFullYear();
 
 /**
@@ -118,7 +149,7 @@ function remoteData(fetcher) {
  * Kartu diagram batang. Instance Chart.js disimpan di luar state Alpine
  * agar tidak dibungkus Proxy reaktif.
  */
-function barChartCard(fetcher, { horizontal, value, valueTick, tooltipLines }) {
+function barChartCard(fetcher, { horizontal, value, valueTick, valueTitle, tooltipLines }) {
     let chart = null;
 
     return {
@@ -129,7 +160,7 @@ function barChartCard(fetcher, { horizontal, value, valueTick, tooltipLines }) {
         },
 
         get chartHeight() {
-            return horizontal ? `${Math.max(240, this.items.length * 48 + 56)}px` : '340px';
+            return horizontal ? `${Math.max(240, this.items.length * 48 + 56)}px` : '400px';
         },
 
         render() {
@@ -151,6 +182,7 @@ function barChartCard(fetcher, { horizontal, value, valueTick, tooltipLines }) {
                 grid: { color: '#e3e6ea' },
                 border: { display: false },
                 ticks: { color: '#6b7685', font: { size: 11 }, callback: valueTick, maxTicksLimit: 6, precision: 0 },
+                title: { display: Boolean(valueTitle), text: valueTitle, color: '#6b7685', font: { size: 11, weight: 600 } },
             };
             const labelAxis = {
                 grid: { display: false },
@@ -160,7 +192,7 @@ function barChartCard(fetcher, { horizontal, value, valueTick, tooltipLines }) {
                     autoSkip: false,
                     maxRotation: 40,
                     callback(tick) {
-                        return truncate(this.getLabelForValue(tick), horizontal ? 28 : 16);
+                        return horizontal ? packageLabel(items()[tick], 40) : packageLines(items()[tick]);
                     },
                 },
             };
@@ -211,7 +243,7 @@ Alpine.data('topPackagesByRevenue', () =>
         horizontal: true,
         value: (item) => item.revenue,
         valueTick: millions,
-        tooltipLines: (item) => [`Masa Aktif: ${item.active_period}`, `Total Pendapatan: ${rupiah(item.revenue)}`],
+        tooltipLines: (item) => [`Masa Aktif: ${activePeriod(item)}`, `Total Pendapatan: ${rupiah(item.revenue)}`],
     }),
 );
 
@@ -220,20 +252,23 @@ Alpine.data('topPackagesByVolume', () =>
         horizontal: false,
         value: (item) => item.transactions,
         valueTick: (tick) => number(tick),
-        tooltipLines: (item) => [`Masa Aktif: ${item.active_period}`, `Total Transaksi: ${number(item.transactions)}`],
+        valueTitle: 'Jumlah Transaksi',
+        tooltipLines: (item) => [`Masa Aktif: ${activePeriod(item)}`, `Total Transaksi: ${number(item.transactions)}`],
     }),
 );
 
+// `hint` = definisi metrik (sama dengan docs/api/products.md), tampil saat judul kolom di-hover.
+// `excelFormat` dipakai untuk kolom rata-rata agar nilai desimalnya tidak dibulatkan di Excel.
 const PERFORMANCE_COLUMNS = [
-    { key: 'name', header: 'Package Name', width: 34 },
-    { key: 'revenue', header: 'Revenue', type: 'number', format: rupiah },
-    { key: 'trx', header: 'Trx', type: 'number', format: number },
-    { key: 'low_price', header: 'Low Price', type: 'number', format: rupiah },
-    { key: 'low_trx', header: 'Low Trx', type: 'number', format: number },
-    { key: 'avg_price', header: 'Avg Price', type: 'number', format: rupiah },
-    { key: 'avg_trx', header: 'Avg Trx', type: 'number', format: number },
-    { key: 'high_price', header: 'High Price', type: 'number', format: rupiah },
-    { key: 'high_trx', header: 'High Trx', type: 'number', format: number },
+    { key: 'name', header: 'Package Name', width: 34, hint: 'Nama produk lengkap, termasuk masa aktif' },
+    { key: 'revenue', header: 'Revenue', type: 'number', format: rupiah, hint: 'Total nominal transaksi berhasil' },
+    { key: 'trx', header: 'Trx', type: 'number', format: number, hint: 'Jumlah transaksi berhasil' },
+    { key: 'low_price', header: 'Low Price', type: 'number', format: rupiah, hint: 'Nominal terendah dari satu transaksi' },
+    { key: 'low_trx', header: 'Low Trx', type: 'number', format: number, hint: 'Jumlah transaksi terendah dalam satu hari' },
+    { key: 'avg_price', header: 'Avg Price', type: 'number', format: rupiah, excelFormat: '#,##0.00', hint: 'Revenue dibagi Trx' },
+    { key: 'avg_trx', header: 'Avg Trx', type: 'number', format: number, excelFormat: '#,##0.00', hint: 'Trx dibagi jumlah hari yang ada penjualannya' },
+    { key: 'high_price', header: 'High Price', type: 'number', format: rupiah, hint: 'Nominal tertinggi dari satu transaksi' },
+    { key: 'high_trx', header: 'High Trx', type: 'number', format: number, hint: 'Jumlah transaksi tertinggi dalam satu hari' },
 ].map((column) => ({ ...column, value: (row) => row[column.key] }));
 
 Alpine.data('packagePerformance', () => ({

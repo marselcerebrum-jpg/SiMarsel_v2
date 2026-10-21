@@ -9,6 +9,7 @@ use App\Http\Controllers\Performance\PerformanceSummaryController;
 use App\Http\Controllers\Performance\PerformanceTrendController;
 use App\Http\Controllers\Performance\PlatformContributionController;
 use App\Http\Controllers\Performance\PurchaseTimeDistributionController;
+use App\Http\Controllers\Product\ProductOverviewController;
 use App\Models\Account;
 use App\Models\Division;
 use Illuminate\Support\Facades\Route;
@@ -67,4 +68,10 @@ Route::middleware('auth')->group(function () {
         ->name('api.performance.purchase-times');
     Route::get('/performance/export', PerformanceExportController::class)
         ->name('api.performance.export');
+    Route::prefix('products')->name('api.products.')->group(function () {
+        Route::get('/filters', [ProductOverviewController::class, 'filters'])->name('filters');
+        Route::get('/top-packages/revenue', [ProductOverviewController::class, 'topByRevenue'])->name('top-packages.revenue');
+        Route::get('/top-packages/volume', [ProductOverviewController::class, 'topByVolume'])->name('top-packages.volume');
+        Route::get('/performance', [ProductOverviewController::class, 'performance'])->name('performance');
+    });
 });

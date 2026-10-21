@@ -1,10 +1,10 @@
 import { http } from '../http';
 
 /**
- * Ubah ke true setelah endpoint backend tersedia. Selama false, setiap kartu
- * menampilkan kondisi "Data belum tersedia" tanpa data contoh.
+ * Endpoint backend sudah tersedia. Ubah ke false hanya untuk menampilkan kondisi
+ * "Data belum tersedia" tanpa memanggil API. Rumus lengkap ada di docs/api/products.md.
  *
- * Kontrak API yang diharapkan. Semua endpoint data menerima query
+ * Kontrak API. Semua endpoint data menerima query
  * platform={slug}&year={yyyy}&month={1-12}; platform dan month opsional (kosong = semua).
  *
  * GET /api/products/filters
@@ -19,7 +19,7 @@ import { http } from '../http';
  * GET /api/products/performance
  *   → { data: [{ name, revenue, trx, low_price, low_trx, avg_price, avg_trx, high_price, high_trx }] }
  */
-export const PRODUCT_API_READY = false;
+export const PRODUCT_API_READY = true;
 
 function query(params) {
     const entries = Object.entries(params).filter(([, value]) => value !== '' && value !== null && value !== undefined);
