@@ -2,12 +2,16 @@
 
 namespace App\Models;
 
+use App\Observers\TransactionObserver;
+use Carbon\CarbonImmutable;
 use Database\Factories\TransactionFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 #[Fillable([
     'platform_id',
@@ -23,6 +27,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'customer_email',
     'status_message',
 ])]
+#[ObservedBy(TransactionObserver::class)]
 class Transaction extends Model
 {
     /** @use HasFactory<TransactionFactory> */
@@ -51,6 +56,22 @@ class Transaction extends Model
     public function platform(): BelongsTo
     {
         return $this->belongsTo(Platform::class);
+    }
+
+    /**
+     * The promo codes used by this transaction, one row per code position.
+     */
+    public function promoCodeUsages(): HasMany
+    {
+        return $this->hasMany(TransactionPromoCode::class)->orderBy('code_position');
+    }
+
+    /**
+     * The moment the transaction was paid; a missing paid_time counts as the start of the day.
+     */
+    public function paidAt(): CarbonImmutable
+    {
+        return CarbonImmutable::parse($this->paid_date->toDateString().' '.($this->paid_time ?? '00:00:00'));
     }
 
     /**
