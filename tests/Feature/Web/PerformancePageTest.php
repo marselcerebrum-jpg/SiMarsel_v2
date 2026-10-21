@@ -201,6 +201,34 @@ class PerformancePageTest extends TestCase
             ->assertSee('@click="retryPayment()"', false);
     }
 
+    public function test_performance_page_has_purchase_time_section_after_payment_methods(): void
+    {
+        $this->actingAs($this->employee)
+            ->get('/dashboard')
+            ->assertOk()
+            ->assertSee('Purchase Time')
+            ->assertSee('x-data="performancePurchaseTime(', false)
+            ->assertSee('@performance-filter.window="loadPurchaseTime($event.detail)"', false)
+            ->assertSeeInOrder(['Early Morning', 'Morning', 'Midday', 'Afternoon', 'Night', 'Unknown'])
+            ->assertSeeInOrder(['Payment Methods', 'Purchase Time'], false);
+    }
+
+    public function test_purchase_time_section_shows_pie_chart_legend_and_states(): void
+    {
+        $this->actingAs($this->employee)
+            ->get('/dashboard')
+            ->assertOk()
+            ->assertSee('x-ref="purchaseTimeCanvas"', false)
+            ->assertSee(':aria-label="purchaseTimeChartLabel"', false)
+            ->assertSeeInOrder(['>Time Range</th>', '>Hours</th>', '>Transactions</th>', '>Share (%)</th>'], false)
+            ->assertSee('@mouseenter="highlightPurchaseTime(index)"', false)
+            ->assertSee('x-text="purchaseTimeTotal"', false)
+            ->assertSee("purchaseTimeState === 'loading'", false)
+            ->assertSee("purchaseTimeState === 'empty'", false)
+            ->assertSee("purchaseTimeState === 'error'", false)
+            ->assertSee('@click="retryPurchaseTime()"', false);
+    }
+
     public function test_sidebar_links_performance_page_and_marks_it_active(): void
     {
         $this->actingAs($this->employee)

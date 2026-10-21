@@ -124,11 +124,18 @@ export function chartConfig({ type, labels, datasets, metric }) {
     };
 }
 
+const paymentTooltip = {
+    title: (row) => row.name,
+    label: (row) => `Contribution: ${row.percentage}`,
+    details: (row) => [`Transactions: ${row.transactions}`, `Revenue: ${row.revenue}`],
+};
+
 /**
- * Pie chart for a distribution such as payment methods. Rows bring their own color so the
- * HTML legend beside the chart matches the slices; hovering a slice shows the full detail.
+ * Pie chart for a distribution such as payment methods or purchase times. Rows bring their own
+ * color so the HTML legend beside the chart matches the slices; hovering a slice shows the
+ * detail lines from `tooltip` (defaults to the payment method detail).
  */
-export function distributionChartConfig({ rows, metric }) {
+export function distributionChartConfig({ rows, metric, tooltip = paymentTooltip }) {
     return {
         type: 'pie',
         data: {
@@ -151,12 +158,9 @@ export function distributionChartConfig({ rows, metric }) {
                 tooltip: {
                     ...TOOLTIP,
                     callbacks: {
-                        title: (items) => rows[items[0].dataIndex].name,
-                        label: (item) => ` Contribution: ${rows[item.dataIndex].percentage}`,
-                        afterLabel: (item) => [
-                            `   Transactions: ${rows[item.dataIndex].transactions}`,
-                            `   Revenue: ${rows[item.dataIndex].revenue}`,
-                        ],
+                        title: (items) => tooltip.title(rows[items[0].dataIndex]),
+                        label: (item) => ` ${tooltip.label(rows[item.dataIndex])}`,
+                        afterLabel: (item) => tooltip.details(rows[item.dataIndex]).map((line) => `   ${line}`),
                     },
                 },
             },

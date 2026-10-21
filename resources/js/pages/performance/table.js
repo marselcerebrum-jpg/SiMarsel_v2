@@ -55,3 +55,26 @@ export function paymentMethodRows(methods, { value, share }) {
         }))
         .sort((a, b) => b.value - a.value);
 }
+
+/**
+ * Rows for the purchase time pie chart and its legend, in the backend order (dawn to night, then
+ * unknown) so each range always keeps its color. `labels` maps a range key to its English label;
+ * the backend label is the fallback.
+ */
+export function purchaseTimeRows(ranges, labels = {}) {
+    return ranges.map((range, index) => {
+        const name = labels[range.key] ?? range.label;
+        const hours = range.start && range.end ? `${range.start} - ${range.end}` : null;
+
+        return {
+            key: range.key,
+            name,
+            hours: hours ?? '—',
+            title: hours ? `${name} (${hours})` : name,
+            color: pieColor(index),
+            value: Number(range.transactions) || 0,
+            transactions: formatValue(range.transactions, 'number'),
+            percentage: formatValue(range.percentage ?? 0, 'percent'),
+        };
+    });
+}

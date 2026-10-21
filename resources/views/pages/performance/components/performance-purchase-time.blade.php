@@ -1,0 +1,141 @@
+@php
+    $columns = [
+        ['label' => 'Time Range', 'class' => ''],
+        ['label' => 'Hours', 'class' => ''],
+        ['label' => 'Transactions', 'class' => 'text-right'],
+        ['label' => 'Share (%)', 'class' => 'text-right'],
+    ];
+
+    $dot = 'size-3 shrink-0 rounded-full';
+@endphp
+
+<div
+    x-data="performancePurchaseTime(@js($purchaseTime['labels']))"
+    @performance-filter.window="loadPurchaseTime($event.detail)"
+    :aria-busy="purchaseTimeLoading.toString()"
+>
+    <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <div>
+            <h2 id="performance-purchase-time-title" class="text-base font-semibold text-ink">Purchase Time</h2>
+            <p class="mt-1 text-sm text-muted">Distribusi jumlah transaksi berdasarkan rentang waktu pembelian sesuai filter aktif.</p>
+        </div>
+
+        <p x-show="purchaseTimeLoading && purchaseTimeState === 'ready'" x-cloak class="inline-flex items-center gap-2 text-xs font-semibold text-label" role="status">
+            <span class="size-3.5 animate-spin rounded-full border-2 border-primary/25 border-t-primary" aria-hidden="true"></span>
+            Memuat data…
+        </p>
+    </div>
+
+    <div class="mt-5 border-t border-line"></div>
+
+    {{-- Loading --}}
+    <div x-show="purchaseTimeState === 'loading'" class="grid gap-6 pt-5 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] lg:items-center" aria-hidden="true">
+        <span class="mx-auto block size-56 animate-pulse rounded-full bg-soft sm:size-64"></span>
+        <div class="space-y-3">
+            @foreach (range(1, 5) as $row)
+                <span class="block h-11 animate-pulse rounded-lg bg-soft"></span>
+            @endforeach
+        </div>
+    </div>
+
+    {{-- Empty --}}
+    <div x-show="purchaseTimeState === 'empty'" x-cloak class="grid min-h-56 place-items-center pt-5 text-center" role="status">
+        <p class="max-w-md text-sm text-label" x-text="purchaseTimeMessage"></p>
+    </div>
+
+    {{-- Error --}}
+    <div x-show="purchaseTimeState === 'error'" x-cloak class="grid min-h-56 place-items-center pt-5 text-center" role="alert">
+        <div class="flex flex-col items-center gap-3">
+            <p class="text-sm font-semibold text-red-600" x-text="purchaseTimeMessage"></p>
+            <button
+                type="button"
+                class="inline-flex h-9 items-center justify-center rounded-lg border border-line bg-white px-3 text-sm font-semibold text-ink hover:bg-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                @click="retryPurchaseTime()"
+            >
+                Reload
+            </button>
+        </div>
+    </div>
+
+    {{-- Pie chart + legend --}}
+    <div
+        x-show="purchaseTimeState === 'ready'"
+        x-cloak
+        class="grid gap-6 pt-5 transition-opacity lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] lg:items-center"
+        :class="purchaseTimeLoading && 'opacity-60'"
+    >
+        <div class="relative mx-auto h-64 w-full max-w-sm sm:h-72">
+            <canvas x-ref="purchaseTimeCanvas" role="img" :aria-label="purchaseTimeChartLabel"></canvas>
+        </div>
+
+        <div class="overflow-hidden rounded-lg border border-line">
+            {{-- Table: tablet and larger --}}
+            <div class="hidden overflow-x-auto md:block">
+                <table class="w-full min-w-[480px] text-left text-sm">
+                    <caption class="sr-only">Purchase time distribution</caption>
+                    <thead class="bg-soft text-xs font-semibold text-label">
+                        <tr>
+                            @foreach ($columns as $column)
+                                <th scope="col" class="px-4 py-3 {{ $column['class'] }}">{{ $column['label'] }}</th>
+                            @endforeach
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-line">
+                        <template x-for="(row, index) in purchaseTimeRows" :key="row.key">
+                            <tr
+                                class="transition hover:bg-soft/60 focus-visible:bg-soft/70 focus-visible:outline-none"
+                                tabindex="0"
+                                @mouseenter="highlightPurchaseTime(index)"
+                                @mouseleave="highlightPurchaseTime(null)"
+                                @focus="highlightPurchaseTime(index)"
+                                @blur="highlightPurchaseTime(null)"
+                            >
+                                <th scope="row" class="px-4 py-3 font-semibold text-ink">
+                                    <span class="inline-flex items-center gap-3">
+                                        <span class="{{ $dot }}" :style="{ backgroundColor: row.color }" aria-hidden="true"></span>
+                                        <span class="break-words" x-text="row.name"></span>
+                                    </span>
+                                </th>
+                                <td class="performance-value px-4 py-3 text-muted" x-text="row.hours"></td>
+                                <td class="performance-value px-4 py-3 text-right text-muted" x-text="row.transactions"></td>
+                                <td class="performance-value px-4 py-3 text-right font-bold text-ink" x-text="row.percentage"></td>
+                            </tr>
+                        </template>
+                    </tbody>
+                    <tfoot class="border-t border-line bg-soft/60 font-bold text-ink">
+                        <tr>
+                            <th scope="row" colspan="2" class="px-4 py-3">Total</th>
+                            <td class="performance-value px-4 py-3 text-right" x-text="purchaseTimeTotal"></td>
+                            <td class="performance-value px-4 py-3 text-right">100%</td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+
+            {{-- Legend list: phones --}}
+            <ul class="divide-y divide-line md:hidden" aria-label="Purchase time distribution">
+                <template x-for="(row, index) in purchaseTimeRows" :key="row.key">
+                    <li class="flex items-center gap-3 px-4 py-3" @click="highlightPurchaseTime(index)">
+                        <span class="{{ $dot }}" :style="{ backgroundColor: row.color }" aria-hidden="true"></span>
+                        <span class="min-w-0 flex-1">
+                            <span class="block font-semibold break-words text-ink" x-text="row.name"></span>
+                            <span class="performance-value block text-xs text-label" x-text="row.hours"></span>
+                        </span>
+                        <span class="shrink-0 text-right">
+                            <span class="performance-value block text-sm font-bold text-ink" x-text="row.transactions"></span>
+                            <span class="performance-value block text-xs text-label" x-text="row.percentage"></span>
+                        </span>
+                    </li>
+                </template>
+                <li class="flex items-center justify-between bg-soft/60 px-4 py-3 text-sm font-bold text-ink">
+                    <span>Total Transactions</span>
+                    <span class="performance-value" x-text="purchaseTimeTotal"></span>
+                </li>
+            </ul>
+
+            <p class="border-t border-line px-4 py-2.5 text-[11px] text-label">
+                Jam diambil dari waktu pembayaran transaksi berhasil (WIB). Karena pembulatan, total persentase bisa sedikit berbeda dari 100%.
+            </p>
+        </div>
+    </div>
+</div>

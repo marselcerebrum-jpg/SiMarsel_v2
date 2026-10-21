@@ -32,6 +32,10 @@ export function fetchPaymentMethods(query) {
     return get('payment-methods', query);
 }
 
+export function fetchPurchaseTimes(query) {
+    return get('purchase-times', query);
+}
+
 /**
  * Download link for the export (docs/api/performance-export.md). The browser follows it with the
  * session cookie, so no fetch() is needed.
