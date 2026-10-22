@@ -24,19 +24,45 @@ const millions = (value) => `${(value / 1_000_000).toLocaleString('id-ID', { max
 
 const truncate = (text, max) => (text.length > max ? `${text.slice(0, max - 1)}…` : text);
 
-// "Bimbel CPNS 2026… (1 Tahun)": nama dipotong lebih dulu agar masa aktif tetap terlihat,
-// karena satu paket bisa dijual dengan beberapa masa aktif.
-const packageLabel = (item, max) => {
-    if (!item.active_period) return truncate(item.name, max);
-
-    const suffix = ` (${item.active_period})`;
-
-    return `${truncate(item.name, Math.max(8, max - suffix.length))}${suffix}`;
-};
-
 const activePeriod = (item) => item.active_period ?? '-';
 
-// Pecah teks per kata menjadi beberapa baris; baris terakhir dipotong jika masih terlalu panjang.
+// Warna batang mengikuti masa aktif paket (bukan peringkat), dipakai bersama oleh kedua diagram
+// agar satu masa aktif selalu berwarna sama walaupun filter berubah. Tiga slot pertama lolos
+// validator palet (aman buta warna); masa aktif lain mendapat slot berikutnya sesuai urutan kemunculan.
+const PERIOD_PALETTE = [
+    { bar: '#2a78d6', hover: '#1f62b8' },
+    { bar: '#eb6834', hover: '#c9531f' },
+    { bar: '#1baf7a', hover: '#158f63' },
+    { bar: '#eda100', hover: '#c78700' },
+    { bar: '#e87ba4', hover: '#d15a87' },
+    { bar: '#008300', hover: '#006a00' },
+    { bar: '#6250d6', hover: '#4c3bbd' },
+    { bar: '#e34948', hover: '#c73433' },
+];
+const NO_PERIOD = { label: 'Tanpa masa aktif', bar: '#9aa3ae', hover: '#7f8996' };
+
+const periodColors = new Map(['6 Bulan', '1 Tahun', '2 Tahun'].map((period, index) => [period, PERIOD_PALETTE[index]]));
+
+const periodColor = (period) => {
+    if (!period) return NO_PERIOD;
+
+    if (!periodColors.has(period)) periodColors.set(period, PERIOD_PALETTE[periodColors.size] ?? NO_PERIOD);
+
+    return periodColors.get(period);
+};
+
+// Legenda: hanya masa aktif yang ada pada data, urut sesuai slot warnanya.
+const periodLegend = (items) => {
+    const present = new Set(items.map((item) => item.active_period ?? null));
+    present.forEach(periodColor);
+
+    const periods = [...periodColors.keys()].filter((period) => present.has(period));
+    if (present.has(null)) periods.push(null);
+
+    return periods.map((period) => ({ label: period ?? NO_PERIOD.label, color: periodColor(period).bar }));
+};
+
+// Pecah teks per kata menjadi beberapa baris; kata atau baris terakhir yang terlalu panjang dipotong.
 const wrap = (text, width, maxLines) => {
     const lines = [];
 
@@ -47,13 +73,23 @@ const wrap = (text, width, maxLines) => {
         else lines.push(word);
     }
 
-    if (lines.length <= maxLines) return lines;
+    const kept = lines.length <= maxLines ? lines : [...lines.slice(0, maxLines - 1), lines.slice(maxLines - 1).join(' ')];
 
-    return [...lines.slice(0, maxLines - 1), truncate(lines.slice(maxLines - 1).join(' '), width)];
+    return kept.map((line) => truncate(line, width));
 };
 
-// Label sumbu diagram vertikal: nama paket (maks. 2 baris) lalu masa aktif di baris terakhir.
-const packageLines = (item) => [...wrap(item.name, 18, 2), ...(item.active_period ? [`(${item.active_period})`] : [])];
+// Perkiraan lebar satu karakter label sumbu (12px, tebal), untuk menghitung muatan per batang.
+const LABEL_CHAR_PX = 7.2;
+// Di bawah lebar ini per batang, label pasti bertumpuk: tampilkan nomor peringkat saja.
+// Cukup untuk masa aktif terpanjang yang umum, mis. "(6 Bulan)", tanpa dipotong.
+const MIN_LABEL_SLOT_PX = 72;
+
+// Label sumbu: nama paket (maks. 3 baris, selebar slot batang) lalu masa aktif utuh di baris terakhir.
+const packageLines = (item, slotWidth) => {
+    const width = Math.floor((slotWidth - 12) / LABEL_CHAR_PX);
+
+    return [...wrap(item.name, width, 3), ...(item.active_period ? [`(${item.active_period})`] : [])];
+};
 
 const currentYear = new Date().getFullYear();
 
@@ -149,7 +185,7 @@ function remoteData(fetcher) {
  * Kartu diagram batang. Instance Chart.js disimpan di luar state Alpine
  * agar tidak dibungkus Proxy reaktif.
  */
-function barChartCard(fetcher, { horizontal, value, valueTick, valueTitle, tooltipLines }) {
+function barChartCard(fetcher, { value, valueTick, valueTitle, tooltipLines }) {
     let chart = null;
 
     return {
@@ -159,8 +195,8 @@ function barChartCard(fetcher, { horizontal, value, valueTick, valueTitle, toolt
             chart?.destroy();
         },
 
-        get chartHeight() {
-            return horizontal ? `${Math.max(240, this.items.length * 48 + 56)}px` : '400px';
+        get legend() {
+            return periodLegend(this.items);
         },
 
         render() {
@@ -168,34 +204,18 @@ function barChartCard(fetcher, { horizontal, value, valueTick, valueTitle, toolt
 
             const labels = this.items.map((item) => item.name);
             const values = this.items.map(value);
+            const colors = this.items.map((item) => periodColor(item.active_period));
+            const backgroundColor = colors.map((color) => color.bar);
+            const hoverBackgroundColor = colors.map((color) => color.hover);
 
             if (chart) {
                 chart.data.labels = labels;
-                chart.data.datasets[0].data = values;
+                Object.assign(chart.data.datasets[0], { data: values, backgroundColor, hoverBackgroundColor });
                 chart.update();
                 return;
             }
 
             const items = () => this.items;
-            const valueAxis = {
-                beginAtZero: true,
-                grid: { color: '#e3e6ea' },
-                border: { display: false },
-                ticks: { color: '#6b7685', font: { size: 11 }, callback: valueTick, maxTicksLimit: 6, precision: 0 },
-                title: { display: Boolean(valueTitle), text: valueTitle, color: '#6b7685', font: { size: 11, weight: 600 } },
-            };
-            const labelAxis = {
-                grid: { display: false },
-                ticks: {
-                    color: '#1e293b',
-                    font: { size: horizontal ? 12 : 11, weight: 600 },
-                    autoSkip: false,
-                    maxRotation: 40,
-                    callback(tick) {
-                        return horizontal ? packageLabel(items()[tick], 40) : packageLines(items()[tick]);
-                    },
-                },
-            };
 
             Chart.defaults.font.family = getComputedStyle(document.body).fontFamily;
 
@@ -205,19 +225,44 @@ function barChartCard(fetcher, { horizontal, value, valueTick, valueTitle, toolt
                     labels,
                     datasets: [{
                         data: values,
-                        backgroundColor: '#059669',
-                        hoverBackgroundColor: '#047857',
+                        backgroundColor,
+                        hoverBackgroundColor,
                         borderRadius: 4,
-                        maxBarThickness: horizontal ? 28 : 48,
+                        maxBarThickness: 64,
                     }],
                 },
                 options: {
-                    indexAxis: horizontal ? 'y' : 'x',
                     responsive: true,
                     maintainAspectRatio: false,
                     animation: { duration: 400 },
-                    scales: horizontal ? { x: valueAxis, y: labelAxis } : { x: labelAxis, y: valueAxis },
+                    scales: {
+                        x: {
+                            grid: { display: false },
+                            ticks: {
+                                color: '#1e293b',
+                                font: { size: 12, weight: 600, lineHeight: 1.3 },
+                                padding: 8,
+                                autoSkip: false,
+                                maxRotation: 0,
+                                minRotation: 0,
+                                // Label mengikuti lebar slot tiap batang agar tidak saling menumpuk.
+                                callback(tick) {
+                                    const slotWidth = this.width / items().length;
+
+                                    return slotWidth < MIN_LABEL_SLOT_PX ? String(tick + 1) : packageLines(items()[tick], slotWidth);
+                                },
+                            },
+                        },
+                        y: {
+                            beginAtZero: true,
+                            grid: { color: '#e3e6ea' },
+                            border: { display: false },
+                            ticks: { color: '#6b7685', font: { size: 12 }, padding: 8, callback: valueTick, maxTicksLimit: 8, precision: 0 },
+                            title: { display: true, text: valueTitle, color: '#6b7685', font: { size: 12, weight: 600 }, padding: { bottom: 8 } },
+                        },
+                    },
                     plugins: {
+                        // Legenda bawaan hanya punya satu entri per dataset; legenda masa aktif dirender di Blade.
                         legend: { display: false },
                         tooltip: {
                             backgroundColor: '#0f2340',
@@ -227,7 +272,7 @@ function barChartCard(fetcher, { horizontal, value, valueTick, valueTitle, toolt
                             titleFont: { size: 13, weight: 700 },
                             bodyFont: { size: 12 },
                             callbacks: {
-                                title: ([item]) => items()[item.dataIndex].name,
+                                title: ([item]) => `${item.dataIndex + 1}. ${items()[item.dataIndex].name}`,
                                 label: (item) => tooltipLines(items()[item.dataIndex]),
                             },
                         },
@@ -240,16 +285,15 @@ function barChartCard(fetcher, { horizontal, value, valueTick, valueTitle, toolt
 
 Alpine.data('topPackagesByRevenue', () =>
     barChartCard(fetchTopPackagesByRevenue, {
-        horizontal: true,
         value: (item) => item.revenue,
         valueTick: millions,
+        valueTitle: 'Total Pendapatan',
         tooltipLines: (item) => [`Masa Aktif: ${activePeriod(item)}`, `Total Pendapatan: ${rupiah(item.revenue)}`],
     }),
 );
 
 Alpine.data('topPackagesByVolume', () =>
     barChartCard(fetchTopPackagesByVolume, {
-        horizontal: false,
         value: (item) => item.transactions,
         valueTick: (tick) => number(tick),
         valueTitle: 'Jumlah Transaksi',
@@ -271,43 +315,101 @@ const PERFORMANCE_COLUMNS = [
     { key: 'high_trx', header: 'High Trx', type: 'number', format: number, hint: 'Jumlah transaksi tertinggi dalam satu hari' },
 ].map((column) => ({ ...column, value: (row) => row[column.key] }));
 
-Alpine.data('packagePerformance', () => ({
-    ...remoteData(fetchPackagePerformance),
+const PAGE_SIZE = 10;
 
-    columns: PERFORMANCE_COLUMNS,
-    search: '',
-    exporting: null,
+Alpine.data('packagePerformance', () => {
+    const data = remoteData(fetchPackagePerformance);
 
-    get rows() {
-        const keyword = this.search.trim().toLowerCase();
-        if (!keyword) return this.items;
+    return {
+        ...data,
 
-        return this.items.filter((row) => row.name.toLowerCase().includes(keyword));
-    },
+        columns: PERFORMANCE_COLUMNS,
+        search: '',
+        exporting: null,
+        page: 1,
 
-    cell(row, column) {
-        return column.format ? column.format(row[column.key]) : row[column.key];
-    },
+        init() {
+            data.init.call(this);
+            this.$watch('search', () => (this.page = 1));
+            this.$watch('filters', () => (this.page = 1));
+        },
 
-    fileName() {
-        const { platform, year, month } = this.filters;
+        // Semua baris hasil pencarian; dipakai juga untuk ekspor.
+        get rows() {
+            const keyword = this.search.trim().toLowerCase();
+            if (!keyword) return this.items;
 
-        return ['detail-performa-paket', platform || 'semua-platform', year, month ? String(month).padStart(2, '0') : 'semua-bulan'].join('_');
-    },
+            return this.items.filter((row) => row.name.toLowerCase().includes(keyword));
+        },
 
-    async exportAs(type) {
-        if (!this.rows.length || this.exporting) return;
+        get pageCount() {
+            return Math.max(1, Math.ceil(this.rows.length / PAGE_SIZE));
+        },
 
-        this.exporting = type;
+        get currentPage() {
+            return Math.min(this.page, this.pageCount);
+        },
 
-        try {
-            if (type === 'csv') {
-                exportCsv(this.fileName(), this.columns, this.rows);
-            } else {
-                await exportExcel(this.fileName(), this.columns, this.rows);
+        get pageRows() {
+            const start = (this.currentPage - 1) * PAGE_SIZE;
+
+            return this.rows.slice(start, start + PAGE_SIZE);
+        },
+
+        get rangeStart() {
+            return this.rows.length ? (this.currentPage - 1) * PAGE_SIZE + 1 : 0;
+        },
+
+        get rangeEnd() {
+            return Math.min(this.currentPage * PAGE_SIZE, this.rows.length);
+        },
+
+        // Nomor halaman yang ditampilkan: halaman pertama, terakhir, dan sekitar halaman aktif; celah jadi "…".
+        get pageLinks() {
+            const total = this.pageCount;
+            const current = this.currentPage;
+            const pages = new Set([1, total, current - 1, current, current + 1]);
+
+            if (current <= 3) [2, 3, 4].forEach((page) => pages.add(page));
+            if (current >= total - 2) [total - 3, total - 2, total - 1].forEach((page) => pages.add(page));
+
+            const sorted = [...pages].filter((page) => page >= 1 && page <= total).sort((a, b) => a - b);
+
+            return sorted.flatMap((page, index) => {
+                const gap = index > 0 && page - sorted[index - 1] > 1 ? [{ key: `gap-${page}`, page: null }] : [];
+
+                return [...gap, { key: `page-${page}`, page }];
+            });
+        },
+
+        goTo(page) {
+            this.page = Math.min(Math.max(1, page), this.pageCount);
+        },
+
+        cell(row, column) {
+            return column.format ? column.format(row[column.key]) : row[column.key];
+        },
+
+        fileName() {
+            const { platform, year, month } = this.filters;
+
+            return ['detail-performa-paket', platform || 'semua-platform', year, month ? String(month).padStart(2, '0') : 'semua-bulan'].join('_');
+        },
+
+        async exportAs(type) {
+            if (!this.rows.length || this.exporting) return;
+
+            this.exporting = type;
+
+            try {
+                if (type === 'csv') {
+                    exportCsv(this.fileName(), this.columns, this.rows);
+                } else {
+                    await exportExcel(this.fileName(), this.columns, this.rows);
+                }
+            } finally {
+                this.exporting = null;
             }
-        } finally {
-            this.exporting = null;
-        }
-    },
-}));
+        },
+    };
+});

@@ -25,11 +25,6 @@
         </div>
 
         <div class="flex flex-wrap items-center gap-3">
-            <p x-show="paymentLoading && paymentState === 'ready'" x-cloak class="inline-flex items-center gap-2 text-xs font-semibold text-label" role="status">
-                <span class="size-3.5 animate-spin rounded-full border-2 border-primary/25 border-t-primary" aria-hidden="true"></span>
-                Memuat data…
-            </p>
-
             <div class="{{ $group }}" role="radiogroup" aria-label="Payment Method Parameter">
                 @foreach ($paymentMethod['parameters'] as $option)
                     <button
@@ -48,12 +43,10 @@
     <div class="mt-5 border-t border-line"></div>
 
     {{-- Loading --}}
-    <div x-show="paymentState === 'loading'" class="grid gap-6 pt-5 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] lg:items-center" aria-hidden="true">
-        <span class="mx-auto block size-56 animate-pulse rounded-full bg-soft sm:size-64"></span>
-        <div class="space-y-3">
-            @foreach (range(1, 4) as $row)
-                <span class="block h-11 animate-pulse rounded-lg bg-soft"></span>
-            @endforeach
+    <div x-show="paymentState === 'loading'" class="grid gap-6 pt-5 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] lg:items-center">
+        <span class="mx-auto block size-56 animate-pulse rounded-full bg-soft sm:size-64" aria-hidden="true"></span>
+        <div class="relative h-56 rounded-lg border border-line">
+            @include('pages.performance.components.loading-spinner', ['show' => 'true'])
         </div>
     </div>
 
@@ -82,14 +75,15 @@
     <div
         x-show="paymentState === 'ready'"
         x-cloak
-        class="grid gap-6 pt-5 transition-opacity lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] lg:items-center"
-        :class="paymentLoading && 'opacity-60'"
+        class="grid gap-6 pt-5 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] lg:items-center"
     >
-        <div class="relative mx-auto h-64 w-full max-w-sm sm:h-72">
+        <div class="relative mx-auto h-64 w-full max-w-sm transition-opacity sm:h-72" :class="paymentLoading && 'opacity-50'">
             <canvas x-ref="paymentCanvas" role="img" :aria-label="paymentChartLabel"></canvas>
         </div>
 
-        <div class="overflow-hidden rounded-lg border border-line">
+        <div class="relative overflow-hidden rounded-lg border border-line">
+            @include('pages.performance.components.loading-spinner', ['show' => 'paymentLoading'])
+
             {{-- Table: tablet and larger --}}
             <div class="hidden overflow-x-auto md:block">
                 <table class="w-full min-w-[520px] text-left text-sm">

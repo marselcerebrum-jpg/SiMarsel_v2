@@ -1,5 +1,8 @@
 @php
     $exportButton = 'inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-line bg-white px-3 text-sm font-semibold text-ink hover:bg-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:opacity-50';
+    // Warna latar dipisah dari kelas dasar agar tombol halaman aktif (bg-primary) tidak tertimpa bg-white.
+    $pageButton = 'grid h-8 min-w-8 place-items-center rounded-lg border px-2 text-xs font-semibold tabular-nums focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-40';
+    $pageButtonIdle = 'border-line bg-white text-ink hover:bg-soft';
 @endphp
 
 <section x-data="packagePerformance" class="{{ $card }} min-w-0 p-5" aria-labelledby="package-performance-title">
@@ -46,7 +49,7 @@
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-line">
-                            <template x-for="row in rows" :key="row.name">
+                            <template x-for="row in pageRows" :key="row.name">
                                 <tr class="hover:bg-soft/60">
                                     <template x-for="column in columns" :key="column.key">
                                         <td
@@ -66,9 +69,39 @@
                 Tidak ada paket yang cocok dengan "<span class="font-semibold text-ink" x-text="search"></span>".
             </p>
 
-            <p x-show="rows.length" class="mt-3 text-xs text-muted" aria-live="polite">
-                Menampilkan <span class="font-semibold text-ink" x-text="rows.length"></span> dari <span x-text="items.length"></span> paket
-            </p>
+            <div x-show="rows.length" class="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <p class="text-xs text-muted" aria-live="polite">
+                    Menampilkan <span class="font-semibold text-ink" x-text="`${rangeStart}–${rangeEnd}`"></span>
+                    dari <span class="font-semibold text-ink" x-text="rows.length"></span> paket
+                    <span x-show="rows.length !== items.length">(hasil pencarian dari <span x-text="items.length"></span> paket)</span>
+                </p>
+
+                <nav x-show="pageCount > 1" class="flex items-center gap-1" aria-label="Package table pagination">
+                    <button type="button" class="{{ $pageButton }} {{ $pageButtonIdle }}" :disabled="currentPage === 1" @click="goTo(currentPage - 1)" aria-label="Previous page">
+                        <x-icon name="chevron-left" />
+                    </button>
+
+                    <template x-for="link in pageLinks" :key="link.key">
+                        <span class="contents">
+                            <span x-show="link.page === null" class="grid size-8 place-items-center text-xs text-label">…</span>
+                            <button
+                                x-show="link.page !== null"
+                                type="button"
+                                class="{{ $pageButton }}"
+                                :class="link.page === currentPage ? 'border-primary bg-primary text-white hover:bg-primary-hover' : @js($pageButtonIdle)"
+                                :aria-current="link.page === currentPage ? 'page' : null"
+                                :aria-label="`Page ${link.page}`"
+                                @click="goTo(link.page)"
+                                x-text="link.page"
+                            ></button>
+                        </span>
+                    </template>
+
+                    <button type="button" class="{{ $pageButton }} {{ $pageButtonIdle }}" :disabled="currentPage === pageCount" @click="goTo(currentPage + 1)" aria-label="Next page">
+                        <x-icon name="chevron-right" />
+                    </button>
+                </nav>
+            </div>
 
             <p class="mt-1 text-xs text-muted">
                 Hanya transaksi berhasil yang dihitung. <span class="font-semibold text-ink">Price</span> dihitung per transaksi,
