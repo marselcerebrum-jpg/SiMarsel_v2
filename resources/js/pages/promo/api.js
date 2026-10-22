@@ -38,3 +38,23 @@ export function fetchPlatforms() {
     return http('/api/platforms');
 }
 
+/**
+ * Promo code master (docs/api/promo-codes.md). The list is paginated: { data, meta }.
+ */
+const PROMO_CODES = '/api/promo-codes';
+
+export function fetchPromoCodes(query) {
+    return http(`${PROMO_CODES}${query ? `?${query}` : ''}`);
+}
+
+export function createPromoCode(body) {
+    return http(PROMO_CODES, { method: 'POST', body });
+}
+
+export function updatePromoCode(id, body) {
+    return http(`${PROMO_CODES}/${id}`, { method: 'PATCH', body });
+}
+
+export function deletePromoCode(id) {
+    return http(`${PROMO_CODES}/${id}`, { method: 'DELETE' });
+}
