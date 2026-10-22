@@ -78,6 +78,36 @@ class PerformancePageTest extends TestCase
             ->assertDontSee('id="filter-preset"', false);
     }
 
+    public function test_filter_shows_active_period_and_empty_data_notice(): void
+    {
+        $this->actingAs($this->employee)
+            ->get('/dashboard')
+            ->assertOk()
+            ->assertSee('x-show="periodLabel && !filterInvalid && !loading"', false)
+            ->assertSee('x-text="periodLabel"', false)
+            ->assertSee('x-show="emptyMessage"', false)
+            ->assertSee('x-text="emptyMessage"', false)
+            ->assertSeeInOrder(['Menampilkan data', 'x-text="emptyMessage"', 'Total Revenue'], false);
+    }
+
+    public function test_cards_shimmer_and_tables_show_a_spinner_while_loading(): void
+    {
+        $response = $this->actingAs($this->employee)->get('/dashboard')->assertOk();
+        $html = $response->getContent();
+
+        $this->assertSame(8, substr_count($html, 'x-show="loading"'), 'Every KPI value turns into shimmer bars.');
+        $this->assertSame(8, substr_count($html, 'x-show="!loading"'));
+        $this->assertSame(3, substr_count($html, 'x-show="contributionLoading"'), 'Two contribution tile values shimmer, its table shows a spinner.');
+        $this->assertSame(20, substr_count($html, 'animate-shimmer'));
+        $response->assertDontSee('blur-[2px]', false);
+
+        foreach (['trendLoading', 'contributionLoading', 'paymentLoading', 'purchaseTimeLoading'] as $state) {
+            $response->assertSee('x-show="'.$state.'"', false);
+        }
+        $this->assertSame(7, substr_count($html, 'size-8 animate-spin'), 'Four tables, plus three first-load table placeholders.');
+        $response->assertDontSee('Loading && contributionState', false);
+    }
+
     public function test_filter_offers_at_least_the_last_five_years(): void
     {
         $this->travelTo(now()->setDate(2026, 10, 19));

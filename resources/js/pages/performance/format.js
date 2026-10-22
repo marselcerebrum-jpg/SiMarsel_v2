@@ -73,3 +73,14 @@ const dateTime = new Intl.DateTimeFormat('id-ID', { day: '2-digit', month: 'shor
 export function formatDateTime(date) {
     return dateTime.format(date);
 }
+
+const date = new Intl.DateTimeFormat('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
+
+/**
+ * A range from the backend filter block ({ date_from, date_to } as YYYY-MM-DD), e.g. "1 Okt 2026 – 20 Okt 2026".
+ */
+export function formatDateRange({ date_from, date_to }) {
+    const parse = (value) => new Date(`${value}T00:00:00`);
+
+    return `${date.format(parse(date_from))} – ${date.format(parse(date_to))}`;
+}

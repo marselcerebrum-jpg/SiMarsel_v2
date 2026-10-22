@@ -20,12 +20,12 @@
             @include('pages.performance.components.product-filter')
         </section>
 
-        <div class="mt-4 grid gap-4 xl:grid-cols-2">
+        <div class="mt-4 grid gap-4">
             @include('pages.performance.components.bar-chart-card', [
                 'component' => 'topPackagesByRevenue',
                 'id' => 'top-revenue-title',
                 'title' => 'Top Packages by Revenue',
-                'placeholder' => 'bars-x',
+                'placeholder' => 'bars-y',
                 'emptyText' => 'Tidak ada data pendapatan paket',
                 'chartLabel' => 'Diagram batang pendapatan per paket',
             ])

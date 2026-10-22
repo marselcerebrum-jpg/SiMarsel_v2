@@ -27,6 +27,8 @@
         'list' => 'M9 6h11M9 12h11M9 18h11M4 6h.01M4 12h.01M4 18h.01',
         'logout' => 'M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 17l-5-5 5-5M5 12h11',
         'chevron-down' => 'M6 9l6 6 6-6',
+        'chevron-left' => 'M15 6l-6 6 6 6',
+        'chevron-right' => 'M9 6l6 6-6 6',
         'repeat' => 'M17 2l4 4-4 4M3 11V9a3 3 0 0 1 3-3h15M7 22l-4-4 4-4M21 13v2a3 3 0 0 1-3 3H3',
         'menu' => 'M4 6h16M4 12h16M4 18h16',
         'close' => 'M6 6l12 12M18 6L6 18',

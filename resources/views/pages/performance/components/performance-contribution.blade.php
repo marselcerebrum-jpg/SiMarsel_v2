@@ -18,28 +18,23 @@
     @resize.window="hideTip()"
     :aria-busy="contributionLoading.toString()"
 >
-    <div class="flex flex-col gap-1.5 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-            <h2 id="performance-contribution-title" class="text-base font-semibold text-ink">Platform Contribution</h2>
-            <p class="mt-1 text-sm text-muted">Peringkat kontribusi revenue setiap platform beserta jumlah transaksi dan user sesuai filter aktif.</p>
-        </div>
-        <p x-show="contributionLoading && contributionState === 'ready'" x-cloak class="inline-flex items-center gap-2 text-xs font-semibold text-label" role="status">
-            <span class="size-3.5 animate-spin rounded-full border-2 border-primary/25 border-t-primary" aria-hidden="true"></span>
-            Memuat data…
-        </p>
+    <div>
+        <h2 id="performance-contribution-title" class="text-base font-semibold text-ink">Platform Contribution</h2>
+        <p class="mt-1 text-sm text-muted">Peringkat kontribusi revenue setiap platform beserta jumlah transaksi dan user sesuai filter aktif.</p>
     </div>
 
     <div class="mt-5 border-t border-line"></div>
 
     {{-- Loading --}}
-    <div x-show="contributionState === 'loading'" class="space-y-4 pt-5" aria-hidden="true">
-        <div class="grid gap-3 sm:grid-cols-2">
-            <span class="block h-20 animate-pulse rounded-lg bg-soft"></span>
-            <span class="block h-20 animate-pulse rounded-lg bg-soft"></span>
+    <div x-show="contributionState === 'loading'" class="space-y-4 pt-5">
+        <div class="grid gap-3 sm:grid-cols-2" aria-hidden="true">
+            @foreach (range(1, 2) as $tileIndex)
+                @include('pages.performance.components.loading-shimmer', ['class' => 'h-20 rounded-lg'])
+            @endforeach
         </div>
-        @foreach (range(1, 4) as $row)
-            <span class="block h-11 animate-pulse rounded-lg bg-soft"></span>
-        @endforeach
+        <div class="relative h-56 rounded-lg border border-line">
+            @include('pages.performance.components.loading-spinner', ['show' => 'true'])
+        </div>
     </div>
 
     {{-- Empty --}}
@@ -64,21 +59,29 @@
     </div>
 
     {{-- Summary + ranking --}}
-    <div x-show="contributionState === 'ready'" x-cloak class="pt-5 transition-opacity" :class="contributionLoading && 'opacity-60'">
+    <div x-show="contributionState === 'ready'" x-cloak class="pt-5">
         <dl class="grid gap-3 sm:grid-cols-2">
             <div class="{{ $tile }}">
                 <dt class="text-xs font-semibold text-label">Total Revenue</dt>
-                <dd class="performance-value mt-1 text-xl font-bold text-ink" x-text="contributionRevenue"></dd>
+                <dd x-show="!contributionLoading" class="performance-value mt-1 text-xl font-bold text-ink" x-text="contributionRevenue"></dd>
+                <dd x-show="contributionLoading" x-cloak class="mt-1.5">
+                    @include('pages.performance.components.loading-shimmer', ['class' => 'h-6 w-32 rounded-md'])
+                </dd>
                 <dd class="mt-0.5 text-xs text-muted">Akumulasi revenue seluruh platform pada filter aktif</dd>
             </div>
             <div class="{{ $tile }}">
                 <dt class="text-xs font-semibold text-label">Platforms</dt>
-                <dd class="performance-value mt-1 text-xl font-bold text-ink" x-text="contributionPlatformCount"></dd>
+                <dd x-show="!contributionLoading" class="performance-value mt-1 text-xl font-bold text-ink" x-text="contributionPlatformCount"></dd>
+                <dd x-show="contributionLoading" x-cloak class="mt-1.5">
+                    @include('pages.performance.components.loading-shimmer', ['class' => 'h-6 w-32 rounded-md'])
+                </dd>
                 <dd class="mt-0.5 text-xs text-muted">Jumlah platform yang tercakup dalam hasil filter</dd>
             </div>
         </dl>
 
-        <div class="mt-4 overflow-hidden rounded-lg border border-line">
+        <div class="relative mt-4 overflow-hidden rounded-lg border border-line">
+            @include('pages.performance.components.loading-spinner', ['show' => 'contributionLoading'])
+
             {{-- Table: tablet and larger --}}
             <div class="hidden overflow-x-auto md:block">
                 <table class="w-full min-w-[720px] text-left text-sm">
