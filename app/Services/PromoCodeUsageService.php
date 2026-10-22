@@ -105,9 +105,12 @@ class PromoCodeUsageService
     private function upsertUsage(Transaction $transaction, int $position, string $rawCode, ?TransactionPromoCode $usage): void
     {
         $code = PromoCode::normalizeCode($rawCode);
+        // Shared lock: waits while PromoCodeService changes this code's identity, so a usage is never
+        // linked to a code whose code/platform is being replaced.
         $promoCode = PromoCode::query()
             ->where('platform_id', $transaction->platform_id)
             ->where('code', $code)
+            ->sharedLock()
             ->first();
 
         $sameUsage = $usage !== null

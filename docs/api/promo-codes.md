@@ -1,0 +1,98 @@
+# API Master Kode Promo
+
+Daftar, Single Entry, edit metadata, dan hapus kode promo untuk tab **Kode Promo** di halaman Manajemen Promo. Aturan versi dan snapshot ada di [promo-codes.md](../promo-codes.md); master Funnel, Source, dan Platform ada di [promo-master-data.md](promo-master-data.md).
+
+Wajib login. **Semua user yang login** boleh melihat, menambah, mengubah, dan menghapus kode promo. Aturan header dan kode error umum ada di [authentication.md](authentication.md).
+
+## Objek kode promo
+
+Tidak ada field tipe kode maupun status aktif/nonaktif.
+
+```json
+{
+    "id": 12,
+    "code": "CPNS26",
+    "platform": { "id": 2, "slug": "jadiasn", "name": "JADIASN" },
+    "funnel": { "id": 1, "name": "Aplikasi" },
+    "source": null,
+    "usages_count": 128,
+    "created_at": "2026-09-01T08:00:00+07:00",
+    "updated_at": "2026-09-15T09:30:00+07:00"
+}
+```
+
+| Field | Keterangan |
+|---|---|
+| `code` | Disimpan tanpa spasi di awal/akhir dan dalam huruf besar |
+| `funnel`, `source` | `null` jika belum diisi (berlaku untuk semua kode, termasuk reseller) |
+| `usages_count` | Jumlah transaksi yang memakai kode ini. `0` berarti kode boleh dihapus dan kode/platform-nya boleh diubah. |
+| `versions` | Hanya di detail, create, dan update: riwayat metadata, terbaru lebih dulu (lihat di bawah) |
+
+## `GET /api/promo-codes`
+
+| Parameter | Wajib | Keterangan |
+|---|---|---|
+| `search` | Tidak | Mencari di kode, nama/slug platform, nama funnel, dan nama source |
+| `platform_id` | Tidak | Hanya kode milik platform ini |
+| `per_page` | Tidak | 1-100, default 15 |
+| `page` | Tidak | Halaman, default 1 |
+
+Urutan: kode yang terakhir dibuat lebih dulu. Respons memakai pagination Laravel: `data`, `links`, dan `meta` (`current_page`, `last_page`, `per_page`, `total`, ...).
+
+## `POST /api/promo-codes` (Single Entry)
+
+```json
+{ "code": "CPNS26", "platform_id": 2, "funnel_id": 1, "source_id": null }
+```
+
+- `code` dan `platform_id` wajib. `funnel_id` dan `source_id` boleh `null` atau tidak dikirim.
+- Membuat versi metadata pertama dengan `effective_from` = saat disimpan.
+- Transaksi lama dengan platform + kode yang sama yang **belum terpetakan** langsung dihubungkan ke kode ini dan diklasifikasi dengan funnel/source yang didaftarkan. Transaksi yang sudah terklasifikasi tidak disentuh.
+
+**201 Created**, dengan `message: "Kode promo berhasil dibuat."`.
+
+## `GET /api/promo-codes/{id}`
+
+Detail beserta `versions`:
+
+```json
+"versions": [
+    { "id": 8, "code": "CPNS26", "platform_id": 2, "funnel": { "id": 2, "name": "Marketing" }, "source": null, "effective_from": "2026-09-15T09:30:00+07:00", "effective_until": null },
+    { "id": 5, "code": "CPNS26", "platform_id": 2, "funnel": { "id": 1, "name": "Aplikasi" }, "source": null, "effective_from": "2026-09-01T08:00:00+07:00", "effective_until": "2026-09-15T09:30:00+07:00" }
+]
+```
+
+Nama funnel/source di `versions` adalah nama **saat versi itu dibuat**, bukan nama master sekarang. `effective_until: null` adalah versi yang sedang berlaku.
+
+## `PUT` / `PATCH /api/promo-codes/{id}`
+
+Kirim hanya field yang diubah: `code`, `platform_id`, `funnel_id`, `source_id`. `funnel_id: null` atau `source_id: null` mengosongkannya.
+
+| Perubahan | Aturan |
+|---|---|
+| Funnel / Source | Selalu boleh. Versi aktif ditutup dan versi baru dimulai **saat disimpan**; user tidak mengisi tanggal efektif. Snapshot transaksi yang sudah terklasifikasi **tidak berubah**; hanya transaksi setelah waktu itu yang memakai funnel/source baru. |
+| Kode / Platform | Hanya boleh jika kode **belum pernah dipakai** transaksi (`usages_count` = 0). Juga dicatat sebagai versi baru. |
+| Tidak ada yang berubah | Tidak membuat versi baru |
+
+**Konfirmasi di FE:** jika Funnel dan/atau Source diubah, tampilkan peringatan konfirmasi sebelum mengirim request. Batal = jangan kirim; Lanjut = kirim ke BE.
+
+**200 OK**, dengan `message: "Kode promo berhasil diperbarui."`.
+
+## `DELETE /api/promo-codes/{id}`
+
+- Kode yang **sudah dipakai** transaksi tidak bisa dihapus (**409**).
+- Kode yang belum pernah dipakai dihapus bersama riwayat versinya sendiri. Penggunaan transaksi tidak pernah ikut terhapus.
+
+**200 OK**: `{ "message": "Kode promo berhasil dihapus." }`
+
+## Error
+
+| Status | Kondisi | Pesan |
+|---|---|---|
+| 422 | Kode kosong | `Kode promo wajib diisi.` |
+| 422 | Platform kosong | `Platform wajib diisi.` |
+| 422 | Platform/funnel/source tidak ada | `Platform tidak ditemukan.` / `Funnel tidak ditemukan.` / `Source tidak ditemukan.` |
+| 422 | Kode sudah ada di platform yang sama | `Kode promo CPNS26 sudah terdaftar di platform JADIASN.` (kode sama di platform lain boleh). Pesan yang sama juga dikembalikan jika dua request menyimpan kode yang sama bersamaan, bukan 500. |
+| 422 | `per_page` di luar 1-100 | `Jumlah per halaman harus di antara 1 dan 100.` |
+| 409 | Ubah kode/platform yang sudah dipakai | `Kode promo dan platform tidak dapat diubah karena kode ini sudah digunakan oleh 12 transaksi. Funnel dan source tetap bisa diubah; buat kode promo baru jika kodenya berbeda.` |
+| 409 | Hapus kode yang sudah dipakai | `Kode promo tidak dapat dihapus karena sudah digunakan oleh 12 transaksi.` |
