@@ -14,6 +14,7 @@ use App\Http\Controllers\Product\ProductOverviewController;
 use App\Http\Controllers\Promo\FunnelController;
 use App\Http\Controllers\Promo\PromoCodeController;
 use App\Http\Controllers\Promo\PromoSourceController;
+use App\Http\Controllers\Promo\UnregisteredPromoCodeController;
 use App\Models\Account;
 use App\Models\Division;
 use App\Models\Funnel;
@@ -105,6 +106,10 @@ Route::middleware('auth')->group(function () {
         Route::get('/', [PromoCodeController::class, 'index'])
             ->can('viewAny', PromoCode::class)
             ->name('index');
+        // Before /{promoCode}, so "unregistered" is not read as a promo code id.
+        Route::get('/unregistered', [UnregisteredPromoCodeController::class, 'index'])
+            ->can('viewAny', PromoCode::class)
+            ->name('unregistered');
         Route::post('/', [PromoCodeController::class, 'store'])
             ->can('create', PromoCode::class)
             ->name('store');
