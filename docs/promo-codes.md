@@ -60,8 +60,20 @@ transaction_promo_codes (1 baris per posisi kode, dengan snapshot funnel/source)
 `PromoCodeService::register(platformId, code, funnelId, sourceId)`, dipakai oleh `POST /api/promo-codes` dan `registerFromAlert()`:
 
 1. Membuat kode promo beserta versi pertamanya.
-2. Menghubungkan penggunaan lama dengan platform + kode yang sama yang **belum terpetakan** (`promo_code_id` kosong) dan **belum terklasifikasi**, lalu melengkapinya dengan metadata yang didaftarkan.
-3. Penggunaan yang sudah punya klasifikasi/snapshot tidak disentuh.
+2. Menghubungkan **semua** penggunaan lama dengan platform + kode yang sama yang **belum terpetakan** (`promo_code_id` kosong) ke kode baru ini.
+3. Penggunaan yang belum terklasifikasi dilengkapi dengan funnel/source yang didaftarkan. Penggunaan yang **sudah punya klasifikasi** hanya dihubungkan; snapshot funnel/source-nya **tidak ditimpa**.
+4. `raw_code` dan `code_position` tidak pernah diubah.
+
+## Alert kode belum terdaftar
+
+`GET /api/promo-codes/unregistered` (lihat [api/promo-codes.md](api/promo-codes.md)) merekap kode yang muncul di transaksi tetapi **belum punya master** untuk platformnya:
+
+- Dikelompokkan per platform + kode yang dinormalisasi; semua penulisan asli dari Markaz ditampilkan di `raw_codes`.
+- Jumlah penggunaan dihitung dari baris `transaction_promo_codes` (satu transaksi bisa memakai kode yang sama di dua posisi).
+- Kode yang **sudah terdaftar tapi belum pernah dipakai tidak muncul** di alert; kode itu ada di daftar master dengan `usages_count = 0`. Kode yang sudah punya master juga tidak muncul, walaupun ada penggunaan yang belum terhubung.
+- Transaksi dengan kode belum terdaftar tetap tersimpan dan tetap dihitung di analisis (scope `TransactionPromoCode::unmapped()`).
+- Mendaftarkan kode dari alert memakai `POST /api/promo-codes` (Single Entry) dengan data `register` dari alert. Setelah berhasil, kode itu hilang dari alert; kode lain yang belum terpetakan tetap tampil.
+- Alert tidak memakai status aktif/nonaktif, karena field itu tidak ada.
 
 ## Edit dan hapus kode
 
