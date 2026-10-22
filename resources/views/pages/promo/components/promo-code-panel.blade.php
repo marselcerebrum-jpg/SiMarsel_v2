@@ -12,14 +12,25 @@
         </div>
     </section>
 
-    <section class="{{ $card }} p-5" aria-labelledby="promo-list-title">
-        <h2 id="promo-list-title" class="text-base font-semibold text-ink">Promo Code List</h2>
-        <p class="mt-1 text-sm text-muted">Kelola kode promo beserta funnel, source, dan platform-nya.</p>
+    <section x-data="promoCodeManagement" class="{{ $card }} min-w-0 p-5" aria-labelledby="promo-list-title">
+        <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+                <h2 id="promo-list-title" class="text-base font-semibold text-ink">Promo Code List</h2>
+                <p class="mt-1 text-sm text-muted">Petakan setiap kode promo ke platform, funnel, dan source yang tepat.</p>
+            </div>
 
-        <div class="mt-4 rounded-lg border border-dashed border-line px-4 py-10 text-center">
-            <p class="text-sm font-medium text-ink">Pengelolaan kode promo belum tersedia.</p>
-            <p class="mt-1 text-xs text-muted">Siapkan funnel dan source terlebih dahulu di tab Master Data.</p>
-            <button type="button" class="mt-2 text-xs font-semibold text-primary hover:text-primary-hover" @click="select('master-data')">Open Master Data</button>
+            <button
+                type="button"
+                class="inline-flex h-9 shrink-0 items-center justify-center gap-2 self-start rounded-lg bg-primary px-4 text-sm font-semibold text-white hover:bg-primary-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                @click="openCreate()"
+            >Add Promo Code</button>
         </div>
+
+        @include('pages.promo.components.promo-code-filter')
+        @include('pages.promo.components.promo-code-table')
+
+        @include('pages.promo.components.promo-code-form-modal')
+        @include('pages.promo.components.promo-code-confirm-modal')
+        @include('pages.promo.components.promo-code-delete-modal')
     </section>
 </div>
