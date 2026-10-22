@@ -12,6 +12,7 @@ use App\Http\Controllers\Performance\PurchaseTimeDistributionController;
 use App\Http\Controllers\Platform\PlatformController;
 use App\Http\Controllers\Product\ProductOverviewController;
 use App\Http\Controllers\Promo\FunnelController;
+use App\Http\Controllers\Promo\PromoAnalysisController;
 use App\Http\Controllers\Promo\PromoCodeController;
 use App\Http\Controllers\Promo\PromoSourceController;
 use App\Models\Account;
@@ -117,6 +118,11 @@ Route::middleware('auth')->group(function () {
         Route::delete('/{promoCode}', [PromoCodeController::class, 'destroy'])
             ->can('delete', 'promoCode')
             ->name('destroy');
+    });
+
+    Route::prefix('promo-analysis')->name('api.promo-analysis.')->group(function () {
+        Route::get('/filters', [PromoAnalysisController::class, 'filters'])->name('filters');
+        Route::get('/summary', [PromoAnalysisController::class, 'summary'])->name('summary');
     });
 
     Route::get('/performance/summary', PerformanceSummaryController::class)
