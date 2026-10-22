@@ -108,6 +108,9 @@ Route::middleware('auth')->group(function () {
         Route::post('/', [PromoCodeController::class, 'store'])
             ->can('create', PromoCode::class)
             ->name('store');
+        Route::post('/bulk', [PromoCodeController::class, 'bulkStore'])
+            ->can('create', PromoCode::class)
+            ->name('bulk-store');
         Route::get('/{promoCode}', [PromoCodeController::class, 'show'])
             ->can('view', 'promoCode')
             ->name('show');
