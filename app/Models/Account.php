@@ -40,6 +40,11 @@ class Account extends Authenticatable
         return $this->belongsTo(Division::class);
     }
 
+    public function isAdmin(): bool
+    {
+        return $this->role?->code_role === Role::ADMIN;
+    }
+
     public function isManager(): bool
     {
         return $this->role?->code_role === Role::MANAGER;
