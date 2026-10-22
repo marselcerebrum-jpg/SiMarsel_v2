@@ -2,8 +2,9 @@
 
 namespace App\Http\Requests\Promo;
 
+use App\Models\PromoCode;
+use App\Support\PromoCodeRules;
 use Illuminate\Contracts\Validation\ValidationRule;
-use Illuminate\Validation\Rule;
 
 class UpdatePromoCodeRequest extends StorePromoCodeRequest
 {
@@ -14,11 +15,9 @@ class UpdatePromoCodeRequest extends StorePromoCodeRequest
      */
     public function rules(): array
     {
-        return [
-            'code' => ['sometimes', 'required', 'string', 'max:255', $this->uniquePerPlatform()],
-            'platform_id' => ['sometimes', 'required', 'integer', Rule::exists('platforms', 'id')],
-            'funnel_id' => ['sometimes', 'nullable', 'integer', Rule::exists('funnels', 'id')],
-            'source_id' => ['sometimes', 'nullable', 'integer', Rule::exists('promo_sources', 'id')],
-        ];
+        /** @var PromoCode $promoCode */
+        $promoCode = $this->route('promoCode');
+
+        return PromoCodeRules::update(fn () => $this->input('platform_id', $promoCode->platform_id), $promoCode);
     }
 }
