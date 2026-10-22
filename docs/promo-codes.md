@@ -71,6 +71,17 @@ transaction_promo_codes (1 baris per posisi kode, dengan snapshot funnel/source)
 - **Kode/platform** hanya bisa diubah selama kode belum pernah dipakai transaksi, karena penggunaan transaksi dicocokkan dari platform + kode. Setelah diubah, penggunaan lama yang belum terpetakan untuk kode baru ikut dihubungkan.
 - **Hapus** hanya untuk kode yang belum pernah dipakai. Riwayat versinya dihapus secara eksplisit di service, karena hanya menjelaskan kode itu sendiri. Penggunaan transaksi tidak pernah ikut terhapus: relasinya `restrict` di database.
 
+### Request bersamaan (concurrency)
+
+Identitas kode (kode + platform) tidak boleh berubah setelah dipakai transaksi, juga ketika edit dan normalisasi transaksi berjalan bersamaan:
+
+- `update()` dan `delete()` mengunci baris kode promo (`SELECT ... FOR UPDATE`) **di dalam transaksi yang sama** dengan perubahannya, lalu menghitung ulang jumlah penggunaan tepat sebelum mengubah atau menghapus.
+- Normalisasi mencari master kode dengan shared lock, dan penyimpanan penggunaan memegang lock baris kode lewat foreign key.
+- Hasilnya: jika penggunaan sedang disimpan, edit/hapus menunggu lalu ditolak (409); jika identitas sedang diganti, normalisasi menunggu lalu tidak lagi menemukan kode lama (penggunaan disimpan sebagai kode belum terdaftar).
+- Validasi unik platform + kode dicek sebelum menyimpan, sehingga dua request bersamaan bisa sama-sama lolos. Index unik di database menolak yang kedua, dan service mengubahnya menjadi **422** dengan pesan validasi yang sama (`Kode promo CPNS26 sudah terdaftar di platform JADIASN.`), bukan 500.
+
+Dibuktikan oleh `tests/Feature/Promo/PromoCodeConcurrencyTest.php` (dua koneksi MySQL sungguhan; dilewati di SQLite karena tidak punya row lock).
+
 ## Command
 
 ```bash

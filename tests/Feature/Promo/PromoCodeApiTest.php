@@ -15,6 +15,7 @@ use App\Services\PromoCodeService;
 use Carbon\CarbonImmutable;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 class PromoCodeApiTest extends TestCase
@@ -321,5 +322,41 @@ class PromoCodeApiTest extends TestCase
         $this->assertNotNull(PromoCode::find($code->id));
         $this->assertSame(1, $code->versions()->count());
         $this->assertSame(2, TransactionPromoCode::where('promo_code_id', $code->id)->count());
+    }
+
+    /**
+     * Simulates another request saving the same platform + code right after this request passed validation.
+     */
+    private function concurrentRequestSaves(string $code): void
+    {
+        DB::table('promo_codes')->insert([
+            'platform_id' => $this->jadiasn->id,
+            'code' => $code,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+    }
+
+    public function test_a_duplicate_created_by_a_concurrent_request_returns_422_not_500(): void
+    {
+        PromoCode::creating(fn () => $this->concurrentRequestSaves('CPNS26'));
+
+        $this->actingAs($this->employee)
+            ->postJson(self::URL, ['code' => 'cpns26', 'platform_id' => $this->jadiasn->id])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['code' => 'Kode promo CPNS26 sudah terdaftar di platform JADIASN.']);
+    }
+
+    public function test_a_duplicate_created_by_a_concurrent_request_while_editing_returns_422_not_500(): void
+    {
+        $code = $this->promoCode('CPNS26');
+        PromoCode::updating(fn (PromoCode $promoCode) => $promoCode->isDirty('code') ? $this->concurrentRequestSaves('CPNS27') : null);
+
+        $this->actingAs($this->employee)
+            ->patchJson(self::URL."/{$code->id}", ['code' => 'cpns27'])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['code' => 'Kode promo CPNS27 sudah terdaftar di platform JADIASN.']);
+
+        $this->assertSame('CPNS26', $code->fresh()->code);
     }
 }

@@ -134,7 +134,7 @@ Kirim hanya field yang diubah: `code`, `platform_id`, `funnel_id`, `source_id`. 
 | 422 | Kode kosong | `Kode promo wajib diisi.` |
 | 422 | Platform kosong | `Platform wajib diisi.` |
 | 422 | Platform/funnel/source tidak ada | `Platform tidak ditemukan.` / `Funnel tidak ditemukan.` / `Source tidak ditemukan.` |
-| 422 | Kode sudah ada di platform yang sama | `Kode promo CPNS26 sudah terdaftar di platform JADIASN.` (kode sama di platform lain boleh) |
+| 422 | Kode sudah ada di platform yang sama | `Kode promo CPNS26 sudah terdaftar di platform JADIASN.` (kode sama di platform lain boleh). Pesan yang sama juga dikembalikan jika dua request menyimpan kode yang sama bersamaan, bukan 500. |
 | 422 | `per_page` di luar 1-100 | `Jumlah per halaman harus di antara 1 dan 100.` |
 | 409 | Ubah kode/platform yang sudah dipakai | `Kode promo dan platform tidak dapat diubah karena kode ini sudah digunakan oleh 12 transaksi. Funnel dan source tetap bisa diubah; buat kode promo baru jika kodenya berbeda.` |
 | 409 | Hapus kode yang sudah dipakai | `Kode promo tidak dapat dihapus karena sudah digunakan oleh 12 transaksi.` |

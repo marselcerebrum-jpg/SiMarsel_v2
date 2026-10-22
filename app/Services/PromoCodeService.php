@@ -3,14 +3,18 @@
 namespace App\Services;
 
 use App\Exceptions\PromoCodeInUseException;
+use App\Models\Platform;
 use App\Models\PromoCode;
 use App\Models\PromoCodeVersion;
 use App\Models\TransactionPromoCode;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
+use Closure;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 /**
  * Promo code master with versioned funnel/source metadata.
@@ -28,9 +32,21 @@ class PromoCodeService
         'source_name_snapshot' => null,
     ];
 
+    /**
+     * The message for a code that already exists on the platform, shared by validation and the database guard.
+     */
+    public static function duplicateMessage(string $code, int|string $platformId): string
+    {
+        return 'Kode promo '.PromoCode::normalizeCode($code).' sudah terdaftar di platform '
+            .Platform::whereKey($platformId)->value('name').'.';
+    }
+
+    /**
+     * @throws ValidationException When another request saved the same platform + code first.
+     */
     public function create(int $platformId, string $code, ?int $funnelId = null, ?int $sourceId = null): PromoCode
     {
-        return DB::transaction(function () use ($platformId, $code, $funnelId, $sourceId) {
+        return $this->guardDuplicate($code, $platformId, fn () => DB::transaction(function () use ($platformId, $code, $funnelId, $sourceId) {
             $promoCode = PromoCode::create([
                 'platform_id' => $platformId,
                 'code' => $code,
@@ -41,7 +57,7 @@ class PromoCodeService
             $this->openVersion($promoCode, $this->now());
 
             return $promoCode;
-        });
+        }));
     }
 
     /**
@@ -105,32 +121,44 @@ class PromoCodeService
      * The code and platform identify the transactions that used the code, so they can only change
      * while no transaction has used it yet.
      *
+     * The usage check runs inside the same transaction as the change, on the locked promo code row:
+     * a usage being inserted holds a lock on that row (foreign key), and normalization looks the code up
+     * with a shared lock, so either this update waits and sees the new usage, or the usage waits and
+     * no longer finds the old code.
+     *
      * @param  array{platform_id?: int, code?: string, funnel_id?: int|null, source_id?: int|null}  $data
      *
      * @throws PromoCodeInUseException
+     * @throws ValidationException When another request saved the same platform + code first.
      */
     public function update(PromoCode $promoCode, array $data): PromoCode
     {
-        $platformId = (int) ($data['platform_id'] ?? $promoCode->platform_id);
-        $code = PromoCode::normalizeCode($data['code'] ?? $promoCode->code);
-        $funnelId = array_key_exists('funnel_id', $data) ? $data['funnel_id'] : $promoCode->funnel_id;
-        $sourceId = array_key_exists('source_id', $data) ? $data['source_id'] : $promoCode->source_id;
+        $targetPlatformId = $data['platform_id'] ?? $promoCode->platform_id;
+        $targetCode = $data['code'] ?? $promoCode->code;
 
-        $identityChanged = $platformId !== (int) $promoCode->platform_id || $code !== $promoCode->code;
+        $this->guardDuplicate($targetCode, $targetPlatformId, fn () => DB::transaction(function () use ($promoCode, $data) {
+            $locked = $this->lock($promoCode);
 
-        if ($identityChanged && ($usages = $promoCode->usages()->count()) > 0) {
-            throw PromoCodeInUseException::identityChange($usages);
-        }
+            $platformId = (int) ($data['platform_id'] ?? $locked->platform_id);
+            $code = PromoCode::normalizeCode($data['code'] ?? $locked->code);
+            $funnelId = array_key_exists('funnel_id', $data) ? $data['funnel_id'] : $locked->funnel_id;
+            $sourceId = array_key_exists('source_id', $data) ? $data['source_id'] : $locked->source_id;
 
-        if (! $identityChanged && $this->sameId($promoCode->funnel_id, $funnelId) && $this->sameId($promoCode->source_id, $sourceId)) {
-            return $promoCode;
-        }
+            $identityChanged = $platformId !== (int) $locked->platform_id || $code !== $locked->code;
 
-        return DB::transaction(function () use ($promoCode, $platformId, $code, $funnelId, $sourceId, $identityChanged) {
+            // Rechecked right before the change, while the row is locked.
+            if ($identityChanged && ($usages = $locked->usages()->count()) > 0) {
+                throw PromoCodeInUseException::identityChange($usages);
+            }
+
+            if (! $identityChanged && $this->sameId($locked->funnel_id, $funnelId) && $this->sameId($locked->source_id, $sourceId)) {
+                return;
+            }
+
             $now = $this->now();
-            $current = $promoCode->currentVersion()->lockForUpdate()->first();
+            $current = $locked->currentVersion()->lockForUpdate()->first();
 
-            $promoCode->update([
+            $locked->update([
                 'platform_id' => $platformId,
                 'code' => $code,
                 'funnel_id' => $funnelId,
@@ -139,37 +167,39 @@ class PromoCodeService
 
             // A second edit within the same second replaces that version instead of starting another one.
             if ($current !== null && $current->effective_from->equalTo($now)) {
-                $current->update($this->versionMetadata($promoCode));
+                $current->update($this->versionMetadata($locked));
             } else {
                 $current?->update(['effective_until' => $now]);
-                $this->openVersion($promoCode, $now);
+                $this->openVersion($locked, $now);
             }
 
             if ($identityChanged) {
-                $this->linkUnmappedUsages($promoCode);
+                $this->linkUnmappedUsages($locked);
             }
+        }));
 
-            return $promoCode;
-        });
+        return $promoCode->refresh();
     }
 
     /**
      * Delete a promo code that no transaction has used. Its versions only describe this code,
      * so they are removed together on purpose; usages can never be removed this way.
+     * Uses the same row lock as update(), so a usage being inserted is either counted or blocked.
      *
      * @throws PromoCodeInUseException
      */
     public function delete(PromoCode $promoCode): void
     {
         DB::transaction(function () use ($promoCode) {
-            $usages = $promoCode->usages()->lockForUpdate()->count();
+            $locked = $this->lock($promoCode);
+            $usages = $locked->usages()->count();
 
             if ($usages > 0) {
                 throw PromoCodeInUseException::delete($usages);
             }
 
-            $promoCode->versions()->delete();
-            $promoCode->delete();
+            $locked->versions()->delete();
+            $locked->delete();
         });
     }
 
@@ -242,6 +272,34 @@ class PromoCodeService
             'source_id' => $promoCode->source_id,
             'source_name_snapshot' => $promoCode->source?->name,
         ];
+    }
+
+    /**
+     * Re-read the promo code row with an exclusive lock held until the transaction ends.
+     */
+    private function lock(PromoCode $promoCode): PromoCode
+    {
+        return PromoCode::query()->whereKey($promoCode->getKey())->lockForUpdate()->firstOrFail();
+    }
+
+    /**
+     * Validation checks uniqueness before saving, so two requests can both pass it. The unique index
+     * then rejects the second one; report that as the same 422 validation error instead of a 500.
+     *
+     * @template TResult
+     *
+     * @param  Closure(): TResult  $save
+     * @return TResult
+     *
+     * @throws ValidationException
+     */
+    private function guardDuplicate(string $code, int|string $platformId, Closure $save): mixed
+    {
+        try {
+            return $save();
+        } catch (UniqueConstraintViolationException) {
+            throw ValidationException::withMessages(['code' => self::duplicateMessage($code, $platformId)]);
+        }
     }
 
     /**
