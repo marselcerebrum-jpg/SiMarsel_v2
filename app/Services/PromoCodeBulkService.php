@@ -4,8 +4,8 @@ namespace App\Services;
 
 use App\Models\PromoCode;
 use App\Support\PromoCodeRules;
-use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\ValidationException;
 
 /**
  * Bulk Entry of promo codes: every row is validated with the Single Entry rules and saved on its own,
@@ -104,8 +104,9 @@ class PromoCodeBulkService
                 isset($row['funnel_id']) ? (int) $row['funnel_id'] : null,
                 isset($row['source_id']) ? (int) $row['source_id'] : null,
             )->load(['platform', 'funnel', 'source'])->loadCount('usages');
-        } catch (UniqueConstraintViolationException) {
-            $errors = ['code' => [PromoCodeRules::duplicateMessage($row['code'], $row['platform_id'])]];
+        } catch (ValidationException $exception) {
+            // PromoCodeService reports a duplicate saved by a concurrent request as a validation error.
+            $errors = $exception->errors();
 
             return null;
         }
