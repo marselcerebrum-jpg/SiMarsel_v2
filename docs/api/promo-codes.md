@@ -52,6 +52,40 @@ Urutan: kode yang terakhir dibuat lebih dulu. Respons memakai pagination Laravel
 
 **201 Created**, dengan `message: "Kode promo berhasil dibuat."`.
 
+## `GET /api/promo-codes/{id}`
+
+Detail beserta `versions`:
+
+```json
+"versions": [
+    { "id": 8, "code": "CPNS26", "platform_id": 2, "funnel": { "id": 2, "name": "Marketing" }, "source": null, "effective_from": "2026-09-15T09:30:00+07:00", "effective_until": null },
+    { "id": 5, "code": "CPNS26", "platform_id": 2, "funnel": { "id": 1, "name": "Aplikasi" }, "source": null, "effective_from": "2026-09-01T08:00:00+07:00", "effective_until": "2026-09-15T09:30:00+07:00" }
+]
+```
+
+Nama funnel/source di `versions` adalah nama **saat versi itu dibuat**, bukan nama master sekarang. `effective_until: null` adalah versi yang sedang berlaku.
+
+## `PUT` / `PATCH /api/promo-codes/{id}`
+
+Kirim hanya field yang diubah: `code`, `platform_id`, `funnel_id`, `source_id`. `funnel_id: null` atau `source_id: null` mengosongkannya.
+
+| Perubahan | Aturan |
+|---|---|
+| Funnel / Source | Selalu boleh. Versi aktif ditutup dan versi baru dimulai **saat disimpan**; user tidak mengisi tanggal efektif. Snapshot transaksi yang sudah terklasifikasi **tidak berubah**; hanya transaksi setelah waktu itu yang memakai funnel/source baru. |
+| Kode / Platform | Hanya boleh jika kode **belum pernah dipakai** transaksi (`usages_count` = 0). Juga dicatat sebagai versi baru. |
+| Tidak ada yang berubah | Tidak membuat versi baru |
+
+**Konfirmasi di FE:** jika Funnel dan/atau Source diubah, tampilkan peringatan konfirmasi sebelum mengirim request. Batal = jangan kirim; Lanjut = kirim ke BE.
+
+**200 OK**, dengan `message: "Kode promo berhasil diperbarui."`.
+
+## `DELETE /api/promo-codes/{id}`
+
+- Kode yang **sudah dipakai** transaksi tidak bisa dihapus (**409**).
+- Kode yang belum pernah dipakai dihapus bersama riwayat versinya sendiri. Penggunaan transaksi tidak pernah ikut terhapus.
+
+**200 OK**: `{ "message": "Kode promo berhasil dihapus." }`
+
 ## `GET /api/promo-codes/unregistered` (Alert kode belum terdaftar)
 
 Kode promo yang muncul di transaksi Markaz tetapi **belum punya master** untuk platformnya, satu baris per platform + kode yang dinormalisasi. Parameter `search` (kode, raw code, nama/slug platform), `platform_id`, `per_page` (1-100, default 15), dan `page` sama dengan daftar kode promo. `meta.total` = jumlah kode belum terdaftar (bisa dipakai untuk badge alert).
@@ -89,40 +123,6 @@ Urutan: penggunaan terbanyak lebih dulu.
 **Alur daftar dari alert:** user memilih "Daftarkan" → FE membuka form Single Entry dengan Kode Promo dan Platform dari `register` → `POST /api/promo-codes`. Validasi unik platform + kode tetap berlaku. Setelah berhasil, penggunaan lama dengan platform + kode yang sama dihubungkan ke kode baru (`usages_count` di respons) dan kode itu tidak lagi muncul di alert. Penggunaan yang sudah terklasifikasi hanya dihubungkan, snapshot funnel/source-nya tidak ditimpa.
 
 Kode yang **sudah terdaftar tapi belum pernah dipakai tidak muncul** di alert; kode itu ada di `GET /api/promo-codes` dengan `usages_count: 0`.
-
-## `GET /api/promo-codes/{id}`
-
-Detail beserta `versions`:
-
-```json
-"versions": [
-    { "id": 8, "code": "CPNS26", "platform_id": 2, "funnel": { "id": 2, "name": "Marketing" }, "source": null, "effective_from": "2026-09-15T09:30:00+07:00", "effective_until": null },
-    { "id": 5, "code": "CPNS26", "platform_id": 2, "funnel": { "id": 1, "name": "Aplikasi" }, "source": null, "effective_from": "2026-09-01T08:00:00+07:00", "effective_until": "2026-09-15T09:30:00+07:00" }
-]
-```
-
-Nama funnel/source di `versions` adalah nama **saat versi itu dibuat**, bukan nama master sekarang. `effective_until: null` adalah versi yang sedang berlaku.
-
-## `PUT` / `PATCH /api/promo-codes/{id}`
-
-Kirim hanya field yang diubah: `code`, `platform_id`, `funnel_id`, `source_id`. `funnel_id: null` atau `source_id: null` mengosongkannya.
-
-| Perubahan | Aturan |
-|---|---|
-| Funnel / Source | Selalu boleh. Versi aktif ditutup dan versi baru dimulai **saat disimpan**; user tidak mengisi tanggal efektif. Snapshot transaksi yang sudah terklasifikasi **tidak berubah**; hanya transaksi setelah waktu itu yang memakai funnel/source baru. |
-| Kode / Platform | Hanya boleh jika kode **belum pernah dipakai** transaksi (`usages_count` = 0). Juga dicatat sebagai versi baru. |
-| Tidak ada yang berubah | Tidak membuat versi baru |
-
-**Konfirmasi di FE:** jika Funnel dan/atau Source diubah, tampilkan peringatan konfirmasi sebelum mengirim request. Batal = jangan kirim; Lanjut = kirim ke BE.
-
-**200 OK**, dengan `message: "Kode promo berhasil diperbarui."`.
-
-## `DELETE /api/promo-codes/{id}`
-
-- Kode yang **sudah dipakai** transaksi tidak bisa dihapus (**409**).
-- Kode yang belum pernah dipakai dihapus bersama riwayat versinya sendiri. Penggunaan transaksi tidak pernah ikut terhapus.
-
-**200 OK**: `{ "message": "Kode promo berhasil dihapus." }`
 
 ## Error
 
