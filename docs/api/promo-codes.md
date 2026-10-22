@@ -47,9 +47,48 @@ Urutan: kode yang terakhir dibuat lebih dulu. Respons memakai pagination Laravel
 
 - `code` dan `platform_id` wajib. `funnel_id` dan `source_id` boleh `null` atau tidak dikirim.
 - Membuat versi metadata pertama dengan `effective_from` = saat disimpan.
-- Transaksi lama dengan platform + kode yang sama yang **belum terpetakan** langsung dihubungkan ke kode ini dan diklasifikasi dengan funnel/source yang didaftarkan. Transaksi yang sudah terklasifikasi tidak disentuh.
+- Transaksi lama dengan platform + kode yang sama yang **belum terpetakan** langsung dihubungkan ke kode ini dan diklasifikasi dengan funnel/source yang didaftarkan. Penggunaan yang sudah terklasifikasi hanya dihubungkan; snapshot funnel/source-nya tidak ditimpa.
+- Endpoint ini juga dipakai untuk mendaftarkan kode dari alert kode belum terdaftar (lihat di bawah).
 
 **201 Created**, dengan `message: "Kode promo berhasil dibuat."`.
+
+## `GET /api/promo-codes/unregistered` (Alert kode belum terdaftar)
+
+Kode promo yang muncul di transaksi Markaz tetapi **belum punya master** untuk platformnya, satu baris per platform + kode yang dinormalisasi. Parameter `search` (kode, raw code, nama/slug platform), `platform_id`, `per_page` (1-100, default 15), dan `page` sama dengan daftar kode promo. `meta.total` = jumlah kode belum terdaftar (bisa dipakai untuk badge alert).
+
+```json
+{
+    "data": [
+        {
+            "code": "CPNS26",
+            "raw_codes": [" cpns26 ", "CPNS26"],
+            "platform": { "id": 2, "slug": "jadiasn", "name": "JADIASN" },
+            "usages_count": 15,
+            "transactions_count": 14,
+            "first_used_on": "2026-09-01",
+            "last_used_on": "2026-10-20",
+            "register": { "code": "CPNS26", "platform_id": 2 }
+        }
+    ],
+    "links": { "...": "..." },
+    "meta": { "total": 1, "...": "..." }
+}
+```
+
+| Field | Keterangan |
+|---|---|
+| `code` | Kode yang dinormalisasi (trim + huruf besar), sama dengan yang akan disimpan di master |
+| `raw_codes` | Semua penulisan asli dari Markaz untuk kode ini |
+| `usages_count` | Jumlah baris penggunaan kode (satu transaksi bisa memakai kode yang sama di dua posisi) |
+| `transactions_count` | Jumlah transaksi berbeda yang memakai kode ini |
+| `first_used_on`, `last_used_on` | Tanggal bayar transaksi pertama dan terakhir yang memakai kode ini |
+| `register` | Isi awal form pendaftaran: kirim ke `POST /api/promo-codes` bersama `funnel_id`/`source_id` pilihan user |
+
+Urutan: penggunaan terbanyak lebih dulu.
+
+**Alur daftar dari alert:** user memilih "Daftarkan" → FE membuka form Single Entry dengan Kode Promo dan Platform dari `register` → `POST /api/promo-codes`. Validasi unik platform + kode tetap berlaku. Setelah berhasil, penggunaan lama dengan platform + kode yang sama dihubungkan ke kode baru (`usages_count` di respons) dan kode itu tidak lagi muncul di alert. Penggunaan yang sudah terklasifikasi hanya dihubungkan, snapshot funnel/source-nya tidak ditimpa.
+
+Kode yang **sudah terdaftar tapi belum pernah dipakai tidak muncul** di alert; kode itu ada di `GET /api/promo-codes` dengan `usages_count: 0`.
 
 ## `GET /api/promo-codes/{id}`
 
