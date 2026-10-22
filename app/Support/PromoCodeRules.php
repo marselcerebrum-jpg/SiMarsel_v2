@@ -2,8 +2,8 @@
 
 namespace App\Support;
 
-use App\Models\Platform;
 use App\Models\PromoCode;
+use App\Services\PromoCodeService;
 use Closure;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Validation\Rule;
@@ -87,11 +87,6 @@ final class PromoCodeRules
         ];
     }
 
-    public static function duplicateMessage(string $code, int|string $platformId): string
-    {
-        return "Kode promo {$code} sudah terdaftar di platform ".Platform::whereKey($platformId)->value('name').'.';
-    }
-
     /**
      * A code is unique per platform; the same code on another platform is allowed.
      *
@@ -113,7 +108,7 @@ final class PromoCodeRules
                 ->exists();
 
             if ($taken) {
-                $fail(self::duplicateMessage($value, $platform));
+                $fail(PromoCodeService::duplicateMessage($value, $platform));
             }
         };
     }
