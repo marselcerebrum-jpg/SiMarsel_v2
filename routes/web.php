@@ -4,6 +4,7 @@ use App\Http\Controllers\Account\AccountPageController;
 use App\Http\Controllers\Performance\PerformancePageController;
 use App\Models\Account;
 use App\Models\Division;
+use App\Models\PromoCode;
 use Illuminate\Support\Facades\Route;
 
 Route::redirect('/', '/dashboard');
@@ -14,6 +15,9 @@ Route::middleware('auth')->group(function () {
     Route::get('/dashboard', PerformancePageController::class)->name('dashboard');
     Route::view('/performance/products', 'pages.performance.products')->name('performance.products');
     Route::view('/tasks', 'pages.tasks.index')->name('tasks.index');
+    Route::view('/promo', 'pages.promo.index')
+        ->can('viewAny', PromoCode::class)
+        ->name('promo.index');
     Route::get('/settings', AccountPageController::class)
         ->can('viewAny', Account::class)
         ->name('settings.index');
