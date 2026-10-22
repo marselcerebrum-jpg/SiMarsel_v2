@@ -14,6 +14,7 @@ use App\Services\PromoCodeService;
 use Carbon\CarbonImmutable;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Testing\TestResponse;
 use Tests\TestCase;
 
@@ -210,6 +211,32 @@ class PromoCodeBulkEntryTest extends TestCase
             ->assertJsonPath('data.rows.0.promo_code.usages_count', 1);
 
         $this->assertSame('Instagram', $transaction->promoCodeUsages()->first()->source_name_snapshot);
+    }
+
+    public function test_a_code_saved_by_a_concurrent_request_fails_only_its_row(): void
+    {
+        // Another request saves BUMN26 right after this row passed validation.
+        PromoCode::creating(function (PromoCode $promoCode) {
+            if ($promoCode->code === 'BUMN26') {
+                DB::table('promo_codes')->insert([
+                    'platform_id' => $promoCode->platform_id,
+                    'code' => 'BUMN26',
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+            }
+        });
+
+        $this->bulk([
+            ['code' => 'CPNS26', 'platform_id' => $this->jadiasn->id],
+            ['code' => 'BUMN26', 'platform_id' => $this->jadiasn->id],
+            ['code' => 'POLRI26', 'platform_id' => $this->jadiasn->id],
+        ])
+            ->assertOk()
+            ->assertJsonPath('data.summary', ['total' => 3, 'succeeded' => 2, 'failed' => 1])
+            ->assertJsonPath('data.rows.1.errors', ['code' => ['Kode promo BUMN26 sudah terdaftar di platform JADIASN.']]);
+
+        $this->assertSame(['CPNS26', 'POLRI26'], PromoCode::orderBy('id')->pluck('code')->all());
     }
 
     public function test_the_submission_shape_is_validated(): void
