@@ -3,11 +3,14 @@
 namespace App\Http\Controllers\Promo;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Promo\BulkStorePromoCodeRequest;
 use App\Http\Requests\Promo\PromoCodeIndexRequest;
 use App\Http\Requests\Promo\StorePromoCodeRequest;
 use App\Http\Requests\Promo\UpdatePromoCodeRequest;
+use App\Http\Resources\PromoCodeBulkResultResource;
 use App\Http\Resources\PromoCodeResource;
 use App\Models\PromoCode;
+use App\Services\PromoCodeBulkService;
 use App\Services\PromoCodeService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
@@ -41,6 +44,14 @@ class PromoCodeController extends Controller
             ->additional(['message' => 'Kode promo berhasil dibuat.'])
             ->response()
             ->setStatusCode(201);
+    }
+
+    /**
+     * Bulk Entry: each row is saved on its own, so the response is 200 with the result of every row.
+     */
+    public function bulkStore(BulkStorePromoCodeRequest $request, PromoCodeBulkService $promoCodeBulkService): PromoCodeBulkResultResource
+    {
+        return PromoCodeBulkResultResource::make($promoCodeBulkService->store($request->validated('rows')));
     }
 
     public function show(PromoCode $promoCode): PromoCodeResource
