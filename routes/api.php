@@ -9,9 +9,14 @@ use App\Http\Controllers\Performance\PerformanceSummaryController;
 use App\Http\Controllers\Performance\PerformanceTrendController;
 use App\Http\Controllers\Performance\PlatformContributionController;
 use App\Http\Controllers\Performance\PurchaseTimeDistributionController;
+use App\Http\Controllers\Platform\PlatformController;
 use App\Http\Controllers\Product\ProductOverviewController;
+use App\Http\Controllers\Promo\FunnelController;
+use App\Http\Controllers\Promo\PromoSourceController;
 use App\Models\Account;
 use App\Models\Division;
+use App\Models\Funnel;
+use App\Models\PromoSource;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/csrf-cookie', fn () => response()->noContent())->name('api.csrf-cookie');
@@ -53,6 +58,44 @@ Route::middleware('auth')->group(function () {
             ->name('update');
         Route::delete('/{division}', [DivisionController::class, 'destroy'])
             ->can('delete', 'division')
+            ->name('destroy');
+    });
+
+    Route::get('/platforms', [PlatformController::class, 'index'])->name('api.platforms.index');
+
+    Route::prefix('funnels')->name('api.funnels.')->group(function () {
+        Route::get('/', [FunnelController::class, 'index'])
+            ->can('viewAny', Funnel::class)
+            ->name('index');
+        Route::post('/', [FunnelController::class, 'store'])
+            ->can('create', Funnel::class)
+            ->name('store');
+        Route::get('/{funnel}', [FunnelController::class, 'show'])
+            ->can('view', 'funnel')
+            ->name('show');
+        Route::match(['put', 'patch'], '/{funnel}', [FunnelController::class, 'update'])
+            ->can('update', 'funnel')
+            ->name('update');
+        Route::delete('/{funnel}', [FunnelController::class, 'destroy'])
+            ->can('delete', 'funnel')
+            ->name('destroy');
+    });
+
+    Route::prefix('promo-sources')->name('api.promo-sources.')->group(function () {
+        Route::get('/', [PromoSourceController::class, 'index'])
+            ->can('viewAny', PromoSource::class)
+            ->name('index');
+        Route::post('/', [PromoSourceController::class, 'store'])
+            ->can('create', PromoSource::class)
+            ->name('store');
+        Route::get('/{promoSource}', [PromoSourceController::class, 'show'])
+            ->can('view', 'promoSource')
+            ->name('show');
+        Route::match(['put', 'patch'], '/{promoSource}', [PromoSourceController::class, 'update'])
+            ->can('update', 'promoSource')
+            ->name('update');
+        Route::delete('/{promoSource}', [PromoSourceController::class, 'destroy'])
+            ->can('delete', 'promoSource')
             ->name('destroy');
     });
 

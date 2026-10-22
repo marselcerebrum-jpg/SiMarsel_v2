@@ -75,6 +75,8 @@ php artisan migrate --seed
 | Role | `MGR` Manager (id 1), `EMP` Employee (id 2) |
 | Akun manager default | username `manager`, password `Manager123!` |
 | Divisi | Kosong |
+| Funnel | Aplikasi, Marketing, Sales, Ads, Live, Lainnya |
+| Source promo | Aplikasi, Instagram, TikTok, Telegram, Sales, Ads, Live, Reseller, Lainnya |
 
 Akun manager default hanya untuk penanda awal bahwa aplikasi berjalan. Ganti password-nya lewat `PATCH /api/accounts/1` sebelum dipakai di luar lingkungan lokal.
 
