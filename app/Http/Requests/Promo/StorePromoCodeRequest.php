@@ -2,8 +2,8 @@
 
 namespace App\Http\Requests\Promo;
 
-use App\Models\Platform;
 use App\Models\PromoCode;
+use App\Services\PromoCodeService;
 use Closure;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
@@ -95,7 +95,7 @@ class StorePromoCodeRequest extends FormRequest
                 ->exists();
 
             if ($taken) {
-                $fail("Kode promo {$value} sudah terdaftar di platform ".Platform::whereKey($platformId)->value('name').'.');
+                $fail(PromoCodeService::duplicateMessage($value, $platformId));
             }
         };
     }
