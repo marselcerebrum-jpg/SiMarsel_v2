@@ -159,7 +159,7 @@ class PromoCodeVersionTest extends TestCase
         $this->assertSame(1, TransactionPromoCode::unclassified()->count());
     }
 
-    public function test_registering_a_code_from_the_alert_links_unmapped_usages_only(): void
+    public function test_registering_a_code_from_the_alert_links_unmapped_usages_and_keeps_classified_snapshots(): void
     {
         $this->travelTo(CarbonImmutable::create(2026, 9, 20, 8));
         $unmapped = $this->transaction('2026-09-10', '10:00:00', ['newcode']);
@@ -176,7 +176,9 @@ class PromoCodeVersionTest extends TestCase
             ...$this->snapshot($unmapped),
         ]);
         $this->assertNull($otherPlatform->promoCodeUsages()->first()->promo_code_id);
-        $this->assertNull($classified->promoCodeUsages()->first()->promo_code_id);
+
+        // The classified usage is linked to the master, but its snapshot is not overwritten.
+        $this->assertSame($promoCode->id, $classified->promoCodeUsages()->first()->promo_code_id);
         $this->assertSame(['Funnel Lama', null], $this->snapshot($classified));
     }
 
