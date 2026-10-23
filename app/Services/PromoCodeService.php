@@ -204,21 +204,23 @@ class PromoCodeService
     }
 
     /**
-     * Link usages of the same platform and code that have no master and no classification yet,
-     * and fill them with the code's current metadata. Classified usages are never overwritten.
+     * Link every usage of the same platform and code that has no master yet. Usages without a
+     * classification also get the code's current metadata; a classified usage only gets the link
+     * and keeps its funnel/source snapshot. raw_code and code_position are never changed.
      *
      * @return int The number of usages linked.
      */
     public function linkUnmappedUsages(PromoCode $promoCode): int
     {
         $version = $promoCode->currentVersion()->first();
-
-        return TransactionPromoCode::query()
+        $unmapped = fn () => TransactionPromoCode::query()
             ->unmapped()
-            ->unclassified()
             ->where('platform_id_snapshot', $promoCode->platform_id)
-            ->where('code_snapshot', $promoCode->code)
-            ->update(['promo_code_id' => $promoCode->id, ...$this->snapshotOf($version)]);
+            ->where('code_snapshot', $promoCode->code);
+
+        $classifiedNow = $unmapped()->unclassified()->update(['promo_code_id' => $promoCode->id, ...$this->snapshotOf($version)]);
+
+        return $classifiedNow + $unmapped()->update(['promo_code_id' => $promoCode->id]);
     }
 
     /**

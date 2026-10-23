@@ -213,6 +213,27 @@ class PromoCodeBulkEntryTest extends TestCase
         $this->assertSame('Instagram', $transaction->promoCodeUsages()->first()->source_name_snapshot);
     }
 
+    public function test_bulk_entry_links_classified_usages_without_overwriting_their_snapshot(): void
+    {
+        $unclassified = Transaction::factory()->for($this->jadiasn)->create(['paid_date' => '2026-08-20', 'promo_code' => ['RESELLER01', ' newcode ']]);
+        $classified = Transaction::factory()->for($this->jadiasn)->create(['paid_date' => '2026-08-21', 'promo_code' => ['NEWCODE']]);
+        $classified->promoCodeUsages()->update(['funnel_name_snapshot' => 'Funnel Lama']);
+
+        $promoCodeId = $this->bulk([['code' => 'NEWCODE', 'platform_id' => $this->jadiasn->id, 'funnel_id' => $this->aplikasi->id, 'source_id' => $this->instagram->id]])
+            ->assertJsonPath('data.rows.0.promo_code.usages_count', 2)
+            ->json('data.rows.0.promo_code.id');
+
+        $usage = $unclassified->promoCodeUsages()->where('code_position', 2)->first();
+        $this->assertSame([$promoCodeId, ' newcode ', 2, 'Aplikasi', 'Instagram'], [
+            $usage->promo_code_id, $usage->raw_code, $usage->code_position, $usage->funnel_name_snapshot, $usage->source_name_snapshot,
+        ]);
+
+        $usage = $classified->promoCodeUsages()->first();
+        $this->assertSame([$promoCodeId, 'NEWCODE', 1, 'Funnel Lama', null], [
+            $usage->promo_code_id, $usage->raw_code, $usage->code_position, $usage->funnel_name_snapshot, $usage->source_name_snapshot,
+        ]);
+    }
+
     public function test_a_code_saved_by_a_concurrent_request_fails_only_its_row(): void
     {
         // Another request saves BUMN26 right after this row passed validation.
