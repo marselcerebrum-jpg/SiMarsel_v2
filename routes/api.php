@@ -187,5 +187,13 @@ Route::middleware('auth')->group(function () {
         Route::get('/{task}/evidences/{evidence}/download', [TaskController::class, 'downloadEvidence'])
             ->can('view', 'task')
             ->name('evidences.download');
+        Route::get('/{task}/assignment-options', [TaskController::class, 'assignmentOptions'])
+            ->whereNumber('task')
+            ->can('assign', 'task')
+            ->name('assignment-options');
+        Route::patch('/{task}/assignment', [TaskController::class, 'assign'])
+            ->whereNumber('task')
+            ->can('assign', 'task')
+            ->name('assign');
     });
 });
