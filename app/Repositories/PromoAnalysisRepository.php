@@ -9,6 +9,7 @@ use App\Services\PaymentMethodDistributionService;
 use App\Support\PromoAnalysisFilter;
 use Illuminate\Contracts\Database\Query\Builder as QueryBuilder;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Query\Builder as BaseBuilder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
@@ -114,22 +115,36 @@ class PromoAnalysisRepository
      */
     public function sourceTotals(PromoAnalysisFilter $filter): Collection
     {
-        $usages = DB::table('transaction_promo_codes')
+        return DB::query()
+            ->fromSub($this->creditedUsages($filter), 'credited_usages')
+            ->groupBy('source_id', 'deleted_source_name')
+            ->selectRaw('source_id, deleted_source_name, COUNT(*) as usages, COALESCE(SUM(revenue), 0) as revenue')
+            ->get();
+    }
+
+    /**
+     * One row per code usage of the filtered transactions, with the nominal credited to it: the full nominal
+     * goes to the code in the highest position (the only code, or the second code of a two-code transaction),
+     * the other code gets 0. With a search, only the codes matching it are included. Funnel and source come from
+     * the usage's snapshot; deleted_*_name is the snapshot name of a funnel or source removed from the master.
+     */
+    public function creditedUsages(PromoAnalysisFilter $filter): BaseBuilder
+    {
+        return DB::table('transaction_promo_codes')
             ->join('transactions', 'transactions.id', '=', 'transaction_promo_codes.transaction_id')
             ->whereIn('transaction_promo_codes.transaction_id', $this->transactions($filter)->select('transactions.id'))
             ->when($filter->hasSearch(), fn (QueryBuilder $query) => $this->whereCodeMatches($query, $filter->search))
             ->selectRaw(
-                'transaction_promo_codes.source_id_snapshot as source_id, '
+                'transaction_promo_codes.transaction_id, transactions.trx_id, transactions.paid_date, transactions.paid_time, transactions.nominal, '
+                .'transaction_promo_codes.code_position, transaction_promo_codes.raw_code, '
+                .'transaction_promo_codes.platform_id_snapshot as platform_id, transaction_promo_codes.code_snapshot as code, '
+                .'transaction_promo_codes.funnel_id_snapshot as funnel_id, '
+                .'CASE WHEN transaction_promo_codes.funnel_id_snapshot IS NULL THEN transaction_promo_codes.funnel_name_snapshot END as deleted_funnel_name, '
+                .'transaction_promo_codes.source_id_snapshot as source_id, '
                 .'CASE WHEN transaction_promo_codes.source_id_snapshot IS NULL THEN transaction_promo_codes.source_name_snapshot END as deleted_source_name, '
                 .'CASE WHEN transaction_promo_codes.code_position = (SELECT MAX(positions.code_position) FROM transaction_promo_codes positions '
                 .'WHERE positions.transaction_id = transaction_promo_codes.transaction_id) THEN transactions.nominal ELSE 0 END as revenue'
             );
-
-        return DB::query()
-            ->fromSub($usages, 'credited_usages')
-            ->groupBy('source_id', 'deleted_source_name')
-            ->selectRaw('source_id, deleted_source_name, COUNT(*) as usages, COALESCE(SUM(revenue), 0) as revenue')
-            ->get();
     }
 
     /**
