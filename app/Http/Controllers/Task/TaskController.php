@@ -1,0 +1,43 @@
+<?php
+
+namespace App\Http\Controllers\Task;
+
+use App\Http\Controllers\Controller;
+use App\Http\Requests\Task\TaskListRequest;
+use App\Http\Resources\TaskDetailResource;
+use App\Http\Resources\TaskResource;
+use App\Models\Task;
+use App\Services\TaskService;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+
+class TaskController extends Controller
+{
+    public function __construct(private TaskService $taskService) {}
+
+    public function meta(Request $request): JsonResponse
+    {
+        return response()->json(['data' => $this->taskService->meta($request->user())]);
+    }
+
+    public function index(TaskListRequest $request): AnonymousResourceCollection
+    {
+        $result = $this->taskService->list(
+            $request->user(),
+            $request->filters(),
+            $request->sort(),
+            $request->direction(),
+            $request->perPage(),
+        );
+
+        return TaskResource::collection($result['tasks'])->additional([
+            'meta' => ['status_counts' => $result['status_counts']],
+        ]);
+    }
+
+    public function show(Task $task): TaskDetailResource
+    {
+        return TaskDetailResource::make($this->taskService->detail($task));
+    }
+}

@@ -52,6 +52,48 @@ Urutan: kode yang terakhir dibuat lebih dulu. Respons memakai pagination Laravel
 
 **201 Created**, dengan `message: "Kode promo berhasil dibuat."`.
 
+## `POST /api/promo-codes/bulk` (Bulk Entry)
+
+Menyimpan banyak kode sekaligus dari form bergaya spreadsheet. Setiap baris divalidasi dengan **aturan yang sama persis dengan Single Entry** (kode/platform wajib, funnel/source boleh kosong, unik per platform + kode).
+
+```json
+{
+    "rows": [
+        { "code": "CPNS26", "platform_id": 2, "funnel_id": 1, "source_id": 2 },
+        { "code": "BUMN26", "platform_id": 3 },
+        { "code": "", "platform_id": null, "funnel_id": null, "source_id": null }
+    ]
+}
+```
+
+| Aturan | Perilaku |
+|---|---|
+| Kolom | `code`, `platform_id`, `funnel_id`, `source_id` (ID dari dropdown). Field lain diabaikan; tidak ada tipe/status. |
+| Baris invalid | Tidak membatalkan baris lain. Baris yang valid tetap disimpan. |
+| Kode sudah terdaftar | Baris **gagal** dengan alasan `Kode promo CPNS26 sudah terdaftar di platform JADIASN.` Data yang ada tidak diubah dan tidak diduplikasi. |
+| Kode sama dua kali dalam satu kiriman | Baris pertama disimpan; baris berikutnya gagal dengan `Duplikat dengan baris 1.` |
+| Baris kosong | Baris yang semua kolomnya kosong (sisa baris form) **diabaikan** dan tidak dihitung |
+| Kode yang berhasil | Langsung punya versi metadata awal, dan transaksi lama yang belum terpetakan ikut dihubungkan (sama seperti Single Entry) |
+| Batas | 1 sampai 500 baris per kiriman |
+
+**200 OK**, selalu, walaupun ada baris yang gagal:
+
+```json
+{
+    "data": {
+        "summary": { "total": 2, "succeeded": 1, "failed": 1 },
+        "rows": [
+            { "row": 1, "status": "created", "code": "CPNS26", "promo_code": { "id": 12, "code": "CPNS26", "...": "objek kode promo" }, "errors": {} },
+            { "row": 2, "status": "failed", "code": "BUMN26", "promo_code": null, "errors": { "code": ["Kode promo BUMN26 sudah terdaftar di platform CEREBRUM."] } }
+        ]
+    }
+}
+```
+
+- `row` = nomor baris di form (mulai dari 1), sehingga baris yang diabaikan tidak menggeser nomor baris lain.
+- `status` = `created` atau `failed`. `errors` memakai key yang sama dengan field (`code`, `platform_id`, `funnel_id`, `source_id`), jadi bisa ditampilkan langsung di sel yang salah.
+- **422** hanya untuk bentuk kiriman yang salah: `rows` kosong (`Isi minimal satu baris kode promo.`), lebih dari 500 baris (`Maksimal 500 baris kode promo dalam sekali simpan.`), atau baris yang bukan objek.
+
 ## `GET /api/promo-codes/{id}`
 
 Detail beserta `versions`:

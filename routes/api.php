@@ -15,11 +15,13 @@ use App\Http\Controllers\Promo\FunnelController;
 use App\Http\Controllers\Promo\PromoCodeController;
 use App\Http\Controllers\Promo\PromoSourceController;
 use App\Http\Controllers\Promo\UnregisteredPromoCodeController;
+use App\Http\Controllers\Task\TaskController;
 use App\Models\Account;
 use App\Models\Division;
 use App\Models\Funnel;
 use App\Models\PromoCode;
 use App\Models\PromoSource;
+use App\Models\Task;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/csrf-cookie', fn () => response()->noContent())->name('api.csrf-cookie');
@@ -113,6 +115,9 @@ Route::middleware('auth')->group(function () {
         Route::post('/', [PromoCodeController::class, 'store'])
             ->can('create', PromoCode::class)
             ->name('store');
+        Route::post('/bulk', [PromoCodeController::class, 'bulkStore'])
+            ->can('create', PromoCode::class)
+            ->name('bulk-store');
         Route::get('/{promoCode}', [PromoCodeController::class, 'show'])
             ->can('view', 'promoCode')
             ->name('show');
@@ -141,5 +146,16 @@ Route::middleware('auth')->group(function () {
         Route::get('/top-packages/revenue', [ProductOverviewController::class, 'topByRevenue'])->name('top-packages.revenue');
         Route::get('/top-packages/volume', [ProductOverviewController::class, 'topByVolume'])->name('top-packages.volume');
         Route::get('/performance', [ProductOverviewController::class, 'performance'])->name('performance');
+    });
+
+    Route::prefix('tasks')->name('api.tasks.')->group(function () {
+        Route::get('/meta', [TaskController::class, 'meta'])->name('meta');
+        Route::get('/', [TaskController::class, 'index'])
+            ->can('viewAny', Task::class)
+            ->name('index');
+        Route::get('/{task}', [TaskController::class, 'show'])
+            ->whereNumber('task')
+            ->can('view', 'task')
+            ->name('show');
     });
 });
