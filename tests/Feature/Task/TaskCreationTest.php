@@ -4,12 +4,14 @@ namespace Tests\Feature\Task;
 
 use App\Enums\TaskPriority;
 use App\Enums\TaskStatus;
+use App\Exceptions\DuplicateTaskSubmissionException;
 use App\Models\Account;
 use App\Models\Division;
 use App\Models\Platform;
 use App\Models\Role;
 use App\Models\Task;
 use App\Models\TaskCategory;
+use App\Services\TaskService;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -40,6 +42,9 @@ class TaskCreationTest extends TestCase
 
         $this->seed(DatabaseSeeder::class);
         $this->travelTo('2026-10-23 09:00:00');
+
+        // The duplicate guard runs on the same shared, lock-capable store as production (CACHE_STORE=database).
+        config(['cache.default' => 'database']);
 
         $this->marketing = Division::create(['code_division' => 'MKT', 'name' => 'Marketing']);
         $this->finance = Division::create(['code_division' => 'FIN', 'name' => 'Finance']);
@@ -348,6 +353,85 @@ class TaskCreationTest extends TestCase
     {
         $this->actingAs($this->manager)->postJson('/api/tasks', $this->payload())->assertCreated();
         $this->actingAs($this->manager)->postJson('/api/tasks', $this->payload(['title' => 'Tugas lain']))->assertCreated();
+
+        $this->assertDatabaseCount('tasks', 2);
+    }
+
+    public function test_equivalent_payload_sent_differently_is_still_a_duplicate(): void
+    {
+        $this->actingAs($this->manager)
+            ->postJson('/api/tasks', [
+                'title' => 'Desain banner promo',
+                'division_id' => $this->marketing->id,
+                'pic_id' => $this->staff->id,
+            ])
+            ->assertCreated();
+
+        $variants = [
+            'urutan key berbeda' => [
+                'pic_id' => $this->staff->id,
+                'title' => 'Desain banner promo',
+                'division_id' => $this->marketing->id,
+            ],
+            'id sebagai string' => [
+                'title' => 'Desain banner promo',
+                'division_id' => (string) $this->marketing->id,
+                'pic_id' => (string) $this->staff->id,
+            ],
+            'default dikirim eksplisit' => [
+                'title' => 'Desain banner promo',
+                'division_id' => $this->marketing->id,
+                'pic_id' => $this->staff->id,
+                'priority' => 'medium',
+                'status' => 'backlog',
+                'requires_review' => false,
+            ],
+            'field opsional dikirim null' => [
+                'title' => 'Desain banner promo',
+                'division_id' => $this->marketing->id,
+                'pic_id' => $this->staff->id,
+                'description' => null,
+                'category_id' => null,
+                'deadline' => null,
+            ],
+        ];
+
+        foreach ($variants as $variant => $payload) {
+            $this->actingAs($this->manager)
+                ->postJson('/api/tasks', $payload)
+                ->assertConflict();
+        }
+
+        $this->assertDatabaseCount('tasks', 1);
+    }
+
+    public function test_identical_request_arriving_while_the_first_is_saving_is_rejected(): void
+    {
+        $service = app(TaskService::class);
+        $data = ['title' => 'Desain banner promo', 'division_id' => $this->marketing->id, 'pic_id' => $this->staff->id];
+        $secondRejected = false;
+
+        // The second request arrives after the first took the guard but before its row is stored.
+        Task::creating(function () use ($service, $data, &$secondRejected) {
+            Task::flushEventListeners();
+
+            try {
+                $service->create($this->manager, $data);
+            } catch (DuplicateTaskSubmissionException) {
+                $secondRejected = true;
+            }
+        });
+
+        $service->create($this->manager, $data);
+
+        $this->assertTrue($secondRejected);
+        $this->assertDatabaseCount('tasks', 1);
+    }
+
+    public function test_same_task_from_two_accounts_is_not_a_duplicate(): void
+    {
+        $this->actingAs($this->manager)->postJson('/api/tasks', $this->payload())->assertCreated();
+        $this->actingAs($this->admin)->postJson('/api/tasks', $this->payload())->assertCreated();
 
         $this->assertDatabaseCount('tasks', 2);
     }

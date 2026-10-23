@@ -63,32 +63,38 @@ class TaskService
      *
      * @param  array<string, mixed>  $data
      *
+     * The duplicate guard is an atomic cache lock that is kept for the duplicate window, so of two identical
+     * requests arriving at the same time only one acquires it. The cache store must support atomic locks
+     * (database, redis, memcached) and be shared by every app server; the default database store is.
+     *
      * @throws DuplicateTaskSubmissionException When the same account sent the same task moments ago.
      */
     public function create(Account $creator, array $data): Task
     {
-        $fingerprint = 'task-create:'.$creator->id.':'.sha1(json_encode($data));
+        $attributes = [
+            ...$data,
+            'creator_id' => $creator->id,
+            'priority' => $data['priority'] ?? TaskPriority::Medium->value,
+            'status' => $data['status'] ?? TaskStatus::Backlog->value,
+            'requires_review' => $this->requiresReview($data),
+        ];
 
-        if (! Cache::add($fingerprint, true, self::DUPLICATE_WINDOW_SECONDS)) {
+        $lock = Cache::lock($this->submissionFingerprint($attributes), self::DUPLICATE_WINDOW_SECONDS);
+
+        if (! $lock->get()) {
             throw new DuplicateTaskSubmissionException;
         }
 
         try {
-            $task = DB::transaction(function () use ($creator, $data) {
-                $task = Task::create([
-                    ...$data,
-                    'creator_id' => $creator->id,
-                    'priority' => $data['priority'] ?? TaskPriority::Medium->value,
-                    'status' => $data['status'] ?? TaskStatus::Backlog->value,
-                    'requires_review' => $this->requiresReview($data),
-                ]);
+            $task = DB::transaction(function () use ($creator, $attributes) {
+                $task = Task::create($attributes);
 
                 $task->activities()->create(['account_id' => $creator->id, 'action' => TaskActivity::CREATED]);
 
                 return $task;
             });
         } catch (Throwable $e) {
-            Cache::forget($fingerprint);
+            $lock->release();
 
             throw $e;
         }
@@ -196,6 +202,23 @@ class TaskService
                 'status' => TaskStatus::Backlog->value,
             ],
         ];
+    }
+
+    /**
+     * Identify a submission by what would be saved, not by how it was sent: key order, an omitted field
+     * versus an empty one, "5" versus 5, and an explicit default versus none all give the same fingerprint.
+     *
+     * @param  array<string, mixed>  $attributes
+     */
+    private function submissionFingerprint(array $attributes): string
+    {
+        $normalized = collect($attributes)
+            ->reject(fn (mixed $value) => $value === null || $value === '')
+            ->map(fn (mixed $value) => is_string($value) && ctype_digit($value) ? (int) $value : $value)
+            ->sortKeys()
+            ->all();
+
+        return 'task-create:'.sha1(json_encode($normalized));
     }
 
     /**
