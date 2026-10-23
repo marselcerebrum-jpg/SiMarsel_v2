@@ -2,13 +2,27 @@
 
 namespace App\Services;
 
+use App\Models\Funnel;
 use App\Repositories\PromoAnalysisRepository;
 use App\Services\Concerns\ComparesWithPreviousValue;
 use App\Support\PromoAnalysisFilter;
+use Illuminate\Support\Collection;
 
 class PromoAnalysisService
 {
     use ComparesWithPreviousValue;
+
+    public const GROUP_FUNNEL = 'funnel';
+
+    public const GROUP_DELETED_FUNNEL = 'deleted_funnel';
+
+    public const GROUP_NO_FUNNEL = 'no_funnel';
+
+    public const GROUP_NO_CODE = 'no_code';
+
+    public const NO_FUNNEL = 'Tanpa Funnel';
+
+    public const NO_CODE = 'Tanpa Kode';
 
     public function __construct(
         private PromoAnalysisRepository $promoAnalysisRepository,
@@ -57,6 +71,65 @@ class PromoAnalysisService
                     ...$this->changeFromPrevious($value, $previous[$key]),
                 ])
                 ->all(),
+        ];
+    }
+
+    /**
+     * Transactions, revenue, and revenue share per funnel of each transaction's main code. Every master funnel
+     * is listed, even without transactions, followed by funnels removed from the master, Tanpa Funnel, and Tanpa Kode.
+     *
+     * @return array<string, mixed>
+     */
+    public function funnelBreakdown(PromoAnalysisFilter $filter): array
+    {
+        $totals = $this->promoAnalysisRepository->funnelTotals($filter)->map(fn (object $row) => [
+            'key' => match (true) {
+                ! $row->has_code => self::GROUP_NO_CODE,
+                $row->funnel_id !== null => self::GROUP_FUNNEL,
+                filled($row->deleted_funnel_name) => self::GROUP_DELETED_FUNNEL,
+                default => self::GROUP_NO_FUNNEL,
+            },
+            'funnel_id' => $row->funnel_id === null ? null : (int) $row->funnel_id,
+            'name' => $row->deleted_funnel_name,
+            'transactions' => (int) $row->transactions,
+            'revenue' => (float) $row->revenue,
+        ]);
+
+        $group = fn (string $key, ?Funnel $funnel, string $name, Collection $rows) => [
+            'key' => $key,
+            'funnel' => $funnel ? ['id' => $funnel->id, 'name' => $funnel->name] : null,
+            'name' => $name,
+            'transactions' => $rows->sum('transactions'),
+            'revenue' => round($rows->sum('revenue'), 2),
+        ];
+
+        $groups = collect([
+            ...Funnel::query()->orderBy('id')->get()->map(fn (Funnel $funnel) => $group(
+                self::GROUP_FUNNEL, $funnel, $funnel->name, $totals->where('funnel_id', $funnel->id),
+            )),
+            ...$totals->where('key', self::GROUP_DELETED_FUNNEL)->groupBy('name')->sortKeys()
+                ->map(fn (Collection $rows, string $name) => $group(self::GROUP_DELETED_FUNNEL, null, $name, $rows))
+                ->values(),
+            $group(self::GROUP_NO_FUNNEL, null, self::NO_FUNNEL, $totals->where('key', self::GROUP_NO_FUNNEL)),
+            $group(self::GROUP_NO_CODE, null, self::NO_CODE, $totals->where('key', self::GROUP_NO_CODE)),
+        ]);
+
+        $totalTransactions = $totals->sum('transactions');
+        $totalRevenue = round($totals->sum('revenue'), 2);
+        $isEmpty = $totalTransactions === 0;
+
+        return [
+            'filter' => $filter->toArray(),
+            'is_empty' => $isEmpty,
+            'message' => $isEmpty ? 'Data tidak tersedia untuk filter yang dipilih.' : null,
+            'totals' => [
+                'transactions' => $totalTransactions,
+                'revenue' => $totalRevenue,
+            ],
+            'funnels' => $groups->map(fn (array $row) => [
+                ...$row,
+                'contribution_percentage' => $totalRevenue > 0 ? round($row['revenue'] / $totalRevenue * 100, 2) : 0,
+            ])->all(),
         ];
     }
 
