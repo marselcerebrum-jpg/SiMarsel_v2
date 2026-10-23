@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Funnel;
+use App\Models\PromoSource;
 use App\Repositories\PromoAnalysisRepository;
 use App\Services\Concerns\ComparesWithPreviousValue;
 use App\Support\PromoAnalysisFilter;
@@ -23,6 +24,14 @@ class PromoAnalysisService
     public const NO_FUNNEL = 'Tanpa Funnel';
 
     public const NO_CODE = 'Tanpa Kode';
+
+    public const GROUP_SOURCE = 'source';
+
+    public const GROUP_DELETED_SOURCE = 'deleted_source';
+
+    public const GROUP_NO_SOURCE = 'no_source';
+
+    public const NO_SOURCE = 'Tanpa Sumber';
 
     public function __construct(
         private PromoAnalysisRepository $promoAnalysisRepository,
@@ -127,6 +136,66 @@ class PromoAnalysisService
                 'revenue' => $totalRevenue,
             ],
             'funnels' => $groups->map(fn (array $row) => [
+                ...$row,
+                'contribution_percentage' => $totalRevenue > 0 ? round($row['revenue'] / $totalRevenue * 100, 2) : 0,
+            ])->all(),
+        ];
+    }
+
+    /**
+     * Usages, credited revenue, and revenue share per source. Every master source is listed, even without usages,
+     * followed by sources removed from the master and Tanpa Sumber. Transactions without a code have no usage,
+     * so their revenue stays out of this table and the percentages can add up to less than 100.
+     *
+     * @return array<string, mixed>
+     */
+    public function sourceBreakdown(PromoAnalysisFilter $filter): array
+    {
+        $totals = $this->promoAnalysisRepository->sourceTotals($filter)->map(fn (object $row) => [
+            'key' => match (true) {
+                $row->source_id !== null => self::GROUP_SOURCE,
+                filled($row->deleted_source_name) => self::GROUP_DELETED_SOURCE,
+                default => self::GROUP_NO_SOURCE,
+            },
+            'source_id' => $row->source_id === null ? null : (int) $row->source_id,
+            'name' => $row->deleted_source_name,
+            'usages' => (int) $row->usages,
+            'revenue' => (float) $row->revenue,
+        ]);
+
+        $group = fn (string $key, ?PromoSource $source, string $name, Collection $rows) => [
+            'key' => $key,
+            'source' => $source ? ['id' => $source->id, 'name' => $source->name] : null,
+            'name' => $name,
+            'usages' => $rows->sum('usages'),
+            'revenue' => round($rows->sum('revenue'), 2),
+        ];
+
+        $groups = collect([
+            ...PromoSource::query()->orderBy('id')->get()->map(fn (PromoSource $source) => $group(
+                self::GROUP_SOURCE, $source, $source->name, $totals->where('source_id', $source->id),
+            )),
+            ...$totals->where('key', self::GROUP_DELETED_SOURCE)->groupBy('name')->sortKeys()
+                ->map(fn (Collection $rows, string $name) => $group(self::GROUP_DELETED_SOURCE, null, $name, $rows))
+                ->values(),
+            $group(self::GROUP_NO_SOURCE, null, self::NO_SOURCE, $totals->where('key', self::GROUP_NO_SOURCE)),
+        ]);
+
+        $transactions = $this->promoAnalysisRepository->transactionTotals($filter);
+        $totalRevenue = round($transactions['promo_revenue'] + $transactions['non_promo_revenue'], 2);
+        $isEmpty = $transactions['transactions'] === 0;
+
+        return [
+            'filter' => $filter->toArray(),
+            'is_empty' => $isEmpty,
+            'message' => $isEmpty ? 'Data tidak tersedia untuk filter yang dipilih.' : null,
+            'totals' => [
+                'transactions' => $transactions['transactions'],
+                'revenue' => $totalRevenue,
+                'usages' => $totals->sum('usages'),
+                'source_revenue' => round($totals->sum('revenue'), 2),
+            ],
+            'sources' => $groups->map(fn (array $row) => [
                 ...$row,
                 'contribution_percentage' => $totalRevenue > 0 ? round($row['revenue'] / $totalRevenue * 100, 2) : 0,
             ])->all(),
