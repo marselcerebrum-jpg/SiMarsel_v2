@@ -108,6 +108,30 @@ class PromoPageTest extends TestCase
             ->assertSee('sehingga tidak dapat dihapus.');
     }
 
+    public function test_bulk_entry_has_spreadsheet_columns_without_type_or_status(): void
+    {
+        $response = $this->actingAs($this->employee)
+            ->get(route('promo.index'))
+            ->assertSee('@click="$dispatch(\'promo-bulk-open\')"', false)
+            ->assertSee('x-data="promoCodeBulkEntry"', false)
+            ->assertSee('id="promo-bulk-title"', false)
+            ->assertSeeInOrder(['Promo Code', 'Platform', 'Funnel', 'Source', 'Status'])
+            ->assertSeeInOrder(['Add Row', 'Add 5 Rows', 'Close', 'Save All']);
+
+        foreach (['Code Type', 'Tipe Kode', 'Inactive', 'Nonaktif', 'is_active'] as $text) {
+            $response->assertDontSee($text, false);
+        }
+    }
+
+    public function test_bulk_entry_shows_succeeded_and_failed_counts(): void
+    {
+        $this->actingAs($this->employee)
+            ->get(route('promo.index'))
+            ->assertSeeInOrder(['Processed', 'Succeeded', 'Failed'])
+            ->assertSee('Baris yang sudah tersimpan tidak dikirim ulang.')
+            ->assertSee('@promo-codes-changed.window="reload()"', false);
+    }
+
     public function test_master_data_tab_manages_funnel_and_source_separately(): void
     {
         $this->actingAs($this->employee)

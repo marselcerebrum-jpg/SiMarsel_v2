@@ -51,6 +51,13 @@ export function createPromoCode(body) {
     return http(PROMO_CODES, { method: 'POST', body });
 }
 
+/**
+ * Always 200: { data: { summary, rows: [{ row, status, code, promo_code, errors }] } }.
+ */
+export function bulkCreatePromoCodes(rows) {
+    return http(`${PROMO_CODES}/bulk`, { method: 'POST', body: { rows } });
+}
+
 export function updatePromoCode(id, body) {
     return http(`${PROMO_CODES}/${id}`, { method: 'PATCH', body });
 }
