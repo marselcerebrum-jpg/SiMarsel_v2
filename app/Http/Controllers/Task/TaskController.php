@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Task;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Task\StoreTaskRequest;
 use App\Http\Requests\Task\TaskListRequest;
 use App\Http\Resources\TaskDetailResource;
 use App\Http\Resources\TaskResource;
@@ -34,6 +35,21 @@ class TaskController extends Controller
         return TaskResource::collection($result['tasks'])->additional([
             'meta' => ['status_counts' => $result['status_counts']],
         ]);
+    }
+
+    public function createOptions(Request $request): JsonResponse
+    {
+        return response()->json(['data' => $this->taskService->createOptions($request->user())]);
+    }
+
+    public function store(StoreTaskRequest $request): JsonResponse
+    {
+        $task = $this->taskService->create($request->user(), $request->validated());
+
+        return TaskDetailResource::make($task)
+            ->additional(['message' => 'Tugas berhasil dibuat.'])
+            ->response()
+            ->setStatusCode(201);
     }
 
     public function show(Task $task): TaskDetailResource

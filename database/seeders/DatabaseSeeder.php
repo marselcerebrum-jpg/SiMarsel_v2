@@ -19,6 +19,7 @@ class DatabaseSeeder extends Seeder
             AccountSeeder::class,
             FunnelSeeder::class,
             PromoSourceSeeder::class,
+            TaskCategorySeeder::class,
         ]);
 
         // Demo performance data for local development only, so tests keep a clean database.

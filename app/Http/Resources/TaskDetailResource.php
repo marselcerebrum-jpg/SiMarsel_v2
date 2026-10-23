@@ -16,6 +16,14 @@ class TaskDetailResource extends TaskResource
         return [
             ...parent::toArray($request),
             'description' => $this->description,
+            'category' => $this->category ? [
+                'id' => $this->category->id,
+                'name' => $this->category->name,
+            ] : null,
+            'platform' => $this->platform ? [
+                'id' => $this->platform->id,
+                'name' => $this->platform->name,
+            ] : null,
             'creator' => $this->creator ? [
                 'id' => $this->creator->id,
                 'fullname' => $this->creator->fullname,
