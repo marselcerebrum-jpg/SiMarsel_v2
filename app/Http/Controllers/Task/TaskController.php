@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Task;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Task\AssignTaskRequest;
 use App\Http\Requests\Task\StoreTaskRequest;
 use App\Http\Requests\Task\TaskListRequest;
 use App\Http\Requests\Task\UpdateTaskRequest;
@@ -63,5 +64,17 @@ class TaskController extends Controller
         $task = $this->taskService->update($request->user(), $task, $request->validated());
 
         return TaskDetailResource::make($task)->additional(['message' => 'Tugas berhasil diperbarui.']);
+    }
+
+    public function assignmentOptions(Request $request, Task $task): JsonResponse
+    {
+        return response()->json(['data' => $this->taskService->assignmentOptions($request->user(), $task)]);
+    }
+
+    public function assign(AssignTaskRequest $request, Task $task): TaskDetailResource
+    {
+        $task = $this->taskService->assign($request->user(), $task, $request->validated());
+
+        return TaskDetailResource::make($task)->additional(['message' => 'PIC berhasil diperbarui.']);
     }
 }

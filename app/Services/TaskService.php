@@ -159,6 +159,84 @@ class TaskService
     }
 
     /**
+     * Assign, reassign, or forward the task to a new PIC. Admin may forward to any division; a Manager only
+     * within the division they manage. The status is left as it is, and the change is appended to the history
+     * so earlier assignments stay on record. A rejected change leaves the current PIC untouched.
+     *
+     * @param  array{version: int|string, pic_id: int|string, division_id?: int|string}  $data
+     *
+     * @throws TaskVersionConflictException When the task was saved by someone else after the actor loaded it.
+     * @throws ValidationException When the actor may not forward to that division, the PIC is locked by the
+     *                             task's status, or the chosen PIC already holds the task.
+     */
+    public function assign(Account $actor, Task $task, array $data): Task
+    {
+        $baseVersion = (int) $data['version'];
+
+        DB::transaction(function () use ($actor, $task, $data, $baseVersion) {
+            $locked = Task::query()->whereKey($task->id)->lockForUpdate()->firstOrFail();
+
+            if ($locked->version !== $baseVersion) {
+                throw new TaskVersionConflictException($locked->version);
+            }
+
+            $lockedFields = $locked->lockedFieldsFor($actor);
+            $previousPicId = $locked->pic_id;
+
+            $locked->fill([
+                'division_id' => $data['division_id'] ?? $locked->division_id,
+                'pic_id' => $data['pic_id'],
+            ]);
+
+            if (! $locked->isDirty()) {
+                throw ValidationException::withMessages(['pic_id' => 'PIC yang dipilih sudah menjadi PIC tugas ini.']);
+            }
+
+            if (! $actor->isAdmin() && isset($lockedFields['division_id'])) {
+                $lockedFields['division_id'] = 'Anda tidak dapat meneruskan tugas ke divisi di luar kewenangan Anda.';
+            }
+
+            $errors = array_intersect_key($lockedFields, $locked->getDirty());
+
+            if ($errors !== []) {
+                throw ValidationException::withMessages($errors);
+            }
+
+            $changes = $this->describeChanges($locked);
+
+            $locked->version = $baseVersion + 1;
+            $locked->save();
+
+            $locked->activities()->create([
+                'account_id' => $actor->id,
+                'action' => $previousPicId === null ? TaskActivity::ASSIGNED : TaskActivity::REASSIGNED,
+                'changes' => $changes,
+            ]);
+        });
+
+        return $this->detail($task->refresh());
+    }
+
+    /**
+     * Choices for the Assign PIC form: the current PIC, the divisions the actor may assign within with each
+     * division's eligible PICs, and the reason the PIC cannot be changed right now, if any.
+     *
+     * @return array<string, mixed>
+     */
+    public function assignmentOptions(Account $actor, Task $task): array
+    {
+        $task->loadMissing(['pic', 'division']);
+
+        return [
+            'current_pic' => $task->pic?->only(['id', 'fullname']),
+            'current_division' => $task->division->only(['id', 'code_division', 'name']),
+            'can_change_division' => $actor->isAdmin(),
+            'locked_reason' => $task->lockedFieldsFor($actor)['pic_id'] ?? null,
+            'divisions' => $this->divisionsWithPics($actor),
+        ];
+    }
+
+    /**
      * Options for the Create Task form: the divisions the account may create tasks for with each
      * division's assignable PICs, task categories with their QA configuration, platforms, and enums.
      *
@@ -167,20 +245,7 @@ class TaskService
     public function createOptions(Account $account): array
     {
         return [
-            'divisions' => Division::query()
-                ->taskCreatableBy($account)
-                ->orderBy('name')
-                ->get(['id', 'code_division', 'name'])
-                ->map(fn (Division $division) => [
-                    ...$division->only(['id', 'code_division', 'name']),
-                    'pics' => Account::query()
-                        ->assignableIn($division->id)
-                        ->orderBy('fullname')
-                        ->get(['id', 'fullname'])
-                        ->map(fn (Account $pic) => $pic->only(['id', 'fullname']))
-                        ->all(),
-                ])
-                ->all(),
+            'divisions' => $this->divisionsWithPics($account),
             'categories' => TaskCategory::query()
                 ->orderBy('name')
                 ->get(['id', 'name', 'requires_review'])
@@ -202,6 +267,29 @@ class TaskService
                 'status' => TaskStatus::Backlog->value,
             ],
         ];
+    }
+
+    /**
+     * Divisions the account may create or assign tasks in, each with the Staff eligible to be PIC there.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    private function divisionsWithPics(Account $account): array
+    {
+        return Division::query()
+            ->taskCreatableBy($account)
+            ->orderBy('name')
+            ->get(['id', 'code_division', 'name'])
+            ->map(fn (Division $division) => [
+                ...$division->only(['id', 'code_division', 'name']),
+                'pics' => Account::query()
+                    ->assignableIn($division->id)
+                    ->orderBy('fullname')
+                    ->get(['id', 'fullname'])
+                    ->map(fn (Account $pic) => $pic->only(['id', 'fullname']))
+                    ->all(),
+            ])
+            ->all();
     }
 
     /**

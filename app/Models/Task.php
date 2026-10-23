@@ -150,6 +150,7 @@ class Task extends Model
 
         if ($this->status->inQa()) {
             $locked['requires_review'] = 'Kewajiban QA tidak dapat diubah setelah tugas masuk tahap QA.';
+            $locked['pic_id'] = 'PIC tidak dapat diganti selama tugas dalam tahap QA.';
         }
 
         return $locked;

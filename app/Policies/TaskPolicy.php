@@ -38,4 +38,12 @@ class TaskPolicy
     {
         return $task->managedBy($user);
     }
+
+    /**
+     * Only Admin, or the Manager of the task's division, may assign, reassign, or forward its PIC; Staff never.
+     */
+    public function assign(Account $user, Task $task): bool
+    {
+        return $task->managedBy($user);
+    }
 }
