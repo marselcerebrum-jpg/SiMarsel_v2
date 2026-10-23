@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Promo\PromoAnalysisFilterRequest;
 use App\Http\Resources\PromoAnalysisFilterOptionsResource;
 use App\Http\Resources\PromoAnalysisSummaryResource;
+use App\Http\Resources\PromoFunnelBreakdownResource;
 use App\Services\PromoAnalysisService;
 
 class PromoAnalysisController extends Controller
@@ -20,5 +21,10 @@ class PromoAnalysisController extends Controller
     public function summary(PromoAnalysisFilterRequest $request): PromoAnalysisSummaryResource
     {
         return PromoAnalysisSummaryResource::make($this->promoAnalysisService->summarize($request->promoFilter()));
+    }
+
+    public function funnels(PromoAnalysisFilterRequest $request): PromoFunnelBreakdownResource
+    {
+        return PromoFunnelBreakdownResource::make($this->promoAnalysisService->funnelBreakdown($request->promoFilter()));
     }
 }

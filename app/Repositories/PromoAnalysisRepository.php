@@ -73,6 +73,37 @@ class PromoAnalysisRepository
     }
 
     /**
+     * Transactions and full revenue per funnel of each transaction's main code, so every transaction
+     * falls in exactly one group. The main code is the lowest code position: position 1, or a code that
+     * stands alone in position 2. The code in position 2 never decides the funnel when position 1 has a code.
+     * deleted_funnel_name is the snapshot name of a funnel that was removed from the master.
+     *
+     * @return Collection<int, object{has_code: int, funnel_id: int|null, deleted_funnel_name: string|null, transactions: int, revenue: string|float}>
+     */
+    public function funnelTotals(PromoAnalysisFilter $filter): Collection
+    {
+        $mainUsages = DB::table('transaction_promo_codes as usages')
+            ->whereRaw('usages.code_position = (SELECT MIN(positions.code_position) FROM transaction_promo_codes positions WHERE positions.transaction_id = usages.transaction_id)')
+            ->select('usages.transaction_id', 'usages.funnel_id_snapshot', 'usages.funnel_name_snapshot');
+
+        $classified = $this->transactions($filter)
+            ->toBase()
+            ->leftJoinSub($mainUsages, 'main_usages', 'main_usages.transaction_id', '=', 'transactions.id')
+            ->selectRaw(
+                'transactions.nominal, '
+                .'CASE WHEN main_usages.transaction_id IS NULL THEN 0 ELSE 1 END as has_code, '
+                .'main_usages.funnel_id_snapshot as funnel_id, '
+                .'CASE WHEN main_usages.funnel_id_snapshot IS NULL THEN main_usages.funnel_name_snapshot END as deleted_funnel_name'
+            );
+
+        return DB::query()
+            ->fromSub($classified, 'classified')
+            ->groupBy('has_code', 'funnel_id', 'deleted_funnel_name')
+            ->selectRaw('has_code, funnel_id, deleted_funnel_name, COUNT(*) as transactions, COALESCE(SUM(nominal), 0) as revenue')
+            ->get();
+    }
+
+    /**
      * Payment methods of successful transactions, for the filter options.
      *
      * @return Collection<int, string|null> Names as stored, without surrounding spaces; null for an empty method.

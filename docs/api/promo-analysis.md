@@ -1,6 +1,6 @@
-# API Analisis Promo: Filter dan KPI
+# API Analisis Promo
 
-Filter analisis dan kartu KPI ringkasan untuk halaman Analisis Promo. Semua komponen analisis promo memakai **filter yang sama**, jadi kirim query parameter yang sama ke setiap endpoint.
+Filter analisis, kartu KPI ringkasan, dan rekap per funnel untuk halaman Analisis Promo. Semua komponen analisis promo memakai **filter yang sama**, jadi kirim query parameter yang sama ke setiap endpoint.
 
 Wajib login. **Semua user yang login** boleh mengakses. Aturan header dan kode error umum ada di [authentication.md](authentication.md). Cara penggunaan kode promo disimpan ada di [promo-codes.md](../promo-codes.md).
 
@@ -8,6 +8,7 @@ Wajib login. **Semua user yang login** boleh mengakses. Aturan header dan kode e
 |---|---|
 | `GET /api/promo-analysis/filters` | Pilihan dropdown filter |
 | `GET /api/promo-analysis/summary` | Kartu KPI |
+| `GET /api/promo-analysis/funnels` | Tabel transaksi dan revenue per funnel |
 
 ## Sumber data
 
@@ -132,6 +133,75 @@ Setiap KPI berisi nilai periode sekarang dan periode pembanding:
 ```
 
 Jika tidak ada transaksi untuk filter itu, respons tetap **200** dengan `is_empty: true` dan `message: "Data tidak tersedia untuk filter yang dipilih."`.
+
+## `GET /api/promo-analysis/funnels`
+
+Jumlah transaksi dan revenue menurut **funnel utama** setiap transaksi. Endpoint ini menerima semua filter di atas.
+
+### Kelompok funnel
+
+Setiap transaksi masuk **tepat ke satu** kelompok:
+
+| Kondisi transaksi | Kelompok |
+|---|---|
+| Tanpa kode promo | **Tanpa Kode** (`no_code`) |
+| Kode utama punya funnel | Funnel kode utama (`funnel`) |
+| Kode utama punya funnel yang sudah dihapus dari master | Baris tersendiri dengan nama funnel saat transaksi (`deleted_funnel`) |
+| Kode utama tanpa funnel, termasuk kode belum terdaftar | **Tanpa Funnel** (`no_funnel`) |
+
+- **Kode utama** = kode posisi 1. Untuk dua kode, funnel **tetap** mengikuti kode posisi 1, walaupun kode posisi 2 (misalnya reseller) punya funnel.
+- Kode reseller yang **berdiri sendiri** menentukan funnel transaksinya, termasuk jika Markaz mengirim posisi 1 kosong (`["", "RESELLER01"]`).
+- Funnel diambil dari **snapshot** pada penggunaan kode, yaitu funnel yang berlaku pada waktu bayar transaksi, bukan funnel kode sekarang.
+- Nama funnel memakai nama master **sekarang**, jadi funnel yang di-rename tetap satu baris.
+- Transaksi anomali (lebih dari 2 kode) tidak punya baris penggunaan, sehingga masuk **Tanpa Kode**, konsisten dengan KPI.
+
+### Rumus
+
+| Field | Rumus |
+|---|---|
+| `transactions` | Jumlah transaksi unik di kelompok itu, bukan jumlah penggunaan kode |
+| `revenue` | Jumlah **seluruh** `nominal` transaksi di kelompok itu, termasuk transaksi dua-kode |
+| `contribution_percentage` | `revenue` ÷ total revenue seluruh transaksi hasil filter × 100, dibulatkan 2 desimal. `0` jika total = 0. |
+| `totals.transactions`, `totals.revenue` | Seluruh transaksi hasil filter. Selalu sama dengan jumlah semua baris, dan sama dengan transaksi/revenue promo + tanpa promo di `/summary`. |
+
+Karena pembulatan, jumlah semua persentase bisa 99.99 atau 100.01.
+
+### Urutan baris
+
+Semua funnel master **selalu tampil**, termasuk yang 0, urut sesuai master (Aplikasi, Marketing, Sales, Ads, Live, Lainnya, lalu funnel baru). Setelah itu funnel yang sudah dihapus (A-Z), **Tanpa Funnel**, dan **Tanpa Kode**.
+
+### 200 OK
+
+`GET /api/promo-analysis/funnels?year=2026&month=9`:
+
+```json
+{
+    "data": {
+        "filter": { "mode": "month", "date_from": "2026-09-01", "date_to": "2026-09-30", "...": "sama dengan /summary" },
+        "is_empty": false,
+        "message": null,
+        "totals": { "transactions": 7, "revenue": 2800000 },
+        "funnels": [
+            { "key": "funnel", "funnel": { "id": 1, "name": "Aplikasi" }, "name": "Aplikasi", "transactions": 2, "revenue": 300000, "contribution_percentage": 10.71 },
+            { "key": "funnel", "funnel": { "id": 2, "name": "Marketing" }, "name": "Marketing", "transactions": 0, "revenue": 0, "contribution_percentage": 0 },
+            { "key": "funnel", "funnel": { "id": 3, "name": "Sales" }, "name": "Sales", "transactions": 2, "revenue": 700000, "contribution_percentage": 25 },
+            { "key": "funnel", "funnel": { "id": 4, "name": "Ads" }, "name": "Ads", "transactions": 0, "revenue": 0, "contribution_percentage": 0 },
+            { "key": "funnel", "funnel": { "id": 5, "name": "Live" }, "name": "Live", "transactions": 0, "revenue": 0, "contribution_percentage": 0 },
+            { "key": "funnel", "funnel": { "id": 6, "name": "Lainnya" }, "name": "Lainnya", "transactions": 0, "revenue": 0, "contribution_percentage": 0 },
+            { "key": "no_funnel", "funnel": null, "name": "Tanpa Funnel", "transactions": 2, "revenue": 1100000, "contribution_percentage": 39.29 },
+            { "key": "no_code", "funnel": null, "name": "Tanpa Kode", "transactions": 1, "revenue": 700000, "contribution_percentage": 25 }
+        ]
+    }
+}
+```
+
+| Field | Keterangan |
+|---|---|
+| `key` | `funnel`, `deleted_funnel`, `no_funnel`, atau `no_code` |
+| `funnel` | `{ id, name }` funnel master; `null` untuk kelompok lain |
+| `name` | Nama yang ditampilkan di kolom Funnel |
+
+Jika tidak ada transaksi, respons tetap **200** dengan `is_empty: true`, `message`, dan semua kelompok bernilai 0.
 
 ## 422 Validasi gagal
 
