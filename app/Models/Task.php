@@ -12,7 +12,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 #[Fillable([
-    'title', 'description', 'division_id', 'pic_id', 'creator_id', 'priority', 'status',
+    'title', 'description', 'category_id', 'division_id', 'platform_id', 'pic_id', 'creator_id', 'priority', 'status',
     'start_date', 'deadline', 'requires_review', 'evidence_required', 'completed_at',
 ])]
 class Task extends Model
@@ -41,6 +41,16 @@ class Task extends Model
     public function division(): BelongsTo
     {
         return $this->belongsTo(Division::class);
+    }
+
+    public function category(): BelongsTo
+    {
+        return $this->belongsTo(TaskCategory::class);
+    }
+
+    public function platform(): BelongsTo
+    {
+        return $this->belongsTo(Platform::class);
     }
 
     public function pic(): BelongsTo

@@ -4,16 +4,26 @@ namespace App\Services;
 
 use App\Enums\TaskPriority;
 use App\Enums\TaskStatus;
+use App\Exceptions\DuplicateTaskSubmissionException;
 use App\Models\Account;
 use App\Models\Division;
+use App\Models\Platform;
 use App\Models\Task;
+use App\Models\TaskCategory;
 use App\Repositories\TaskRepository;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Facades\Cache;
+use Throwable;
 
 class TaskService
 {
+    /**
+     * How long an identical submission from the same account is treated as a resend.
+     */
+    public const DUPLICATE_WINDOW_SECONDS = 10;
+
     public function __construct(private TaskRepository $tasks) {}
 
     /**
@@ -37,7 +47,99 @@ class TaskService
 
     public function detail(Task $task): Task
     {
-        return $task->load(['division', 'pic', 'creator']);
+        return $task->load(['category', 'division', 'platform', 'pic', 'creator']);
+    }
+
+    /**
+     * Create a task from validated input. The creator is the logged-in account, the status starts at
+     * Back Log unless To Do is chosen, and QA is required whenever the category requires it.
+     *
+     * @param  array<string, mixed>  $data
+     *
+     * @throws DuplicateTaskSubmissionException When the same account sent the same task moments ago.
+     */
+    public function create(Account $creator, array $data): Task
+    {
+        $fingerprint = 'task-create:'.$creator->id.':'.sha1(json_encode($data));
+
+        if (! Cache::add($fingerprint, true, self::DUPLICATE_WINDOW_SECONDS)) {
+            throw new DuplicateTaskSubmissionException;
+        }
+
+        try {
+            $task = Task::create([
+                ...$data,
+                'creator_id' => $creator->id,
+                'priority' => $data['priority'] ?? TaskPriority::Medium->value,
+                'status' => $data['status'] ?? TaskStatus::Backlog->value,
+                'requires_review' => $this->requiresReview($data),
+            ]);
+        } catch (Throwable $e) {
+            Cache::forget($fingerprint);
+
+            throw $e;
+        }
+
+        return $this->detail($task);
+    }
+
+    /**
+     * Options for the Create Task form: the divisions the account may create tasks for with each
+     * division's assignable PICs, task categories with their QA configuration, platforms, and enums.
+     *
+     * @return array<string, mixed>
+     */
+    public function createOptions(Account $account): array
+    {
+        return [
+            'divisions' => Division::query()
+                ->taskCreatableBy($account)
+                ->orderBy('name')
+                ->get(['id', 'code_division', 'name'])
+                ->map(fn (Division $division) => [
+                    ...$division->only(['id', 'code_division', 'name']),
+                    'pics' => Account::query()
+                        ->assignableIn($division->id)
+                        ->orderBy('fullname')
+                        ->get(['id', 'fullname'])
+                        ->map(fn (Account $pic) => $pic->only(['id', 'fullname']))
+                        ->all(),
+                ])
+                ->all(),
+            'categories' => TaskCategory::query()
+                ->orderBy('name')
+                ->get(['id', 'name', 'requires_review'])
+                ->map(fn (TaskCategory $category) => $category->only(['id', 'name', 'requires_review']))
+                ->all(),
+            'platforms' => Platform::query()
+                ->orderBy('name')
+                ->get(['id', 'name'])
+                ->map(fn (Platform $platform) => $platform->only(['id', 'name']))
+                ->all(),
+            'priorities' => collect(TaskPriority::cases())
+                ->map(fn (TaskPriority $priority) => ['value' => $priority->value, 'label' => $priority->label()])
+                ->all(),
+            'statuses' => collect(TaskStatus::initial())
+                ->map(fn (TaskStatus $status) => ['value' => $status->value, 'label' => $status->label()])
+                ->all(),
+            'defaults' => [
+                'priority' => TaskPriority::Medium->value,
+                'status' => TaskStatus::Backlog->value,
+            ],
+        ];
+    }
+
+    /**
+     * A category that requires QA always does; otherwise QA is required only when the creator asks for it.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    private function requiresReview(array $data): bool
+    {
+        $categoryRequiresReview = isset($data['category_id'])
+            && TaskCategory::whereKey($data['category_id'])->value('requires_review');
+
+        return $categoryRequiresReview || (bool) ($data['requires_review'] ?? false);
     }
 
     /**

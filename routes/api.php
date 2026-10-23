@@ -148,6 +148,12 @@ Route::middleware('auth')->group(function () {
         Route::get('/', [TaskController::class, 'index'])
             ->can('viewAny', Task::class)
             ->name('index');
+        Route::get('/create-options', [TaskController::class, 'createOptions'])
+            ->can('create', Task::class)
+            ->name('create-options');
+        Route::post('/', [TaskController::class, 'store'])
+            ->can('create', Task::class)
+            ->name('store');
         Route::get('/{task}', [TaskController::class, 'show'])
             ->whereNumber('task')
             ->can('view', 'task')
