@@ -134,6 +134,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/filters', [PromoAnalysisController::class, 'filters'])->name('filters');
         Route::get('/summary', [PromoAnalysisController::class, 'summary'])->name('summary');
         Route::get('/funnels', [PromoAnalysisController::class, 'funnels'])->name('funnels');
+        Route::get('/sources', [PromoAnalysisController::class, 'sources'])->name('sources');
     });
 
     Route::get('/performance/summary', PerformanceSummaryController::class)
