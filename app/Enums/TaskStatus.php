@@ -11,6 +11,16 @@ enum TaskStatus: string
     case OnQa = 'on_qa';
     case Done = 'done';
 
+    /**
+     * Statuses a new task may start in: Back Log when it is not ready yet, To Do when it is.
+     *
+     * @return array<int, self>
+     */
+    public static function initial(): array
+    {
+        return [self::Backlog, self::Todo];
+    }
+
     public function label(): string
     {
         return match ($this) {

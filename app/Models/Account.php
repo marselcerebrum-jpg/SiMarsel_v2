@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 
@@ -38,6 +39,15 @@ class Account extends Authenticatable
     public function division(): BelongsTo
     {
         return $this->belongsTo(Division::class);
+    }
+
+    /**
+     * Accounts that can be PIC of a task in the division: the Staff of that division.
+     */
+    public function scopeAssignableIn(Builder $query, int $divisionId): void
+    {
+        $query->where('division_id', $divisionId)
+            ->whereHas('role', fn (Builder $query) => $query->where('code_role', Role::EMPLOYEE));
     }
 
     public function isAdmin(): bool

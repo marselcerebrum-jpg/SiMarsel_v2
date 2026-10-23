@@ -24,6 +24,14 @@ class TaskPolicy
     }
 
     /**
+     * Admin creates tasks for every division and a Manager for the division they manage; Staff cannot create tasks.
+     */
+    public function create(Account $user): bool
+    {
+        return $user->isAdmin() || ($user->isManager() && $user->division_id !== null);
+    }
+
+    /**
      * Seeing a task does not grant editing it: only Admin, or the Manager of its division, may edit.
      */
     public function update(Account $user, Task $task): bool
