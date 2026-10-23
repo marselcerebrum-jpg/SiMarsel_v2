@@ -4,6 +4,7 @@ namespace App\View\Components;
 
 use App\Models\Account;
 use App\Models\Division;
+use App\Models\PromoCode;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\View\Component;
 use Illuminate\View\View;
@@ -27,6 +28,12 @@ class Sidebar extends Component
                     $this->link('Summary', 'chart', 'dashboard'),
                     $this->link('Products', 'cube', 'performance.products'),
                 ]),
+            ],
+            'Work' => [
+                $this->link('Tasklist', 'checklist', 'tasks.index'),
+            ],
+            'Sales & Marketing' => [
+                $this->link('Promo Management', 'ticket', 'promo.index', ['viewAny', PromoCode::class]),
             ],
             'System' => [
                 $this->link('Account Management', 'gear', 'settings.index', ['viewAny', Account::class]),

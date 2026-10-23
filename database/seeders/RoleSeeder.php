@@ -13,6 +13,7 @@ class RoleSeeder extends Seeder
     public function run(): void
     {
         $roles = [
+            ['code_role' => 'ADM', 'name' => 'Admin'],
             ['code_role' => 'MGR', 'name' => 'Manager'],
             ['code_role' => 'EMP', 'name' => 'Employee'],
         ];
