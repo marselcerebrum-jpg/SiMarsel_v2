@@ -14,6 +14,7 @@ use App\Http\Controllers\Product\ProductOverviewController;
 use App\Http\Controllers\Promo\FunnelController;
 use App\Http\Controllers\Promo\PromoAnalysisController;
 use App\Http\Controllers\Promo\PromoCodeController;
+use App\Http\Controllers\Promo\PromoCodeSummaryController;
 use App\Http\Controllers\Promo\PromoSourceController;
 use App\Http\Controllers\Promo\UnregisteredPromoCodeController;
 use App\Http\Controllers\Task\TaskController;
@@ -135,6 +136,8 @@ Route::middleware('auth')->group(function () {
         Route::get('/summary', [PromoAnalysisController::class, 'summary'])->name('summary');
         Route::get('/funnels', [PromoAnalysisController::class, 'funnels'])->name('funnels');
         Route::get('/sources', [PromoAnalysisController::class, 'sources'])->name('sources');
+        Route::get('/codes', [PromoCodeSummaryController::class, 'index'])->name('codes');
+        Route::get('/codes/usages', [PromoCodeSummaryController::class, 'usages'])->name('codes.usages');
     });
 
     Route::get('/performance/summary', PerformanceSummaryController::class)
