@@ -1,6 +1,6 @@
 # API Analisis Promo
 
-Filter analisis, kartu KPI ringkasan, dan rekap per funnel untuk halaman Analisis Promo. Semua komponen analisis promo memakai **filter yang sama**, jadi kirim query parameter yang sama ke setiap endpoint.
+Filter analisis, kartu KPI ringkasan, serta rekap per funnel dan per source untuk halaman Analisis Promo. Semua komponen analisis promo memakai **filter yang sama**, jadi kirim query parameter yang sama ke setiap endpoint.
 
 Wajib login. **Semua user yang login** boleh mengakses. Aturan header dan kode error umum ada di [authentication.md](authentication.md). Cara penggunaan kode promo disimpan ada di [promo-codes.md](../promo-codes.md).
 
@@ -9,6 +9,7 @@ Wajib login. **Semua user yang login** boleh mengakses. Aturan header dan kode e
 | `GET /api/promo-analysis/filters` | Pilihan dropdown filter |
 | `GET /api/promo-analysis/summary` | Kartu KPI |
 | `GET /api/promo-analysis/funnels` | Tabel transaksi dan revenue per funnel |
+| `GET /api/promo-analysis/sources` | Tabel penggunaan dan revenue per source |
 
 ## Sumber data
 
@@ -202,6 +203,74 @@ Semua funnel master **selalu tampil**, termasuk yang 0, urut sesuai master (Apli
 | `name` | Nama yang ditampilkan di kolom Funnel |
 
 Jika tidak ada transaksi, respons tetap **200** dengan `is_empty: true`, `message`, dan semua kelompok bernilai 0.
+
+## `GET /api/promo-analysis/sources`
+
+Jumlah penggunaan dan revenue menurut **source setiap kode promo**. Endpoint ini menerima semua filter di atas.
+
+Berbeda dengan tabel Funnel yang menghitung **transaksi**, tabel Source menghitung **penggunaan kode**:
+
+| Kondisi transaksi | Penggunaan | Revenue |
+|---|---|---|
+| Satu kode | +1 untuk source kode itu | Seluruh nominal ke source kode itu |
+| Dua kode | +1 untuk source **masing-masing** kode | Kode posisi 1: **Rp0**. Kode posisi 2 (reseller): **seluruh** nominal. |
+| Posisi 1 kosong (`["", "RESELLER01"]`) | +1 untuk source kode itu | Seluruh nominal, karena hanya ada satu kode |
+| Tanpa kode | Tidak dihitung | Tidak masuk tabel Source; tetap ada di KPI dan Funnel |
+
+- Source diambil dari **snapshot** pada penggunaan kode itu sendiri (source yang berlaku pada waktu bayar). Kode utama dan kode kedua masing-masing memakai source-nya sendiri.
+- Kode tanpa source, termasuk kode belum terdaftar, masuk **Tanpa Sumber** (`no_source`).
+- Source yang sudah dihapus dari master tampil sebagai baris tersendiri dengan nama saat transaksi (`deleted_source`).
+- Nama source memakai nama master **sekarang**, jadi source yang di-rename tetap satu baris.
+- Saat `search` aktif, hanya kode yang **cocok** dengan pencarian yang dihitung. Misalnya `search=reseller` pada transaksi `CPNS26` + `RESELLER01` hanya menghitung `RESELLER01` (1 penggunaan, seluruh nominal).
+- Transaksi anomali (lebih dari 2 kode) tidak punya baris penggunaan, sehingga tidak masuk tabel Source.
+
+### Rumus
+
+| Field | Rumus |
+|---|---|
+| `usages` | Jumlah penggunaan kode di source itu. Total penggunaan **boleh lebih besar** dari jumlah transaksi. |
+| `revenue` | Jumlah nominal yang dikreditkan ke source itu (lihat tabel di atas) |
+| `contribution_percentage` | `revenue` ÷ total revenue **seluruh** transaksi hasil filter × 100, dibulatkan 2 desimal. `0` jika total = 0. |
+| `totals.transactions`, `totals.revenue` | Seluruh transaksi hasil filter, termasuk transaksi tanpa kode. Sama dengan `/summary`. |
+| `totals.usages`, `totals.source_revenue` | Jumlah semua baris tabel Source. `source_revenue` sama dengan Revenue dengan Promo di `/summary`. |
+
+Persentase Source **tidak harus berjumlah 100%**, karena revenue transaksi tanpa kode tidak masuk tabel Source tetapi tetap ada di total revenue.
+
+### Urutan baris
+
+Semua source master **selalu tampil**, termasuk yang 0, urut sesuai master (Aplikasi, Instagram, TikTok, Telegram, Sales, Ads, Live, Reseller, Lainnya, lalu source baru). Setelah itu source yang sudah dihapus (A-Z), lalu **Tanpa Sumber**. Tidak ada baris Tanpa Kode.
+
+### 200 OK
+
+`GET /api/promo-analysis/sources?year=2026&month=9`:
+
+```json
+{
+    "data": {
+        "filter": { "mode": "month", "date_from": "2026-09-01", "date_to": "2026-09-30", "...": "sama dengan /summary" },
+        "is_empty": false,
+        "message": null,
+        "totals": { "transactions": 6, "revenue": 2100000, "usages": 7, "source_revenue": 1500000 },
+        "sources": [
+            { "key": "source", "source": { "id": 1, "name": "Aplikasi" }, "name": "Aplikasi", "usages": 0, "revenue": 0, "contribution_percentage": 0 },
+            { "key": "source", "source": { "id": 2, "name": "Instagram" }, "name": "Instagram", "usages": 2, "revenue": 100000, "contribution_percentage": 4.76 },
+            { "key": "source", "source": { "id": 3, "name": "TikTok" }, "name": "TikTok", "usages": 1, "revenue": 0, "contribution_percentage": 0 },
+            { "key": "source", "source": { "id": 8, "name": "Reseller" }, "name": "Reseller", "usages": 2, "revenue": 500000, "contribution_percentage": 23.81 },
+            { "key": "no_source", "source": null, "name": "Tanpa Sumber", "usages": 2, "revenue": 900000, "contribution_percentage": 42.86 }
+        ]
+    }
+}
+```
+
+(Dipersingkat; source master lain tetap tampil dengan nilai 0.)
+
+| Field | Keterangan |
+|---|---|
+| `key` | `source`, `deleted_source`, atau `no_source` |
+| `source` | `{ id, name }` source master; `null` untuk kelompok lain |
+| `name` | Nama yang ditampilkan di kolom Source |
+
+Jika tidak ada transaksi, respons tetap **200** dengan `is_empty: true`, `message`, dan semua source bernilai 0.
 
 ## 422 Validasi gagal
 

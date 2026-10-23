@@ -104,6 +104,35 @@ class PromoAnalysisRepository
     }
 
     /**
+     * Usages and credited revenue per source of each code, from the code's own snapshot. Every usage of the
+     * filtered transactions counts once, so a two-code transaction adds a usage to both sources. The full
+     * nominal goes to the code in the highest position: the only code, or the second (reseller) code of a
+     * two-code transaction, whose main code gets Rp0. With a search, only the codes matching it are counted.
+     * deleted_source_name is the snapshot name of a source that was removed from the master.
+     *
+     * @return Collection<int, object{source_id: int|null, deleted_source_name: string|null, usages: int, revenue: string|float}>
+     */
+    public function sourceTotals(PromoAnalysisFilter $filter): Collection
+    {
+        $usages = DB::table('transaction_promo_codes')
+            ->join('transactions', 'transactions.id', '=', 'transaction_promo_codes.transaction_id')
+            ->whereIn('transaction_promo_codes.transaction_id', $this->transactions($filter)->select('transactions.id'))
+            ->when($filter->hasSearch(), fn (QueryBuilder $query) => $this->whereCodeMatches($query, $filter->search))
+            ->selectRaw(
+                'transaction_promo_codes.source_id_snapshot as source_id, '
+                .'CASE WHEN transaction_promo_codes.source_id_snapshot IS NULL THEN transaction_promo_codes.source_name_snapshot END as deleted_source_name, '
+                .'CASE WHEN transaction_promo_codes.code_position = (SELECT MAX(positions.code_position) FROM transaction_promo_codes positions '
+                .'WHERE positions.transaction_id = transaction_promo_codes.transaction_id) THEN transactions.nominal ELSE 0 END as revenue'
+            );
+
+        return DB::query()
+            ->fromSub($usages, 'credited_usages')
+            ->groupBy('source_id', 'deleted_source_name')
+            ->selectRaw('source_id, deleted_source_name, COUNT(*) as usages, COALESCE(SUM(revenue), 0) as revenue')
+            ->get();
+    }
+
+    /**
      * Payment methods of successful transactions, for the filter options.
      *
      * @return Collection<int, string|null> Names as stored, without surrounding spaces; null for an empty method.
