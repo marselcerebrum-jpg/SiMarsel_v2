@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Task;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Task\StoreTaskRequest;
 use App\Http\Requests\Task\TaskListRequest;
+use App\Http\Requests\Task\UpdateTaskRequest;
 use App\Http\Resources\TaskDetailResource;
 use App\Http\Resources\TaskResource;
 use App\Models\Task;
@@ -55,5 +56,12 @@ class TaskController extends Controller
     public function show(Task $task): TaskDetailResource
     {
         return TaskDetailResource::make($this->taskService->detail($task));
+    }
+
+    public function update(UpdateTaskRequest $request, Task $task): TaskDetailResource
+    {
+        $task = $this->taskService->update($request->user(), $task, $request->validated());
+
+        return TaskDetailResource::make($task)->additional(['message' => 'Tugas berhasil diperbarui.']);
     }
 }

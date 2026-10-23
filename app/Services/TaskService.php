@@ -5,16 +5,23 @@ namespace App\Services;
 use App\Enums\TaskPriority;
 use App\Enums\TaskStatus;
 use App\Exceptions\DuplicateTaskSubmissionException;
+use App\Exceptions\TaskVersionConflictException;
 use App\Models\Account;
 use App\Models\Division;
 use App\Models\Platform;
 use App\Models\Task;
+use App\Models\TaskActivity;
 use App\Models\TaskCategory;
 use App\Repositories\TaskRepository;
+use BackedEnum;
+use Carbon\CarbonInterface;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use Throwable;
 
 class TaskService
@@ -47,7 +54,7 @@ class TaskService
 
     public function detail(Task $task): Task
     {
-        return $task->load(['category', 'division', 'platform', 'pic', 'creator']);
+        return $task->load(['category', 'division', 'platform', 'pic', 'creator', 'activities.actor']);
     }
 
     /**
@@ -67,13 +74,19 @@ class TaskService
         }
 
         try {
-            $task = Task::create([
-                ...$data,
-                'creator_id' => $creator->id,
-                'priority' => $data['priority'] ?? TaskPriority::Medium->value,
-                'status' => $data['status'] ?? TaskStatus::Backlog->value,
-                'requires_review' => $this->requiresReview($data),
-            ]);
+            $task = DB::transaction(function () use ($creator, $data) {
+                $task = Task::create([
+                    ...$data,
+                    'creator_id' => $creator->id,
+                    'priority' => $data['priority'] ?? TaskPriority::Medium->value,
+                    'status' => $data['status'] ?? TaskStatus::Backlog->value,
+                    'requires_review' => $this->requiresReview($data),
+                ]);
+
+                $task->activities()->create(['account_id' => $creator->id, 'action' => TaskActivity::CREATED]);
+
+                return $task;
+            });
         } catch (Throwable $e) {
             Cache::forget($fingerprint);
 
@@ -81,6 +94,62 @@ class TaskService
         }
 
         return $this->detail($task);
+    }
+
+    /**
+     * Apply an edit from an Admin or the division's Manager. Only fields whose value actually changes are
+     * checked against the task's current condition, so a form that resends unchanged values still saves.
+     *
+     * The edit must carry the version it was based on; the row is locked while that is compared, so of two
+     * edits based on the same version only the first is saved and the second gets a conflict instead of
+     * silently overwriting it.
+     *
+     * @param  array<string, mixed>  $data  Validated input including version.
+     *
+     * @throws TaskVersionConflictException When the task was saved by someone else after the editor loaded it.
+     * @throws ValidationException When a change breaks the field, workflow, assignment, or QA rules.
+     */
+    public function update(Account $editor, Task $task, array $data): Task
+    {
+        $baseVersion = (int) $data['version'];
+        unset($data['version']);
+
+        DB::transaction(function () use ($editor, $task, $data, $baseVersion) {
+            $locked = Task::query()->whereKey($task->id)->lockForUpdate()->firstOrFail();
+
+            if ($locked->version !== $baseVersion) {
+                throw new TaskVersionConflictException($locked->version);
+            }
+
+            $lockedFields = $locked->lockedFieldsFor($editor);
+            $previousStatus = $locked->status;
+
+            $locked->fill($data);
+            $this->applyCategoryReview($locked, $data);
+
+            if (! $locked->isDirty()) {
+                return;
+            }
+
+            $this->guardChanges($locked, $previousStatus, $lockedFields);
+
+            if ($locked->isDirty('status')) {
+                $locked->completed_at = $locked->status === TaskStatus::Done ? now() : null;
+            }
+
+            $changes = $this->describeChanges($locked);
+
+            $locked->version = $baseVersion + 1;
+            $locked->save();
+
+            $locked->activities()->create([
+                'account_id' => $editor->id,
+                'action' => TaskActivity::UPDATED,
+                'changes' => $changes,
+            ]);
+        });
+
+        return $this->detail($task->refresh());
     }
 
     /**
@@ -140,6 +209,111 @@ class TaskService
             && TaskCategory::whereKey($data['category_id'])->value('requires_review');
 
         return $categoryRequiresReview || (bool) ($data['requires_review'] ?? false);
+    }
+
+    /**
+     * A category that requires QA keeps QA required: choosing such a category turns it on, and it cannot be
+     * turned off while the task has one.
+     *
+     * @param  array<string, mixed>  $data
+     *
+     * @throws ValidationException
+     */
+    private function applyCategoryReview(Task $task, array $data): void
+    {
+        if ($task->category_id === null || ! TaskCategory::whereKey($task->category_id)->value('requires_review')) {
+            return;
+        }
+
+        if (array_key_exists('requires_review', $data) && ! $data['requires_review']) {
+            throw ValidationException::withMessages(['requires_review' => 'Kategori tugas ini mewajibkan QA.']);
+        }
+
+        if ($task->isDirty('category_id')) {
+            $task->requires_review = true;
+        }
+    }
+
+    /**
+     * @param  array<string, string>  $lockedFields  Fields locked in the task's condition before the edit, with the reason.
+     *
+     * @throws ValidationException
+     */
+    private function guardChanges(Task $task, TaskStatus $previousStatus, array $lockedFields): void
+    {
+        $errors = array_intersect_key($lockedFields, $task->getDirty());
+
+        if ($errors !== []) {
+            throw ValidationException::withMessages($errors);
+        }
+
+        if ($task->isDirty('status') && ! $previousStatus->canMoveTo($task->status, $task->requires_review)) {
+            $message = "Status tidak dapat diubah dari {$previousStatus->label()} ke {$task->status->label()}.";
+
+            if ($task->status === TaskStatus::Done && $task->requires_review) {
+                $message .= ' Tugas ini wajib melalui QA sebelum Done.';
+            }
+
+            throw ValidationException::withMessages(['status' => $message]);
+        }
+
+        if ($task->isDirty(['status', 'pic_id']) && $task->status !== TaskStatus::Backlog && $task->pic_id === null) {
+            throw ValidationException::withMessages(['pic_id' => 'PIC wajib diisi untuk tugas yang tidak berstatus Back Log.']);
+        }
+    }
+
+    /**
+     * Old and new value of each changed field. Related records are kept with their name at the time
+     * of the change, so the history stays readable after they are renamed.
+     *
+     * @return array<string, array{old: mixed, new: mixed}>
+     */
+    private function describeChanges(Task $task): array
+    {
+        $relations = [
+            'category_id' => ['category', TaskCategory::class, 'name'],
+            'division_id' => ['division', Division::class, 'name'],
+            'platform_id' => ['platform', Platform::class, 'name'],
+            'pic_id' => ['pic', Account::class, 'fullname'],
+        ];
+
+        return collect($task->getDirty())
+            ->keys()
+            ->reject(fn (string $field) => $field === 'completed_at')
+            ->mapWithKeys(function (string $field) use ($task, $relations) {
+                if (isset($relations[$field])) {
+                    [$name, $model, $column] = $relations[$field];
+
+                    return [$name => [
+                        'old' => $this->reference($model, $column, $task->getOriginal($field)),
+                        'new' => $this->reference($model, $column, $task->{$field}),
+                    ]];
+                }
+
+                return [$field => [
+                    'old' => $this->plain($task->getOriginal($field)),
+                    'new' => $this->plain($task->{$field}),
+                ]];
+            })
+            ->all();
+    }
+
+    /**
+     * @param  class-string<Model>  $model
+     * @return array{id: int, name: ?string}|null
+     */
+    private function reference(string $model, string $column, mixed $id): ?array
+    {
+        return $id === null ? null : ['id' => (int) $id, 'name' => $model::whereKey($id)->value($column)];
+    }
+
+    private function plain(mixed $value): mixed
+    {
+        return match (true) {
+            $value instanceof BackedEnum => $value->value,
+            $value instanceof CarbonInterface => $value->toDateString(),
+            default => $value,
+        };
     }
 
     /**

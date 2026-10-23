@@ -21,6 +21,34 @@ enum TaskStatus: string
         return [self::Backlog, self::Todo];
     }
 
+    /**
+     * Statuses this one may move to. A task that requires QA reaches Done only through Ready for QA and On QA;
+     * one that does not goes from On Process straight to Done.
+     *
+     * @return array<int, self>
+     */
+    public function nextStatuses(bool $requiresReview): array
+    {
+        return match ($this) {
+            self::Backlog => [self::Todo],
+            self::Todo => [self::Backlog, self::InProgress],
+            self::InProgress => [self::Todo, $requiresReview ? self::ReadyForQa : self::Done],
+            self::ReadyForQa => [self::InProgress, self::OnQa],
+            self::OnQa => [self::InProgress, self::Done],
+            self::Done => [self::InProgress],
+        };
+    }
+
+    public function canMoveTo(self $status, bool $requiresReview): bool
+    {
+        return in_array($status, $this->nextStatuses($requiresReview), true);
+    }
+
+    public function inQa(): bool
+    {
+        return $this === self::ReadyForQa || $this === self::OnQa;
+    }
+
     public function label(): string
     {
         return match ($this) {

@@ -98,9 +98,17 @@ class StoreTaskRequest extends FormRequest
     }
 
     /**
+     * The division the task belongs to after this request.
+     */
+    protected function divisionId(): mixed
+    {
+        return $this->input('division_id');
+    }
+
+    /**
      * A Manager may only create tasks for the division they manage.
      */
-    private function creatableDivision(): Closure
+    protected function creatableDivision(): Closure
     {
         return function (string $attribute, mixed $value, Closure $fail) {
             if (! is_numeric($value) || ! Division::whereKey($value)->exists()) {
@@ -116,10 +124,10 @@ class StoreTaskRequest extends FormRequest
     /**
      * The PIC must be a Staff member of the task's division.
      */
-    private function assignablePic(): Closure
+    protected function assignablePic(): Closure
     {
         return function (string $attribute, mixed $value, Closure $fail) {
-            $divisionId = $this->input('division_id');
+            $divisionId = $this->divisionId();
 
             if (! is_numeric($value) || ! is_numeric($divisionId)) {
                 return;

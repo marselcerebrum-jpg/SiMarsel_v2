@@ -158,5 +158,9 @@ Route::middleware('auth')->group(function () {
             ->whereNumber('task')
             ->can('view', 'task')
             ->name('show');
+        Route::match(['put', 'patch'], '/{task}', [TaskController::class, 'update'])
+            ->whereNumber('task')
+            ->can('update', 'task')
+            ->name('update');
     });
 });
