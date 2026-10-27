@@ -1,15 +1,18 @@
 import { http } from '../http';
 
 /**
- * Semua panggilan API Tasklist. Backend belum tersedia: selama VITE_TASK_API_READY bukan "true",
- * setiap pemanggilan langsung ditolak dengan { unavailable: true } tanpa memanggil server, dan
- * halaman menampilkan keterangan "Menunggu Back End". Kontrak lengkap ada di docs/api/tasks.md.
+ * Semua panggilan API Tasklist. Kontrak lengkap ada di docs/api/tasks.md.
+ *
+ * Detail, edit, dan opsi edit sudah terhubung ke backend. Endpoint lain masih menunggu: selama
+ * VITE_TASK_API_READY bukan "true", pemanggilannya langsung ditolak dengan { unavailable: true }
+ * tanpa memanggil server, dan halaman menampilkan keterangan "Menunggu Back End".
  *
  * GET    /api/tasks/meta                       → { data: { role, scope, can_create, divisions, categories, platforms } }
  * GET    /api/tasks?division&priority&status   → { data: [Task] }
  * POST   /api/tasks                            → { data: Task, message }
- * GET    /api/tasks/{id}                       → { data: TaskDetail }
- * PATCH  /api/tasks/{id}                       → { data: TaskDetail, message }         (kirim updated_at)
+ * GET    /api/tasks/{id}                       → { data: TaskDetail }                  (tersambung)
+ * PATCH  /api/tasks/{id}                       → { data: TaskDetail, message }         (tersambung; kirim version)
+ * GET    /api/tasks/create-options             → { data: { categories, platforms, … } } (tersambung; Admin & Manajer)
  * PATCH  /api/tasks/{id}/status                → { data: TaskDetail, message }         (kirim status, updated_at)
  * PATCH  /api/tasks/{id}/assignee              → { data: TaskDetail, message }         (kirim pic_id, note, updated_at)
  * GET    /api/tasks/assignees?division         → { data: [{ id, fullname, division }] }
@@ -38,9 +41,12 @@ export const fetchTasks = (filters) => request(`/api/tasks${query(filters)}`);
 
 export const createTask = (body) => request('/api/tasks', { method: 'POST', body });
 
-export const fetchTask = (id) => request(`/api/tasks/${id}`);
+export const fetchTask = (id) => http(`/api/tasks/${id}`);
 
-export const updateTask = (id, body) => request(`/api/tasks/${id}`, { method: 'PATCH', body });
+export const updateTask = (id, body) => http(`/api/tasks/${id}`, { method: 'PATCH', body });
+
+// Kategori (dengan konfigurasi QA) dan platform beserta ID-nya untuk form edit.
+export const fetchEditOptions = () => http('/api/tasks/create-options');
 
 export const changeTaskStatus = (id, body) => request(`/api/tasks/${id}/status`, { method: 'PATCH', body });
 

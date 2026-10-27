@@ -45,7 +45,9 @@ Backend **wajib** menerapkan cakupan ini di setiap endpoint. Staff yang mengubah
 - `pic`, `start_date`, dan `deadline` boleh `null`.
 - `updated_at` dipakai untuk mencegah perubahan berbasis data lama (lihat 409).
 
-**TaskDetail** = Task ditambah `description`, `category` (`{ id, name }`), `platform` (`{ slug, name }` | null), `creator` (`{ id, fullname }`), `created_at`, `completed_at`, dan `last_review` (`{ decision: "approve"|"revision", note, reviewer: { id, fullname }, created_at }` | null).
+**TaskDetail** = Task ditambah `description`, `division` (`{ id, code_division, name }`), `category` (`{ id, name, requires_review }` | null), `platform` (`{ id, name }` | null), `creator` (`{ id, fullname }`), `evidence` (`[Evidence]`), `history` (`[{ id, action, changes, actor: { id, fullname } | null, created_at }]`, terbaru dulu), `editable_fields` (field yang boleh diubah user ini pada kondisi tugas saat ini), `next_statuses` (`[{ value, label }]`), `version`, `created_at`, `completed_at`, dan `last_review` (`{ decision: "approve"|"revision", note, reviewer: { id, fullname }, created_at }` | null).
+
+- `history[].action`: `created` | `updated` | `assigned` | `reassigned`. `changes` berisi `{ field: { old, new } }`; field relasi (`category`, `division`, `platform`, `pic`) bernilai `{ id, name }`.
 
 ## Endpoint
 
@@ -55,7 +57,8 @@ Backend **wajib** menerapkan cakupan ini di setiap endpoint. Staff yang mengubah
 | `GET /api/tasks` | `division` (opsional) | `{ data: [Task] }`, semua tugas dalam cakupan user. Pencarian, filter prioritas/status, sort, dan pagination dilakukan di frontend. |
 | `POST /api/tasks` | `title`*, `description`, `category_id`, `division`*, `pic_id`, `platform`, `priority`*, `start_date`, `deadline`, `status`* (`backlog`\|`todo`), `requires_review`, `client_request_id`* | `201 { data: Task, message }` |
 | `GET /api/tasks/{id}` | – | `{ data: TaskDetail }` |
-| `PATCH /api/tasks/{id}` | `title`, `description`, `category_id`, `platform`, `priority`, `start_date`, `deadline`, `updated_at`* | `{ data: TaskDetail, message }` |
+| `GET /api/tasks/create-options` | – (Admin & Manajer) | `{ data: { divisions, categories: [{ id, name, requires_review }], platforms: [{ id, name }], priorities, statuses, defaults } }`, dipakai juga untuk opsi form edit |
+| `PATCH /api/tasks/{id}` | `version`*, lalu hanya field yang diubah: `title`, `description`, `category_id`, `division_id`, `platform_id`, `pic_id`, `priority`, `status`, `start_date`, `deadline`, `requires_review` | `{ data: TaskDetail, message }`; `409 { message, current_version }` bila `version` sudah usang |
 | `PATCH /api/tasks/{id}/status` | `status`*, `updated_at`* | `{ data: TaskDetail, message }` |
 | `PATCH /api/tasks/{id}/assignee` | `pic_id`*, `note`, `updated_at`* | `{ data: TaskDetail, message }` |
 | `GET /api/tasks/assignees` | `division` | `{ data: [{ id, fullname, division }] }`, hanya user yang memenuhi aturan penugasan |

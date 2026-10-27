@@ -5,10 +5,9 @@ import {
     assignTask,
     changeTaskStatus,
     createTask,
-    fetchActivities,
     fetchAssignees,
     fetchCalendar,
-    fetchEvidences,
+    fetchEditOptions,
     fetchSchedule,
     fetchTask,
     fetchTaskMeta,
@@ -37,6 +36,7 @@ import {
     transitionRule,
     userContext,
 } from './workflow';
+import { historyEntries } from './history';
 
 const VIEWS = ['board', 'table', 'timeline', 'calendar'];
 const PAGE_SIZE = 10;
@@ -605,6 +605,23 @@ Alpine.data('taskCreateForm', () => ({
     },
 }));
 
+// Field form edit; nama sama dengan field API dan editable_fields dari backend.
+const EDIT_FIELDS = ['title', 'description', 'category_id', 'platform_id', 'priority', 'start_date', 'deadline'];
+
+// Nilai form → nilai yang dikirim ke API: teks dirapikan, pilihan kosong menjadi null, ID menjadi angka.
+const editPayload = (form) => ({
+    title: form.title.trim(),
+    description: form.description.trim() || null,
+    category_id: form.category_id ? Number(form.category_id) : null,
+    platform_id: form.platform_id ? Number(form.platform_id) : null,
+    priority: form.priority,
+    start_date: form.start_date || null,
+    deadline: form.deadline || null,
+});
+
+// Board dan Table hanya butuh data ringkas; histori, evidence, dan aturan edit tetap di panel detail.
+const listFields = ({ history, evidence, editable_fields, next_statuses, ...task }) => task;
+
 /**
  * Panel detail tugas (TASK-03 s.d. TASK-08): informasi, edit, PIC, status, evidence, review, histori.
  */
@@ -620,8 +637,12 @@ Alpine.data('taskDetail', () => ({
 
     editing: false,
     editForm: {},
+    editBase: {},
     editErrors: {},
+    editFormError: '',
     saving: false,
+    editOptions: { categories: [], platforms: [] },
+    editOptionsState: 'idle',
 
     assignees: [],
     assigneeState: 'idle',
@@ -653,11 +674,10 @@ Alpine.data('taskDetail', () => ({
             const { data } = await fetchTask(id);
             this.task = data;
             this.state = 'ready';
-            this.syncTask(data);
+            this.applyRelated(data);
+            this.syncTask(listFields(data));
             // Tugas yang belum ada di daftar baru masuk Board setelah detailnya dimuat.
             if (this.highlightId === data.id) this.$nextTick(() => this.revealHighlight());
-            this.loadEvidences();
-            this.loadActivities();
             if (this.detailFocus === 'revision') this.startReview('revision');
             if (this.detailFocus === 'edit' && this.canEditThis) this.startEdit();
         } catch (error) {
@@ -676,8 +696,20 @@ Alpine.data('taskDetail', () => ({
     // Respons sukses dari backend membawa data tugas terbaru: tampilkan di detail, Board, dan Table.
     applyTask(data) {
         this.task = { ...this.task, ...data };
-        this.syncTask(this.task);
-        this.loadActivities();
+        this.applyRelated(data);
+        this.syncTask(listFields(this.task));
+    },
+
+    // Evidence dan histori ikut dalam respons detail/update, jadi tidak perlu permintaan terpisah.
+    applyRelated(data) {
+        if (Array.isArray(data.evidence)) {
+            this.evidences = data.evidence;
+            this.evidenceState = 'ready';
+        }
+        if (Array.isArray(data.history)) {
+            this.activities = historyEntries(data.history);
+            this.activityState = 'ready';
+        }
     },
 
     async handleFailure(error, fallback) {
@@ -688,27 +720,15 @@ Alpine.data('taskDetail', () => ({
         }
     },
 
-    async loadEvidences() {
-        this.evidenceState = 'loading';
-
-        try {
-            const { data } = await fetchEvidences(this.task.id);
-            this.evidences = data;
-            this.evidenceState = 'ready';
-        } catch (error) {
-            this.evidenceState = error?.unavailable ? 'unavailable' : 'error';
-        }
-    },
-
+    // "Coba lagi" pada histori: ambil ulang detail tugas yang memuat histori terbaru.
     async loadActivities() {
         this.activityState = 'loading';
 
         try {
-            const { data } = await fetchActivities(this.task.id);
-            this.activities = [...data].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-            this.activityState = 'ready';
-        } catch (error) {
-            this.activityState = error?.unavailable ? 'unavailable' : 'error';
+            const { data } = await fetchTask(this.task.id);
+            this.applyTask(data);
+        } catch {
+            this.activityState = 'error';
         }
     },
 
@@ -722,8 +742,16 @@ Alpine.data('taskDetail', () => ({
         return this.task?.pic?.id !== undefined && this.task?.pic?.id === this.user.id;
     },
 
+    // Backend menentukan field yang boleh diubah sesuai role dan kondisi tugas (mis. Done hanya status).
     get canEditThis() {
-        return this.task ? canEditTask(this.task, this.user) : false;
+        if (!this.task) return false;
+        if (Array.isArray(this.task.editable_fields)) return EDIT_FIELDS.some((field) => this.task.editable_fields.includes(field));
+
+        return canEditTask(this.task, this.user);
+    },
+
+    isEditable(field) {
+        return Array.isArray(this.task?.editable_fields) ? this.task.editable_fields.includes(field) : this.canEditThis;
     },
 
     get assignment() {
@@ -745,14 +773,45 @@ Alpine.data('taskDetail', () => ({
         this.editForm = {
             title,
             description: description ?? '',
-            category_id: category?.id ?? '',
-            platform: platform?.slug ?? '',
+            category_id: category?.id ? String(category.id) : '',
+            platform_id: platform?.id ? String(platform.id) : '',
             priority,
             start_date: start_date ?? '',
             deadline: deadline ?? '',
         };
+        this.editBase = editPayload(this.editForm);
         this.editErrors = {};
+        this.editFormError = '';
         this.editing = true;
+        this.loadEditOptions();
+    },
+
+    async loadEditOptions() {
+        if (this.editOptionsState === 'ready' || this.editOptionsState === 'loading') return;
+
+        this.editOptionsState = 'loading';
+
+        try {
+            const { data } = await fetchEditOptions();
+            this.editOptions = { categories: data.categories ?? [], platforms: data.platforms ?? [] };
+            this.editOptionsState = 'ready';
+        } catch {
+            this.editOptionsState = 'error';
+        }
+    },
+
+    // Pilihan kategori/platform; nilai tugas saat ini tetap ada meski opsi gagal dimuat.
+    editChoices(kind) {
+        const current = this.task?.[kind === 'categories' ? 'category' : 'platform'];
+        const options = this.editOptions[kind];
+
+        return current && !options.some((option) => option.id === current.id) ? [current, ...options] : options;
+    },
+
+    get editCategoryRequiresReview() {
+        const id = Number(this.editForm.category_id);
+
+        return Boolean(id && this.editChoices('categories').find((category) => category.id === id)?.requires_review);
     },
 
     async saveEdit() {
@@ -762,22 +821,46 @@ Alpine.data('taskDetail', () => ({
             errors.deadline = 'Deadline tidak boleh sebelum tanggal mulai.';
         }
         this.editErrors = errors;
+        this.editFormError = '';
         if (Object.keys(errors).length || this.saving) return;
+
+        // Hanya field yang berubah dikirim, sehingga data lain tidak ikut tertimpa.
+        const changes = Object.fromEntries(
+            Object.entries(editPayload(this.editForm)).filter(([field, value]) => value !== this.editBase[field] && this.isEditable(field)),
+        );
+
+        if (!Object.keys(changes).length) {
+            this.editing = false;
+            showToast({ type: 'info', title: 'Tidak ada perubahan', text: 'Informasi tugas tidak berubah.' });
+            return;
+        }
 
         this.saving = true;
 
         try {
-            // updated_at dikirim agar backend menolak perubahan yang berbasis data lama (409).
-            const { data, message } = await updateTask(this.task.id, { ...this.editForm, updated_at: this.task.updated_at });
+            // version dikirim agar backend menolak perubahan yang berbasis data lama (409).
+            const { data, message } = await updateTask(this.task.id, { ...changes, version: this.task.version });
             this.applyTask(data);
             this.editing = false;
             showToast({ title: 'Changes Saved', text: message ?? 'Informasi tugas diperbarui.' });
         } catch (error) {
-            if (error?.status === 422) this.editErrors = validationErrors(error);
+            if (error?.status === 422) this.showEditErrors(validationErrors(error));
             else await this.handleFailure(error, 'Perubahan tugas gagal disimpan.');
         } finally {
             this.saving = false;
         }
+    },
+
+    // Error untuk field di form tampil di bawah field-nya; error lain (mis. aturan QA) tampil di atas tombol simpan.
+    async showEditErrors(errors) {
+        if (errors.version) {
+            await this.handleFailure({ status: 409 });
+            return;
+        }
+
+        this.editErrors = Object.fromEntries(Object.entries(errors).filter(([field]) => EDIT_FIELDS.includes(field)));
+        const others = Object.entries(errors).filter(([field]) => !EDIT_FIELDS.includes(field)).map(([, message]) => message);
+        this.editFormError = others.length ? others.join(' ') : 'Periksa kembali isian yang ditandai.';
     },
 
     // --- Penugasan PIC (TASK-04) ----------------------------------------------------------------
