@@ -46,4 +46,13 @@ class TaskPolicy
     {
         return $task->managedBy($user);
     }
+
+    /**
+     * Anyone who sees the task may request a status change; whether this account may make this particular
+     * move (PIC vs. Admin/Manager) is checked by TaskService so the rejection carries its reason.
+     */
+    public function changeStatus(Account $user, Task $task): bool
+    {
+        return $task->isVisibleTo($user);
+    }
 }

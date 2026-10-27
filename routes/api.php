@@ -162,6 +162,10 @@ Route::middleware('auth')->group(function () {
             ->whereNumber('task')
             ->can('update', 'task')
             ->name('update');
+        Route::patch('/{task}/status', [TaskController::class, 'changeStatus'])
+            ->whereNumber('task')
+            ->can('changeStatus', 'task')
+            ->name('change-status');
         Route::get('/{task}/assignment-options', [TaskController::class, 'assignmentOptions'])
             ->whereNumber('task')
             ->can('assign', 'task')

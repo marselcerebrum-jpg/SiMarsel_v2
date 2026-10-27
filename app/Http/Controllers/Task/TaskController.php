@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Task;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Task\AssignTaskRequest;
+use App\Http\Requests\Task\ChangeTaskStatusRequest;
 use App\Http\Requests\Task\StoreTaskRequest;
 use App\Http\Requests\Task\TaskListRequest;
 use App\Http\Requests\Task\UpdateTaskRequest;
@@ -64,6 +65,13 @@ class TaskController extends Controller
         $task = $this->taskService->update($request->user(), $task, $request->validated());
 
         return TaskDetailResource::make($task)->additional(['message' => 'Tugas berhasil diperbarui.']);
+    }
+
+    public function changeStatus(ChangeTaskStatusRequest $request, Task $task): TaskDetailResource
+    {
+        $task = $this->taskService->changeStatus($request->user(), $task, $request->validated());
+
+        return TaskDetailResource::make($task)->additional(['message' => 'Status tugas berhasil diperbarui.']);
     }
 
     public function assignmentOptions(Request $request, Task $task): JsonResponse

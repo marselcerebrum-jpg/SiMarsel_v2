@@ -128,7 +128,7 @@ class TaskService
             }
 
             $lockedFields = $locked->lockedFieldsFor($editor);
-            $previousStatus = $locked->status;
+            $statusDenial = $this->statusDenial($editor, $locked, $data['status'] ?? null);
 
             $locked->fill($data);
             $this->applyCategoryReview($locked, $data);
@@ -137,7 +137,7 @@ class TaskService
                 return;
             }
 
-            $this->guardChanges($locked, $previousStatus, $lockedFields);
+            $this->guardChanges($locked, $statusDenial, $lockedFields);
 
             if ($locked->isDirty('status')) {
                 $locked->completed_at = $locked->status === TaskStatus::Done ? now() : null;
@@ -151,6 +151,60 @@ class TaskService
             $locked->activities()->create([
                 'account_id' => $editor->id,
                 'action' => TaskActivity::UPDATED,
+                'changes' => $changes,
+            ]);
+        });
+
+        return $this->detail($task->refresh());
+    }
+
+    /**
+     * Move the task to another status following the transition matrix: the PIC starts and submits the work
+     * (To Do → On Process → Ready for QA, or straight to Done when QA is not required), and Admin or the
+     * division's Manager moves Back Log → To Do and runs the review (Ready for QA → On QA → Done, or back to
+     * On Process for revision). The change is appended to the history.
+     *
+     * @param  array{version: int|string, status: string}  $data
+     *
+     * @throws TaskVersionConflictException When the task was saved by someone else after the actor loaded it.
+     * @throws ValidationException When the move is not in the matrix, belongs to another role, or the task has no PIC.
+     */
+    public function changeStatus(Account $actor, Task $task, array $data): Task
+    {
+        $baseVersion = (int) $data['version'];
+
+        DB::transaction(function () use ($actor, $task, $data, $baseVersion) {
+            $locked = Task::query()->whereKey($task->id)->lockForUpdate()->firstOrFail();
+
+            if ($locked->version !== $baseVersion) {
+                throw new TaskVersionConflictException($locked->version);
+            }
+
+            $status = TaskStatus::from($data['status']);
+
+            if ($locked->status === $status) {
+                throw ValidationException::withMessages(['status' => "Tugas sudah berstatus {$status->label()}."]);
+            }
+
+            if ($denial = $locked->statusChangeDenialFor($actor, $status)) {
+                throw ValidationException::withMessages(['status' => $denial]);
+            }
+
+            if ($locked->pic_id === null) {
+                throw ValidationException::withMessages(['pic_id' => 'Tetapkan PIC sebelum memindahkan tugas dari Back Log.']);
+            }
+
+            $locked->status = $status;
+            $locked->completed_at = $status === TaskStatus::Done ? now() : null;
+
+            $changes = $this->describeChanges($locked);
+
+            $locked->version = $baseVersion + 1;
+            $locked->save();
+
+            $locked->activities()->create([
+                'account_id' => $actor->id,
+                'action' => TaskActivity::STATUS_CHANGED,
                 'changes' => $changes,
             ]);
         });
@@ -346,11 +400,25 @@ class TaskService
     }
 
     /**
+     * Why the editor may not move the task, in its condition before the edit, to the sent status; null when
+     * no other status is sent or the move is allowed.
+     */
+    private function statusDenial(Account $editor, Task $task, ?string $status): ?string
+    {
+        if ($status === null || $status === $task->status->value) {
+            return null;
+        }
+
+        return $task->statusChangeDenialFor($editor, TaskStatus::from($status));
+    }
+
+    /**
+     * @param  ?string  $statusDenial  Why the sent status change is not allowed, if it is not.
      * @param  array<string, string>  $lockedFields  Fields locked in the task's condition before the edit, with the reason.
      *
      * @throws ValidationException
      */
-    private function guardChanges(Task $task, TaskStatus $previousStatus, array $lockedFields): void
+    private function guardChanges(Task $task, ?string $statusDenial, array $lockedFields): void
     {
         $errors = array_intersect_key($lockedFields, $task->getDirty());
 
@@ -358,14 +426,8 @@ class TaskService
             throw ValidationException::withMessages($errors);
         }
 
-        if ($task->isDirty('status') && ! $previousStatus->canMoveTo($task->status, $task->requires_review)) {
-            $message = "Status tidak dapat diubah dari {$previousStatus->label()} ke {$task->status->label()}.";
-
-            if ($task->status === TaskStatus::Done && $task->requires_review) {
-                $message .= ' Tugas ini wajib melalui QA sebelum Done.';
-            }
-
-            throw ValidationException::withMessages(['status' => $message]);
+        if ($statusDenial !== null) {
+            throw ValidationException::withMessages(['status' => $statusDenial]);
         }
 
         if ($task->isDirty(['status', 'pic_id']) && $task->status !== TaskStatus::Backlog && $task->pic_id === null) {

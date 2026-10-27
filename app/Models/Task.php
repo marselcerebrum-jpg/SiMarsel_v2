@@ -137,8 +137,7 @@ class Task extends Model
     {
         if ($this->status === TaskStatus::Done) {
             return collect(self::EDITABLE_FIELDS)
-                ->reject(fn (string $field) => $field === 'status')
-                ->mapWithKeys(fn (string $field) => [$field => 'Tugas yang sudah selesai tidak dapat diubah. Buka kembali tugas terlebih dahulu.'])
+                ->mapWithKeys(fn (string $field) => [$field => 'Tugas yang sudah selesai tidak dapat diubah.'])
                 ->all();
         }
 
@@ -166,5 +165,47 @@ class Task extends Model
         }
 
         return array_values(array_diff(self::EDITABLE_FIELDS, array_keys($this->lockedFieldsFor($account))));
+    }
+
+    /**
+     * Statuses the account may move the task to from its current one: the PIC starts and submits the work,
+     * Admin or the division's Manager handles every other step.
+     *
+     * @return array<int, TaskStatus>
+     */
+    public function nextStatusesFor(Account $account): array
+    {
+        return $this->mayMoveStatus($account) ? $this->status->nextStatuses($this->requires_review) : [];
+    }
+
+    /**
+     * Why the account may not move the task from its current status to the given one, or null when it may.
+     */
+    public function statusChangeDenialFor(Account $account, TaskStatus $status): ?string
+    {
+        $from = $this->status;
+
+        if (! $from->canMoveTo($status, $this->requires_review)) {
+            $reason = "Status tidak dapat diubah dari {$from->label()} ke {$status->label()}.";
+
+            return $status === TaskStatus::Done && $this->requires_review
+                ? $reason.' Tugas ini wajib melalui QA sebelum Done.'
+                : $reason;
+        }
+
+        if (! $this->mayMoveStatus($account)) {
+            return $from->movedByPic()
+                ? "Hanya PIC tugas yang dapat mengubah status dari {$from->label()} ke {$status->label()}."
+                : "Hanya Admin atau Manajer divisi yang dapat mengubah status dari {$from->label()} ke {$status->label()}.";
+        }
+
+        return null;
+    }
+
+    private function mayMoveStatus(Account $account): bool
+    {
+        return $this->status->movedByPic()
+            ? $this->pic_id !== null && $this->pic_id === $account->id
+            : $this->managedBy($account);
     }
 }

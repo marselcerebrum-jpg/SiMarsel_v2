@@ -128,14 +128,13 @@ class TaskUpdateTest extends TestCase
     public function test_updated_task_appears_in_the_task_list(): void
     {
         $this->actingAs($this->manager)
-            ->patchJson($this->url(), $this->payload(['title' => 'Judul baru', 'status' => 'in_progress']))
+            ->patchJson($this->url(), $this->payload(['title' => 'Judul baru', 'priority' => 'high']))
             ->assertOk();
 
         $this->getJson('/api/tasks')
             ->assertJsonPath('data.0.title', 'Judul baru')
-            ->assertJsonPath('data.0.status', 'in_progress')
-            ->assertJsonPath('data.0.version', 2)
-            ->assertJsonPath('meta.status_counts.in_progress', 1);
+            ->assertJsonPath('data.0.priority', 'high')
+            ->assertJsonPath('data.0.version', 2);
     }
 
     // Validasi field
@@ -204,7 +203,9 @@ class TaskUpdateTest extends TestCase
             ->assertUnprocessable()
             ->assertJsonValidationErrors(['pic_id' => 'PIC wajib diisi untuk tugas yang tidak berstatus Back Log.']);
 
-        $this->patchJson($this->url(), $this->payload(['status' => 'backlog', 'pic_id' => null]))
+        $backlog = $this->task(['status' => TaskStatus::Backlog]);
+
+        $this->patchJson("/api/tasks/{$backlog->id}", $this->payload(['pic_id' => null]))
             ->assertOk()
             ->assertJsonPath('data.pic', null);
     }
@@ -266,9 +267,19 @@ class TaskUpdateTest extends TestCase
             ->assertUnprocessable()
             ->assertJsonValidationErrors(['status' => 'Status tidak dapat diubah dari To Do ke On QA.']);
 
-        $this->patchJson($this->url(), $this->payload(['status' => 'in_progress']))
+        $backlog = $this->task(['status' => TaskStatus::Backlog]);
+
+        $this->patchJson("/api/tasks/{$backlog->id}", $this->payload(['status' => 'todo']))
             ->assertOk()
-            ->assertJsonPath('data.status', 'in_progress');
+            ->assertJsonPath('data.status', 'todo');
+    }
+
+    public function test_edit_form_cannot_make_a_move_that_belongs_to_the_pic(): void
+    {
+        $this->actingAs($this->manager)
+            ->patchJson($this->url(), $this->payload(['status' => 'in_progress']))
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['status' => 'Hanya PIC tugas yang dapat mengubah status dari To Do ke On Process.']);
     }
 
     public function test_task_that_requires_qa_cannot_skip_qa(): void
@@ -283,33 +294,32 @@ class TaskUpdateTest extends TestCase
             ]);
     }
 
-    public function test_task_without_qa_goes_straight_to_done_and_records_completion(): void
+    public function test_review_through_the_edit_form_records_completion(): void
     {
-        $task = $this->task(['category_id' => $this->unreviewed->id, 'requires_review' => false, 'status' => TaskStatus::InProgress]);
+        $task = $this->task(['status' => TaskStatus::OnQa]);
 
         $this->actingAs($this->manager)
             ->patchJson("/api/tasks/{$task->id}", ['version' => 1, 'status' => 'done'])
             ->assertOk()
             ->assertJsonPath('data.status', 'done')
             ->assertJsonPath('data.completed_at', now()->toIso8601ZuluString());
-
-        $this->patchJson("/api/tasks/{$task->id}", ['version' => 2, 'status' => 'in_progress'])
-            ->assertOk()
-            ->assertJsonPath('data.completed_at', null);
     }
 
-    public function test_done_task_can_only_be_reopened(): void
+    public function test_done_task_cannot_be_changed(): void
     {
         $this->task->forceFill(['status' => TaskStatus::Done, 'completed_at' => now()])->save();
 
         $this->actingAs($this->admin)
-            ->patchJson($this->url(), $this->payload(['title' => 'Baru']))
+            ->patchJson($this->url(), $this->payload(['title' => 'Baru', 'status' => 'in_progress']))
             ->assertUnprocessable()
-            ->assertJsonValidationErrors(['title' => 'Tugas yang sudah selesai tidak dapat diubah. Buka kembali tugas terlebih dahulu.']);
+            ->assertJsonValidationErrors([
+                'title' => 'Tugas yang sudah selesai tidak dapat diubah.',
+                'status' => 'Tugas yang sudah selesai tidak dapat diubah.',
+            ]);
 
-        $this->getJson($this->url())->assertJsonPath('data.editable_fields', ['status']);
-
-        $this->patchJson($this->url(), $this->payload(['status' => 'in_progress']))->assertOk();
+        $this->getJson($this->url())
+            ->assertJsonPath('data.editable_fields', [])
+            ->assertJsonPath('data.next_statuses', []);
     }
 
     // QA
@@ -364,7 +374,7 @@ class TaskUpdateTest extends TestCase
             ->patchJson($this->url(), $this->payload([
                 'title' => 'Judul baru',
                 'pic_id' => $this->otherStaff->id,
-                'status' => 'in_progress',
+                'start_date' => '2026-10-25',
                 'deadline' => '2026-11-01',
             ]))
             ->assertOk()
@@ -375,7 +385,7 @@ class TaskUpdateTest extends TestCase
                 'old' => ['id' => $this->staff->id, 'name' => 'mkt.staff'],
                 'new' => ['id' => $this->otherStaff->id, 'name' => 'mkt.other'],
             ])
-            ->assertJsonPath('data.history.0.changes.status', ['old' => 'todo', 'new' => 'in_progress'])
+            ->assertJsonPath('data.history.0.changes.start_date', ['old' => '2026-10-24', 'new' => '2026-10-25'])
             ->assertJsonPath('data.history.0.changes.deadline', ['old' => '2026-10-30', 'new' => '2026-11-01']);
     }
 

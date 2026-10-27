@@ -140,10 +140,8 @@ class TaskDetailTest extends TestCase
                 ->getJson("/api/tasks/{$this->task->id}")
                 ->assertOk()
                 ->assertJsonPath('data.can_edit', true)
-                ->assertJsonPath('data.next_statuses', [
-                    ['value' => 'backlog', 'label' => 'Back Log'],
-                    ['value' => 'in_progress', 'label' => 'On Process'],
-                ]);
+                // Starting the work is the PIC's step, so neither may move a To Do task.
+                ->assertJsonPath('data.next_statuses', []);
         }
     }
 
@@ -175,7 +173,7 @@ class TaskDetailTest extends TestCase
             ->assertOk()
             ->assertJsonPath('data.can_edit', false)
             ->assertJsonPath('data.editable_fields', [])
-            ->assertJsonPath('data.next_statuses', []);
+            ->assertJsonPath('data.next_statuses', [['value' => 'in_progress', 'label' => 'On Process']]);
     }
 
     public function test_staff_cannot_open_a_task_assigned_to_someone_else(): void

@@ -23,7 +23,7 @@ enum TaskStatus: string
 
     /**
      * Statuses this one may move to. A task that requires QA reaches Done only through Ready for QA and On QA;
-     * one that does not goes from On Process straight to Done.
+     * one that does not goes from On Process straight to Done. On QA goes back to On Process for revision.
      *
      * @return array<int, self>
      */
@@ -31,17 +31,26 @@ enum TaskStatus: string
     {
         return match ($this) {
             self::Backlog => [self::Todo],
-            self::Todo => [self::Backlog, self::InProgress],
-            self::InProgress => [self::Todo, $requiresReview ? self::ReadyForQa : self::Done],
-            self::ReadyForQa => [self::InProgress, self::OnQa],
-            self::OnQa => [self::InProgress, self::Done],
-            self::Done => [self::InProgress],
+            self::Todo => [self::InProgress],
+            self::InProgress => [$requiresReview ? self::ReadyForQa : self::Done],
+            self::ReadyForQa => [self::OnQa],
+            self::OnQa => [self::Done, self::InProgress],
+            self::Done => [],
         };
     }
 
     public function canMoveTo(self $status, bool $requiresReview): bool
     {
         return in_array($status, $this->nextStatuses($requiresReview), true);
+    }
+
+    /**
+     * Whether moving out of this status is the PIC's step (starting and submitting the work).
+     * Every other move is made by Admin or the Manager of the task's division.
+     */
+    public function movedByPic(): bool
+    {
+        return $this === self::Todo || $this === self::InProgress;
     }
 
     public function inQa(): bool
