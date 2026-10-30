@@ -152,8 +152,8 @@ Setiap transaksi masuk **tepat ke satu** kelompok:
 | Kode utama tanpa funnel, termasuk kode belum terdaftar | **Tanpa Funnel** (`no_funnel`) |
 
 - **Kode utama** = kode posisi 1. Untuk dua kode, funnel **tetap** mengikuti kode posisi 1, walaupun kode posisi 2 (misalnya reseller) punya funnel.
-- Kode reseller yang **berdiri sendiri** menentukan funnel transaksinya, termasuk jika Markaz mengirim posisi 1 kosong (`["", "RESELLER01"]`).
-- Funnel diambil dari **snapshot** pada penggunaan kode, yaitu funnel yang berlaku pada waktu bayar transaksi, bukan funnel kode sekarang.
+- Kode reseller yang berada di posisi 1 (`["RESELLER01"]`) menentukan Funnel. Jika posisi 1 kosong (`["", "RESELLER01"]`), transaksi masuk **Tanpa Funnel**, tetap dihitung sebagai menggunakan promo, dan bukan Tanpa Kode.
+- ID Funnel diambil dari **snapshot** master saat transaksi pertama kali diproses SIMarsel, tanpa pencarian versi berdasarkan tanggal bayar. Hasil kosong yang sudah terhubung juga tetap dipertahankan.
 - Nama funnel memakai nama master **sekarang**, jadi funnel yang di-rename tetap satu baris.
 - Transaksi anomali dikecualikan, termasuk penggunaan lama yang tetap disimpan; tidak masuk Tanpa Kode maupun kelompok Funnel lain.
 

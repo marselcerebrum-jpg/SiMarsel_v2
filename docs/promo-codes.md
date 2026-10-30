@@ -13,7 +13,7 @@ transactions.promo_code (data mentah Markaz, tidak pernah diubah)
         ▼
 PromoCodeUsageService::normalize()
         │  cocokkan master: platform_id + kode yang dinormalisasi
-        │  ambil versi metadata yang berlaku pada waktu bayar transaksi
+        │  ambil master saat pertama diproses; pertahankan snapshot yang sudah terhubung
         ▼
 transaction_promo_codes (1 baris per posisi kode, dengan snapshot funnel/source)
 ```
@@ -54,10 +54,13 @@ Jika Markaz mengirim payload valid kembali, normalisasi menghapus penanda anomal
 
 ## Snapshot di setiap penggunaan
 
-- Waktu transaksi = `paid_date` + `paid_time` (WIB; `paid_time` kosong dianggap 00:00:00).
-- Snapshot diambil dari versi yang berlaku pada waktu itu: `effective_from` ≤ waktu transaksi < `effective_until`.
-- **Tidak ada versi** untuk waktu itu (misalnya transaksi sebelum kode didaftarkan): snapshot dibiarkan kosong. Sistem tidak mengarang funnel/source. Nilai kosong dikelompokkan sebagai **Tanpa Funnel** / **Tanpa Sumber** di analisis (scope `TransactionPromoCode::unclassified()`).
-- Penggunaan yang **sudah punya klasifikasi tidak pernah ditimpa**, baik saat master diedit maupun saat transaksi disinkronkan ulang. Hanya transaksi setelah waktu efektif versi baru yang memakai metadata baru.
+- Klasifikasi awal memakai master yang tersedia saat pertama diproses, walaupun tanggal pembayaran lebih lama daripada tanggal pendaftaran kode. Versi metadata tetap disimpan sebagai riwayat master.
+- Penggunaan yang **sudah terhubung ke master** mempertahankan snapshot, termasuk jika Funnel dan/atau Source sengaja kosong. Melengkapi master tidak mengisi ulang transaksi tersebut.
+- Penggunaan **belum terhubung** (`promo_code_id = NULL`) boleh dilengkapi ketika master didaftarkan melalui jalur yang tersedia. Snapshot legacy yang sudah berisi klasifikasi tidak ditimpa.
+- Snapshot kosong masuk **Tanpa Funnel** / **Tanpa Sumber**. Kosong bukan otomatis berarti belum diproses; bedakan dari kode belum terdaftar.
+- Rename pada ID master yang sama mengubah **label laporan** menjadi nama terbaru. Nilai `*_name_snapshot` tetap tersimpan dan menjadi cadangan jika master dihapus. Mengganti mapping ke ID Funnel/Source lain tidak mengubah ID snapshot transaksi lama.
+- Funnel transaksi hanya ditentukan kode posisi 1. `['', 'RES']` tetap menggunakan promo, tetapi masuk Tanpa Funnel; Source/penggunaan RES dicatat dan RES menerima nominal penuh karena menjadi satu-satunya penggunaan kode.
+- Normalisasi tidak mengubah `created_at`/`updated_at` transaksi. Kontrak tanggal sumber dan periode laporan terpisah dari pemilihan master klasifikasi.
 
 ## Pendaftaran kode (Single Entry dan alert)
 
@@ -67,6 +70,8 @@ Jika Markaz mengirim payload valid kembali, normalisasi menghapus penanda anomal
 2. Menghubungkan **semua** penggunaan lama dengan platform + kode yang sama yang **belum terpetakan** (`promo_code_id` kosong) ke kode baru ini.
 3. Penggunaan yang belum terklasifikasi dilengkapi dengan funnel/source yang didaftarkan. Penggunaan yang **sudah punya klasifikasi** hanya dihubungkan; snapshot funnel/source-nya **tidak ditimpa**.
 4. `raw_code` dan `code_position` tidak pernah diubah.
+
+Pendaftaran dari Single Entry, alert, Bulk Entry, serta perubahan kode/platform yang diizinkan memakai pelengkapan yang sama. Hanya penggunaan transaksi sukses dan non-anomali yang belum terhubung yang memenuhi syarat. Transaksi yang sudah terhubung dengan snapshot kosong tidak ikut diisi ulang. Tidak diperlukan `from_alert`.
 
 ## Alert kode belum terdaftar
 
@@ -107,3 +112,16 @@ php artisan promo-codes:normalize --chunk=1000
 ```
 
 Aman dijalankan berkali-kali. Jalankan setelah import massal atau seeder, karena insert massal tidak memicu observer.
+
+## Deployment perubahan aturan
+
+1. Jalankan `php artisan migrate` sebelum memakai kode baru. Migrasi menambah `promo_code_anomaly` pada transaksi dan menandai payload anomali yang sudah tersimpan, tanpa mengubah snapshot atau timestamp sumber.
+2. Untuk data yang dimasukkan lewat insert/upsert massal, jalankan normalisasi dalam pipeline import atau command di atas sebelum laporan/alert dipakai.
+3. Migrasi tidak menebak metadata yang hilang pada transaksi lama, tidak mengisi snapshot kosong yang sudah terhubung, dan tidak dapat memulihkan penggunaan yang sudah dihapus versi program sebelumnya. Koreksi data tersebut membutuhkan penanganan terpisah berdasarkan bukti sumber.
+
+## Bulk Entry
+
+- Pilihan kosong yang disengaja valid; nama hasil paste yang tidak ditemukan invalid. Teks salah tetap ditampilkan pada dropdown sampai dipilih nilai valid atau dikosongkan secara eksplisit.
+- Baris paste invalid tetap di layar dengan error dan tidak dikirim sebagai ID null. Baris valid lain tetap dapat disimpan.
+- Setiap baris kiriman membawa `client_row_id` sementara; backend mengembalikan ID yang sama untuk keberhasilan maupun kegagalan, tanpa menyimpannya di database. Client lama tanpa ID tetap didukung.
+- Selama menyimpan, penghapusan/penambahan/reset/paste baris dan submit ulang dikunci. Respons dipasangkan lewat identitas baris, bukan posisi grid terkini.

@@ -89,8 +89,8 @@ class PromoCodeUsageService
             && $usage->code_snapshot === $code
             && (int) $usage->platform_id_snapshot === (int) $transaction->platform_id;
 
-        // A classified usage keeps its snapshot, even after its master metadata was edited.
-        if ($sameUsage && $usage->isClassified()) {
+        // A mapped usage is already processed, even when its snapshot was intentionally empty.
+        if ($sameUsage && ($usage->promo_code_id !== null || $usage->isClassified())) {
             $usage->update([
                 'raw_code' => $rawCode,
                 'promo_code_id' => $usage->promo_code_id ?? $promoCode?->id,

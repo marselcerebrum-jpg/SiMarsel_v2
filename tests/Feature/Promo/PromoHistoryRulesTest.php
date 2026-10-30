@@ -127,6 +127,27 @@ class PromoHistoryRulesTest extends TestCase
         $this->assertSame($sales->id, $new->promoCodeUsages()->sole()->funnel_id_snapshot);
     }
 
+    public function test_empty_and_partial_mapped_snapshots_stay_frozen_after_master_is_completed(): void
+    {
+        $code = $this->register(metadata: false);
+        $empty = $this->transaction();
+        $this->travelTo(CarbonImmutable::parse('2026-09-02 08:00:00'));
+        app(PromoCodeService::class)->updateMetadata($code, $this->funnel->id, null);
+        $partial = $this->transaction();
+        $this->travelTo(CarbonImmutable::parse('2026-09-03 08:00:00'));
+        app(PromoCodeService::class)->updateMetadata($code, $this->funnel->id, $this->source->id);
+
+        foreach ([$empty, $partial] as $transaction) {
+            $transaction->update(['paid_date' => '2026-09-04']);
+            app(PromoCodeUsageService::class)->normalize($transaction->fresh());
+        }
+        $this->assertNull($empty->promoCodeUsages()->sole()->funnel_id_snapshot);
+        $this->assertNull($empty->promoCodeUsages()->sole()->source_id_snapshot);
+        $this->assertSame($this->funnel->id, $partial->promoCodeUsages()->sole()->funnel_id_snapshot);
+        $this->assertNull($partial->promoCodeUsages()->sole()->source_id_snapshot);
+        $this->assertSame($this->source->id, $this->transaction()->promoCodeUsages()->sole()->source_id_snapshot);
+    }
+
     public function test_success_filter_handles_both_status_transitions_and_backfill(): void
     {
         $transaction = $this->transaction(['UNKNOWN'], 'failed');

@@ -60,6 +60,8 @@ php artisan migrate --seed
 - Username: 4-25 karakter, hanya huruf, angka, titik, dan underscore.
 - Transaksi dihitung **berhasil** jika `status_message` = `Success`. Transaksi lain diabaikan di semua KPI.
 - Hanya transaksi Markaz dengan `status_message` = `Success` yang diambil dan disimpan ke `transactions`.
+- Penggunaan promo, alert, dan backfill pendaftaran hanya memproses transaksi sukses. `transactions.promo_code_anomaly` menandai payload promo invalid: detail ada di file log, histori penggunaan tetap disimpan, dan seluruh query analisis promo/alert mengecualikannya. Ringkasan Performa umum tetap menghitung fakta transaksi sukses tersebut.
+- Snapshot promo memakai master saat pertama diproses, tanpa melihat tanggal bayar; snapshot yang sudah terhubung tetap, termasuk hasil kosong. Rename menggunakan label master terbaru tanpa mengubah snapshot tersimpan.
 - `transactions.trx_id` unik, sehingga satu transaksi Markaz hanya tersimpan sekali.
 - `downloaders` unik per kombinasi `platform_id` + `date`: satu platform pada satu tanggal hanya punya satu baris, dan sinkronisasi memakai upsert.
 - `markaz_api_tokens.token` disimpan terenkripsi dan tidak pernah dikembalikan oleh API. Hanya boleh ada 1 token aktif; token lama diganti saat token baru disimpan.
