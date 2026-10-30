@@ -14,6 +14,7 @@ Wajib login. **Semua user yang login** boleh mengakses. Aturan header dan kode e
 ## Sumber data
 
 - Tabel `transactions`, hanya transaksi dengan `status_message` = `Success`, sama seperti Ringkasan Performa.
+- Khusus analisis promo, transaksi `promo_code_anomaly = true` dikecualikan dari seluruh perhitungan dan denominator. Fakta transaksi tersebut tetap tersedia pada Ringkasan Performa umum.
 - Periode memakai `paid_date` Markaz.
 - Penggunaan kode dari `transaction_promo_codes`, termasuk kode yang **belum terdaftar** di master.
 - Semua KPI dihitung **per transaksi unik** (satu baris `transactions`), bukan dari penjumlahan baris penggunaan kode. Transaksi dengan dua kode tetap dihitung satu kali, dan nominalnya dijumlahkan satu kali.
@@ -82,7 +83,7 @@ Contoh: `GET /api/promo-analysis/summary?year=2026&month=9&platforms[]=jadiasn&p
 
 Kode yang sama di platform lain dihitung sebagai kode berbeda, sesuai aturan master kode promo.
 
-Transaksi dengan **lebih dari 2 kode** adalah anomali: tidak dibuatkan baris penggunaan (lihat [promo-codes.md](../promo-codes.md)), sehingga terhitung sebagai transaksi tanpa promo. Transaksi ini tercatat di `storage/logs/promo-code-anomalies.log`.
+Transaksi dengan **lebih dari 2 kode** atau format invalid adalah anomali. Raw terbaru serta penggunaan valid sebelumnya tetap disimpan, tetapi transaksi dikecualikan dari seluruh KPI promo, bukan dihitung sebagai tanpa promo. Detail dicatat di `storage/logs/promo-code-anomalies.log`; filter query memakai penanda pada transaksi. Payload valid berikutnya dapat memulihkan atribusi melalui normalisasi.
 
 ### Naik / turun
 
@@ -154,7 +155,7 @@ Setiap transaksi masuk **tepat ke satu** kelompok:
 - Kode reseller yang **berdiri sendiri** menentukan funnel transaksinya, termasuk jika Markaz mengirim posisi 1 kosong (`["", "RESELLER01"]`).
 - Funnel diambil dari **snapshot** pada penggunaan kode, yaitu funnel yang berlaku pada waktu bayar transaksi, bukan funnel kode sekarang.
 - Nama funnel memakai nama master **sekarang**, jadi funnel yang di-rename tetap satu baris.
-- Transaksi anomali (lebih dari 2 kode) tidak punya baris penggunaan, sehingga masuk **Tanpa Kode**, konsisten dengan KPI.
+- Transaksi anomali dikecualikan, termasuk penggunaan lama yang tetap disimpan; tidak masuk Tanpa Kode maupun kelompok Funnel lain.
 
 ### Rumus
 
@@ -222,7 +223,7 @@ Berbeda dengan tabel Funnel yang menghitung **transaksi**, tabel Source menghitu
 - Source yang sudah dihapus dari master tampil sebagai baris tersendiri dengan nama saat transaksi (`deleted_source`).
 - Nama source memakai nama master **sekarang**, jadi source yang di-rename tetap satu baris.
 - Saat `search` aktif, hanya kode yang **cocok** dengan pencarian yang dihitung. Misalnya `search=reseller` pada transaksi `CPNS26` + `RESELLER01` hanya menghitung `RESELLER01` (1 penggunaan, seluruh nominal).
-- Transaksi anomali (lebih dari 2 kode) tidak punya baris penggunaan, sehingga tidak masuk tabel Source.
+- Transaksi anomali tidak masuk tabel Source atau denominator-nya, termasuk jika masih memiliki penggunaan valid sebelumnya.
 
 ### Rumus
 

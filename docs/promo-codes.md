@@ -38,8 +38,12 @@ transaction_promo_codes (1 baris per posisi kode, dengan snapshot funnel/source)
 | `code_snapshot` | Kode yang sudah dinormalisasi, dipakai untuk pencocokan dan pengelompokan |
 | Kode belum ada di master | Tetap disimpan dengan `promo_code_id = NULL`, transaksi tidak gagal. Bisa dihitung lewat scope `TransactionPromoCode::unmapped()` untuk analisis dan alert. |
 | Proses ulang / sinkronisasi ulang | Upsert per `transaction_id` + `code_position`, sehingga tidak pernah ada baris ganda. Posisi yang sudah tidak ada di Markaz dihapus. |
-| Lebih dari 2 kode | **Anomali**: transaksi itu tidak dibuatkan baris penggunaan sama sekali, supaya atribusi dua kode tidak diterapkan diam-diam. Dicatat di `storage/logs/promo-code-anomalies.log` beserta `trx_id`, platform, dan isi `promo_code`. |
+| Lebih dari 2 kode | **Anomali**: simpan raw terbaru dan pertahankan penggunaan terakhir yang valid. Jangan membuat/mengubah atribusi dari payload invalid. Tandai `transactions.promo_code_anomaly = true`; catat detail di `storage/logs/promo-code-anomalies.log`. |
 | Format tidak dikenali | Misalnya objek, bukan array teks. Diperlakukan sama seperti anomali di atas. |
+
+Transaksi anomali dikecualikan dari seluruh query analisis promo (termasuk denominator persentase), alert, dan backfill pendaftaran master. Transaksi tersebut tidak dihitung sebagai promo valid maupun Tanpa Promo/Tanpa Kode. Data transaksi tetap tersedia untuk Ringkasan Performa umum. Tidak ada tabel anomali atau UI baru.
+
+Jika Markaz mengirim payload valid kembali, normalisasi menghapus penanda anomali dan memproses penggunaan terbaru. Kode dan posisi yang sama mempertahankan snapshot terakhir; kode/platform yang benar-benar berubah mendapat klasifikasi awal baru. Payload valid tanpa kode menghapus penggunaan yang sudah tidak berlaku. Proses ini idempotent.
 
 ## Riwayat metadata (`promo_code_versions`)
 

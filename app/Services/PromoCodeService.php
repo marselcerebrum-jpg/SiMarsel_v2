@@ -215,6 +215,7 @@ class PromoCodeService
         $version = $promoCode->currentVersion()->first();
         $unmapped = fn () => TransactionPromoCode::query()
             ->unmapped()
+            ->whereHas('transaction', fn (Builder $query) => $query->promoAnalyzable())
             ->where('platform_id_snapshot', $promoCode->platform_id)
             ->where('code_snapshot', $promoCode->code);
 

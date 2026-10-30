@@ -3,6 +3,7 @@
 namespace App\Repositories;
 
 use App\Models\PromoCode;
+use App\Models\Transaction;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Collection;
@@ -81,6 +82,7 @@ class UnregisteredPromoCodeRepository
     private function unregisteredUsages(): Builder
     {
         return DB::table('transaction_promo_codes as usages')
+            ->whereIn('usages.transaction_id', Transaction::query()->promoAnalyzable()->select('id'))
             ->whereNull('usages.promo_code_id')
             ->whereNotExists(fn (Builder $query) => $query
                 ->selectRaw('1')

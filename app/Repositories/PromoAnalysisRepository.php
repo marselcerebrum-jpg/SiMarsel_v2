@@ -140,7 +140,7 @@ class PromoAnalysisRepository
     public function paymentMethods(): Collection
     {
         return Transaction::query()
-            ->successful()
+            ->promoAnalyzable()
             ->toBase()
             ->selectRaw('MIN(TRIM(payment_method)) as name')
             ->groupByRaw(self::NORMALIZED_PAYMENT_METHOD)
@@ -154,7 +154,7 @@ class PromoAnalysisRepository
      */
     private function transactions(PromoAnalysisFilter $filter): Builder
     {
-        return $this->applyPerformanceFilter(Transaction::query()->successful(), $filter->period, 'paid_date', 'platform_id')
+        return $this->applyPerformanceFilter(Transaction::query()->promoAnalyzable(), $filter->period, 'paid_date', 'platform_id')
             ->when($filter->paymentMethods !== [], fn (Builder $query) => $query->whereIn(
                 DB::raw(self::NORMALIZED_PAYMENT_METHOD),
                 array_map(fn (string $method) => $method === PaymentMethodDistributionService::UNKNOWN_METHOD ? '' : mb_strtolower($method), $filter->paymentMethods),
