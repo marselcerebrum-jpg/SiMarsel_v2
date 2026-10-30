@@ -127,6 +127,20 @@ class PromoHistoryRulesTest extends TestCase
         $this->assertSame($sales->id, $new->promoCodeUsages()->sole()->funnel_id_snapshot);
     }
 
+    public function test_second_position_alone_has_source_and_full_revenue_but_no_funnel(): void
+    {
+        $this->register('RES');
+        $transaction = $this->transaction(['', 'RES']);
+        $this->assertSame(2, $transaction->promoCodeUsages()->sole()->code_position);
+        $analysis = app(PromoAnalysisService::class);
+        $groups = $analysis->funnelBreakdown($this->filter());
+        $this->assertSame(1, collect($groups['funnels'])->firstWhere('key', 'no_funnel')['transactions']);
+        $this->assertSame(0, collect($groups['funnels'])->firstWhere('key', 'no_code')['transactions']);
+        $source = collect($analysis->sourceBreakdown($this->filter())['sources'])->firstWhere('name', 'Instagram');
+        $this->assertSame(1, $source['usages']);
+        $this->assertEquals(100000, $source['revenue']);
+    }
+
     public function test_renaming_both_masters_changes_report_labels_without_mutating_snapshots(): void
     {
         $this->register();

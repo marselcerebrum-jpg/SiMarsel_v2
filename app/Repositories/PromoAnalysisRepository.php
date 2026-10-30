@@ -74,8 +74,8 @@ class PromoAnalysisRepository
 
     /**
      * Transactions and full revenue per funnel of each transaction's main code, so every transaction
-     * falls in exactly one group. The main code is the lowest code position: position 1, or a code that
-     * stands alone in position 2. The code in position 2 never decides the funnel when position 1 has a code.
+     * falls in exactly one group. Only position 1 determines the funnel. A code standing alone in
+     * position 2 still counts as a promo transaction, but belongs to Tanpa Funnel.
      * deleted_funnel_name is the snapshot name of a funnel that was removed from the master.
      *
      * @return Collection<int, object{has_code: int, funnel_id: int|null, deleted_funnel_name: string|null, transactions: int, revenue: string|float}>
@@ -83,7 +83,7 @@ class PromoAnalysisRepository
     public function funnelTotals(PromoAnalysisFilter $filter): Collection
     {
         $mainUsages = DB::table('transaction_promo_codes as usages')
-            ->whereRaw('usages.code_position = (SELECT MIN(positions.code_position) FROM transaction_promo_codes positions WHERE positions.transaction_id = usages.transaction_id)')
+            ->where('usages.code_position', 1)
             ->select('usages.transaction_id', 'usages.funnel_id_snapshot', 'usages.funnel_name_snapshot');
 
         $classified = $this->transactions($filter)
@@ -91,7 +91,7 @@ class PromoAnalysisRepository
             ->leftJoinSub($mainUsages, 'main_usages', 'main_usages.transaction_id', '=', 'transactions.id')
             ->selectRaw(
                 'transactions.nominal, '
-                .'CASE WHEN main_usages.transaction_id IS NULL THEN 0 ELSE 1 END as has_code, '
+                .'CASE WHEN '.self::HAS_PROMO.' THEN 1 ELSE 0 END as has_code, '
                 .'main_usages.funnel_id_snapshot as funnel_id, '
                 .'CASE WHEN main_usages.funnel_id_snapshot IS NULL THEN main_usages.funnel_name_snapshot END as deleted_funnel_name'
             );
