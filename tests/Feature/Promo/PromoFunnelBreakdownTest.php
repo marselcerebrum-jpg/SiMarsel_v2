@@ -71,7 +71,7 @@ class PromoFunnelBreakdownTest extends TestCase
         $this->transaction(['APP26'], 100000);
         // Two codes: the funnel and the full revenue follow the code in position 1, not the reseller code.
         $this->transaction(['APP26', 'RESELLER01'], 200000);
-        // A reseller code on its own decides the funnel, also when Markaz leaves position 1 empty.
+        // A reseller in position 1 decides the funnel; position 2 alone belongs to Tanpa Funnel.
         $this->transaction(['RESELLER01'], 300000);
         $this->transaction(['', 'RESELLER01'], 400000);
         // Position 1 without a funnel is Tanpa Funnel, even when position 2 has one; so is an unregistered code.
@@ -112,11 +112,11 @@ class PromoFunnelBreakdownTest extends TestCase
         $this->assertEquals([
             'Aplikasi' => [2, 300000, 10.71],
             'Marketing' => [0, 0, 0],
-            'Sales' => [2, 700000, 25],
+            'Sales' => [1, 300000, 10.71],
             'Ads' => [0, 0, 0],
             'Live' => [0, 0, 0],
             'Lainnya' => [0, 0, 0],
-            'Tanpa Funnel' => [2, 1100000, 39.29],
+            'Tanpa Funnel' => [3, 1500000, 53.57],
             'Tanpa Kode' => [1, 700000, 25],
         ], $this->rows($breakdown));
 
@@ -185,9 +185,9 @@ class PromoFunnelBreakdownTest extends TestCase
 
         // A search narrows the transactions; the funnel still follows each transaction's main code.
         $search = $this->rows($this->breakdown(self::SEPTEMBER.'&search=reseller'));
-        $this->assertSame([[1, 2, 0, 0], 900000], [
+        $this->assertSame([[1, 1, 1, 0], 900000], [
             [$search['Aplikasi'][0], $search['Sales'][0], $search['Tanpa Funnel'][0], $search['Tanpa Kode'][0]],
-            $search['Aplikasi'][1] + $search['Sales'][1],
+            $search['Aplikasi'][1] + $search['Sales'][1] + $search['Tanpa Funnel'][1],
         ]);
 
         // APP26 is only registered on JADIASN, so on CEREBRUM it is an unregistered code.

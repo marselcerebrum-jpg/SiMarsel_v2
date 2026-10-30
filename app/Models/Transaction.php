@@ -50,6 +50,7 @@ class Transaction extends Model
             'paid_date' => 'date',
             'nominal' => 'decimal:2',
             'promo_code' => 'array',
+            'promo_code_anomaly' => 'boolean',
         ];
     }
 
@@ -82,6 +83,12 @@ class Transaction extends Model
     public function scopeSuccessful(Builder $query): void
     {
         $query->where('status_message', self::STATUS_SUCCESS);
+    }
+
+    /** Successful transactions eligible for promo attribution, including genuine no-code transactions. */
+    public function scopePromoAnalyzable(Builder $query): void
+    {
+        $query->successful()->where('promo_code_anomaly', false);
     }
 
     /**

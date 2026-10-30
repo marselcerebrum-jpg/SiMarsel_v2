@@ -4,6 +4,8 @@ namespace App\Http\Requests\Promo;
 
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Validator as RequestValidator;
 
 /**
  * Only checks the shape of the submission. Each row is validated on its own by PromoCodeBulkService,
@@ -32,6 +34,21 @@ class BulkStorePromoCodeRequest extends FormRequest
             'rows' => ['required', 'array', 'list', 'min:1', 'max:'.self::MAX_ROWS],
             'rows.*' => ['nullable', 'array'],
         ];
+    }
+
+    /** Validate correlation IDs without stripping the row data validated individually by the service. */
+    public function after(): array
+    {
+        return [function (RequestValidator $validator) {
+            if ($validator->errors()->isNotEmpty()) {
+                return;
+            }
+
+            $ids = Validator::make($this->all(), [
+                'rows.*.client_row_id' => ['sometimes', 'string', 'max:100', 'distinct:strict'],
+            ]);
+            $validator->errors()->merge($ids->errors());
+        }];
     }
 
     /**

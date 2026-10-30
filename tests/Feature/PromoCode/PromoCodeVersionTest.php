@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\PromoCode;
 
+use App\Http\Resources\PromoCodeVersionResource;
 use App\Models\Funnel;
 use App\Models\Platform;
 use App\Models\PromoCode;
@@ -108,27 +109,95 @@ class PromoCodeVersionTest extends TestCase
         $this->assertSame(1, $promoCode->versions()->count());
     }
 
-    public function test_two_edits_in_the_same_second_keep_one_version(): void
+    public function test_two_edits_in_the_same_second_preserve_every_version_and_effective_boundary(): void
     {
         $this->travelTo(CarbonImmutable::create(2026, 9, 1, 8));
         $promoCode = $this->service->create($this->platform->id, 'CPNS26', $this->webinar->id);
 
-        $this->travelTo(CarbonImmutable::create(2026, 9, 2, 8));
+        $this->travelTo(CarbonImmutable::parse('2026-09-02 08:00:00.100000'));
         $this->service->updateMetadata($promoCode, $this->tryout->id, null);
+        $this->travelTo(CarbonImmutable::parse('2026-09-02 08:00:00.800000'));
         $this->service->updateMetadata($promoCode, null, $this->instagram->id);
 
-        $this->assertSame(2, $promoCode->versions()->count());
+        $versions = $promoCode->versions()->orderBy('effective_from')->get();
+        $this->assertCount(3, $versions);
+        $this->assertSame(['Webinar', 'Tryout Gratis', null], $versions->pluck('funnel_name_snapshot')->all());
+        $this->assertSame('2026-09-02 08:00:00.100000', $versions[1]->effective_from->format('Y-m-d H:i:s.u'));
+        $this->assertSame('2026-09-02 08:00:00.800000', $versions[2]->effective_from->format('Y-m-d H:i:s.u'));
+        $this->assertTrue($versions[0]->effective_until->equalTo($versions[1]->effective_from));
+        $this->assertTrue($versions[1]->effective_until->equalTo($versions[2]->effective_from));
+        $this->assertNull($versions[2]->effective_until);
+        $this->assertSame(1, $promoCode->versions()->whereNull('effective_until')->count());
+        foreach (['08:00:00.099999' => 0, '08:00:00.100000' => 1, '08:00:00.799999' => 1, '08:00:00.800000' => 2] as $time => $index) {
+            $this->assertSame($versions[$index]->id, $promoCode->versions()->effectiveAt(CarbonImmutable::parse('2026-09-02 '.$time))->sole()->id);
+        }
+        $resource = PromoCodeVersionResource::make($versions[1])->resolve();
+        $this->assertSame('2026-09-02T08:00:00.100000+07:00', $resource['effective_from']);
+        $this->assertSame('2026-09-02T08:00:00.800000+07:00', $resource['effective_until']);
         $this->assertSame([null, 'Instagram'], [
             $promoCode->currentVersion()->first()->funnel_name_snapshot,
             $promoCode->currentVersion()->first()->source_name_snapshot,
         ]);
     }
 
-    public function test_each_transaction_gets_the_version_valid_at_its_payment_time(): void
+    public function test_create_and_repeated_edits_at_the_same_clock_tick_keep_ordered_versions(): void
+    {
+        $this->travelTo(CarbonImmutable::parse('2026-09-01 08:00:00.123456'));
+        $promoCode = $this->service->create($this->platform->id, 'CPNS26', $this->webinar->id);
+        $transaction = $this->transaction('2026-09-01', '08:00:00');
+        $snapshot = $transaction->promoCodeUsages()->sole()->toArray();
+
+        $this->service->updateMetadata($promoCode, $this->tryout->id, null);
+        $this->service->updateMetadata($promoCode, null, $this->instagram->id);
+        $versions = $promoCode->versions()->orderBy('effective_from')->get();
+
+        $this->assertCount(3, $versions);
+        $this->assertSame(['123456', '123457', '123458'], $versions->map(fn ($version) => $version->effective_from->format('u'))->all());
+        $this->assertSame(['Webinar', 'Tryout Gratis', null], $versions->pluck('funnel_name_snapshot')->all());
+        $this->assertTrue($versions[0]->effective_until->equalTo($versions[1]->effective_from));
+        $this->assertTrue($versions[1]->effective_until->equalTo($versions[2]->effective_from));
+        $this->assertSame($snapshot, $transaction->promoCodeUsages()->sole()->toArray());
+
+        $this->service->updateMetadata($promoCode, null, $this->instagram->id);
+        $this->assertSame(3, $promoCode->versions()->count());
+    }
+
+    public function test_precision_migration_preserves_existing_versions_on_upgrade(): void
+    {
+        $promoCode = $this->codeEditedOnSeptember15();
+        $before = $promoCode->versions()->get()->toArray();
+        $migration = require database_path('migrations/2026_10_30_000002_preserve_promo_version_timestamp_precision.php');
+        $migration->down();
+        $migration->up();
+
+        $this->assertSame($before, $promoCode->versions()->get()->toArray());
+        $this->travelTo(CarbonImmutable::parse('2026-09-15 09:30:00.123456'));
+        $this->service->updateMetadata($promoCode, null, $this->instagram->id);
+        $this->assertSame('123456', $promoCode->currentVersion()->sole()->effective_from->format('u'));
+    }
+
+    public function test_precision_rollback_rejects_loss_of_fractional_audit_timestamps(): void
+    {
+        $this->travelTo(CarbonImmutable::parse('2026-09-01 08:00:00.100000'));
+        $promoCode = $this->service->create($this->platform->id, 'CPNS26', $this->webinar->id);
+        $before = $promoCode->versions()->sole()->toArray();
+        $migration = require database_path('migrations/2026_10_30_000002_preserve_promo_version_timestamp_precision.php');
+
+        try {
+            $migration->down();
+            $this->fail('Rollback must not discard fractional audit timestamps.');
+        } catch (\LogicException $exception) {
+            $this->assertStringContainsString('Preserve the audit history', $exception->getMessage());
+        }
+
+        $this->assertSame($before, $promoCode->versions()->sole()->toArray());
+    }
+
+    public function test_initial_classification_uses_current_master_regardless_of_payment_time(): void
     {
         $this->codeEditedOnSeptember15();
 
-        $this->assertSame(['Webinar', 'Instagram'], $this->snapshot($this->transaction('2026-09-15', '09:29:59')));
+        $this->assertSame(['Tryout Gratis', null], $this->snapshot($this->transaction('2026-09-15', '09:29:59')));
         $this->assertSame(['Tryout Gratis', null], $this->snapshot($this->transaction('2026-09-15', '09:30:00')));
     }
 
@@ -147,7 +216,7 @@ class PromoCodeVersionTest extends TestCase
         $this->assertSame(['Webinar', 'Instagram'], $this->snapshot($transaction));
     }
 
-    public function test_no_metadata_is_invented_for_a_date_before_the_first_version(): void
+    public function test_late_transactions_paid_before_registration_use_current_master(): void
     {
         $this->travelTo(CarbonImmutable::create(2026, 9, 1, 8));
         $promoCode = $this->service->create($this->platform->id, 'CPNS26', $this->webinar->id);
@@ -155,8 +224,9 @@ class PromoCodeVersionTest extends TestCase
         $usage = $this->transaction('2026-08-20', '10:00:00')->promoCodeUsages()->first();
 
         $this->assertSame($promoCode->id, $usage->promo_code_id);
-        $this->assertFalse($usage->isClassified());
-        $this->assertSame(1, TransactionPromoCode::unclassified()->count());
+        $this->assertSame($this->webinar->id, $usage->funnel_id_snapshot);
+        $this->assertSame('Webinar', $usage->funnel_name_snapshot);
+        $this->assertTrue($usage->isClassified());
     }
 
     public function test_registering_a_code_from_the_alert_links_unmapped_usages_and_keeps_classified_snapshots(): void

@@ -62,7 +62,7 @@ Spasi di awal dan akhir nama otomatis dibuang.
 
 ### Ganti nama
 
-Mengganti nama funnel/source **tidak mengubah** snapshot historis. Transaksi yang sudah terklasifikasi tetap menampilkan nama lama, sesuai aturan di [promo-codes.md](../promo-codes.md).
+Mengganti nama Funnel/Source **tidak menulis ulang** snapshot historis, tetapi laporan dan tampilan menggunakan **nama master terbaru** untuk ID yang sama. Contoh: Marketing menjadi Digital Marketing membuat seluruh transaksi pada ID tersebut tampil sebagai Digital Marketing. Jika master dihapus, nama snapshot menjadi cadangan. Memindahkan mapping kode ke ID master lain tetap tidak mengubah ID klasifikasi transaksi lama. Lihat [promo-codes.md](../promo-codes.md).
 
 ## Data awal
 

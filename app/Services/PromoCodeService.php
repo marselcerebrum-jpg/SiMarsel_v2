@@ -155,8 +155,13 @@ class PromoCodeService
                 return;
             }
 
-            $now = $this->now();
             $current = $locked->currentVersion()->lockForUpdate()->first();
+            $now = $this->now();
+
+            // Preserve ordering even if two saves share a clock tick (or the clock moves backwards).
+            if ($current !== null && $now->lessThanOrEqualTo($current->effective_from)) {
+                $now = CarbonImmutable::instance($current->effective_from)->addMicrosecond();
+            }
 
             $locked->update([
                 'platform_id' => $platformId,
@@ -165,13 +170,8 @@ class PromoCodeService
                 'source_id' => $sourceId,
             ]);
 
-            // A second edit within the same second replaces that version instead of starting another one.
-            if ($current !== null && $current->effective_from->equalTo($now)) {
-                $current->update($this->versionMetadata($locked));
-            } else {
-                $current?->update(['effective_until' => $now]);
-                $this->openVersion($locked, $now);
-            }
+            $current?->update(['effective_until' => $now]);
+            $this->openVersion($locked, $now);
 
             if ($identityChanged) {
                 $this->linkUnmappedUsages($locked);
@@ -212,13 +212,14 @@ class PromoCodeService
      */
     public function linkUnmappedUsages(PromoCode $promoCode): int
     {
-        $version = $promoCode->currentVersion()->first();
+        $snapshot = $this->snapshotCurrent($promoCode);
         $unmapped = fn () => TransactionPromoCode::query()
             ->unmapped()
+            ->whereHas('transaction', fn (Builder $query) => $query->promoAnalyzable())
             ->where('platform_id_snapshot', $promoCode->platform_id)
             ->where('code_snapshot', $promoCode->code);
 
-        $classifiedNow = $unmapped()->unclassified()->update(['promo_code_id' => $promoCode->id, ...$this->snapshotOf($version)]);
+        $classifiedNow = $unmapped()->unclassified()->update(['promo_code_id' => $promoCode->id, ...$snapshot]);
 
         return $classifiedNow + $unmapped()->update(['promo_code_id' => $promoCode->id]);
     }
@@ -232,6 +233,19 @@ class PromoCodeService
     public function snapshotAt(PromoCode $promoCode, CarbonInterface $moment): array
     {
         return $this->snapshotOf($promoCode->versions()->effectiveAt($moment)->first());
+    }
+
+    /** Classification at first processing comes from the current master, regardless of payment date. */
+    public function snapshotCurrent(PromoCode $promoCode): array
+    {
+        $promoCode->load(['funnel', 'source']);
+
+        return [
+            'funnel_id_snapshot' => $promoCode->funnel_id,
+            'funnel_name_snapshot' => $promoCode->funnel?->name,
+            'source_id_snapshot' => $promoCode->source_id,
+            'source_name_snapshot' => $promoCode->source?->name,
+        ];
     }
 
     /**
@@ -304,12 +318,9 @@ class PromoCodeService
         }
     }
 
-    /**
-     * Timestamps are stored without fractions of a second.
-     */
     private function now(): CarbonImmutable
     {
-        return CarbonImmutable::now()->startOfSecond();
+        return CarbonImmutable::now();
     }
 
     private function sameId(int|string|null $current, ?int $new): bool

@@ -25,7 +25,7 @@ class PromoCodeBulkService
      * @param  list<array<string, mixed>|null>  $rows  In form order; row numbers start at 1.
      * @return array{
      *     summary: array{total: int, succeeded: int, failed: int},
-     *     rows: list<array{row: int, status: string, code: mixed, promo_code: PromoCode|null, errors: array<string, list<string>>}>
+     *     rows: list<array{row: int, client_row_id: string|null, status: string, code: mixed, promo_code: PromoCode|null, errors: array<string, list<string>>}>
      * }
      */
     public function store(array $rows): array
@@ -40,6 +40,7 @@ class PromoCodeBulkService
             }
 
             $number = $index + 1;
+            $clientRowId = $row['client_row_id'] ?? null;
             $row = PromoCodeRules::normalize(array_intersect_key($row, array_flip(self::FIELDS)));
             $key = $this->key($row);
 
@@ -56,6 +57,7 @@ class PromoCodeBulkService
 
             $results[] = [
                 'row' => $number,
+                'client_row_id' => $clientRowId,
                 'status' => $promoCode === null ? self::STATUS_FAILED : self::STATUS_CREATED,
                 'code' => $row['code'] ?? null,
                 'promo_code' => $promoCode,
