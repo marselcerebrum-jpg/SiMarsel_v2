@@ -127,6 +127,23 @@ class PromoHistoryRulesTest extends TestCase
         $this->assertSame($sales->id, $new->promoCodeUsages()->sole()->funnel_id_snapshot);
     }
 
+    public function test_renaming_both_masters_changes_report_labels_without_mutating_snapshots(): void
+    {
+        $this->register();
+        $transaction = $this->transaction();
+        $this->funnel->update(['name' => 'Digital Marketing']);
+        $this->source->update(['name' => 'Instagram Organic']);
+        $usage = $transaction->promoCodeUsages()->sole();
+        $this->assertSame('Marketing', $usage->funnel_name_snapshot);
+        $this->assertSame('Instagram', $usage->source_name_snapshot);
+        $analysis = app(PromoAnalysisService::class);
+        $this->assertSame(1, collect($analysis->funnelBreakdown($this->filter())['funnels'])->firstWhere('name', 'Digital Marketing')['transactions']);
+        $this->assertSame(1, collect($analysis->sourceBreakdown($this->filter())['sources'])->firstWhere('name', 'Instagram Organic')['usages']);
+        $new = $this->transaction()->promoCodeUsages()->sole();
+        $this->assertSame('Digital Marketing', $new->funnel_name_snapshot);
+        $this->assertSame('Instagram Organic', $new->source_name_snapshot);
+    }
+
     public function test_normalization_does_not_modify_source_timestamps(): void
     {
         $transaction = $this->transaction();
