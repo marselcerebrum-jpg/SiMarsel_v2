@@ -155,8 +155,13 @@ class PromoCodeService
                 return;
             }
 
-            $now = $this->now();
             $current = $locked->currentVersion()->lockForUpdate()->first();
+            $now = $this->now();
+
+            // Preserve ordering even if two saves share a clock tick (or the clock moves backwards).
+            if ($current !== null && $now->lessThanOrEqualTo($current->effective_from)) {
+                $now = CarbonImmutable::instance($current->effective_from)->addMicrosecond();
+            }
 
             $locked->update([
                 'platform_id' => $platformId,
@@ -165,13 +170,8 @@ class PromoCodeService
                 'source_id' => $sourceId,
             ]);
 
-            // A second edit within the same second replaces that version instead of starting another one.
-            if ($current !== null && $current->effective_from->equalTo($now)) {
-                $current->update($this->versionMetadata($locked));
-            } else {
-                $current?->update(['effective_until' => $now]);
-                $this->openVersion($locked, $now);
-            }
+            $current?->update(['effective_until' => $now]);
+            $this->openVersion($locked, $now);
 
             if ($identityChanged) {
                 $this->linkUnmappedUsages($locked);
@@ -318,12 +318,9 @@ class PromoCodeService
         }
     }
 
-    /**
-     * Timestamps are stored without fractions of a second.
-     */
     private function now(): CarbonImmutable
     {
-        return CarbonImmutable::now()->startOfSecond();
+        return CarbonImmutable::now();
     }
 
     private function sameId(int|string|null $current, ?int $new): bool

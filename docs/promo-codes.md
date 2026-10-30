@@ -48,7 +48,8 @@ Jika Markaz mengirim payload valid kembali, normalisasi menghapus penanda anomal
 ## Riwayat metadata (`promo_code_versions`)
 
 - Membuat kode promo membuka versi pertama dengan `effective_from` = saat disimpan.
-- Mengubah funnel/source menutup versi aktif (`effective_until` = saat disimpan) dan membuka versi baru dari detik yang sama. User **tidak pernah** mengisi tanggal efektif.
+- Setiap perubahan metadata menutup versi aktif dan membuka versi baru pada batas waktu yang sama. Waktu efektif disimpan dengan presisi mikrodetik agar beberapa perubahan dalam satu detik tetap memiliki riwayat terpisah. Jika clock menghasilkan waktu yang sama atau mundur, batas berikutnya memakai waktu versi aktif + 1 mikrodetik. User **tidak pernah** mengisi tanggal efektif.
+- Menyimpan nilai yang tidak berubah tidak membuat versi baru. Versi lama tidak ditimpa; snapshot transaksi tetap dipertahankan, termasuk snapshot kosong yang sudah terhubung.
 - Menyimpan funnel/source yang sama tidak membuat versi baru. Dua perubahan di detik yang sama memperbarui versi detik itu.
 - Setiap versi menyimpan nama funnel/source saat itu (`*_name_snapshot`), jadi tetap terbaca walaupun master funnel/source diganti namanya.
 
@@ -114,6 +115,8 @@ php artisan promo-codes:normalize --chunk=1000
 Aman dijalankan berkali-kali. Jalankan setelah import massal atau seeder, karena insert massal tidak memicu observer.
 
 ## Deployment perubahan aturan
+
+Migrasi presisi `effective_from`/`effective_until` wajib dijalankan sebelum memakai perubahan versioning. API menyertakan pecahan detik jika ada. Riwayat yang sudah terlanjur tergabung tidak dapat direkonstruksi otomatis. Rollback presisi ditolak jika masih terdapat waktu pecahan detik agar riwayat dan constraint unik tidak rusak.
 
 1. Jalankan `php artisan migrate` sebelum memakai kode baru. Migrasi menambah `promo_code_anomaly` pada transaksi dan menandai payload anomali yang sudah tersimpan, tanpa mengubah snapshot atau timestamp sumber.
 2. Untuk data yang dimasukkan lewat insert/upsert massal, jalankan normalisasi dalam pipeline import atau command di atas sebelum laporan/alert dipakai.

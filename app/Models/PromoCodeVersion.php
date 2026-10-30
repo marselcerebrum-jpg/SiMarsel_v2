@@ -24,6 +24,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 ])]
 class PromoCodeVersion extends Model
 {
+    protected $dateFormat = 'Y-m-d H:i:s.u';
+
     /**
      * Get the attributes that should be cast.
      *
@@ -59,7 +61,7 @@ class PromoCodeVersion extends Model
      */
     public function scopeEffectiveAt(Builder $query, CarbonInterface $moment): void
     {
-        $at = $moment->toDateTimeString();
+        $at = $moment->format($this->getDateFormat());
 
         $query->where('effective_from', '<=', $at)
             ->where(fn (Builder $query) => $query->whereNull('effective_until')->orWhere('effective_until', '>', $at));

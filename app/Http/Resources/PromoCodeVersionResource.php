@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources;
 
+use Carbon\CarbonInterface;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -28,8 +29,15 @@ class PromoCodeVersionResource extends JsonResource
             'source' => $this->source_name_snapshot === null && $this->source_id === null
                 ? null
                 : ['id' => $this->source_id, 'name' => $this->source_name_snapshot],
-            'effective_from' => $this->effective_from->toIso8601String(),
-            'effective_until' => $this->effective_until?->toIso8601String(),
+            'effective_from' => $this->effectiveTime($this->effective_from),
+            'effective_until' => $this->effectiveTime($this->effective_until),
         ];
+    }
+
+    private function effectiveTime(?CarbonInterface $time): ?string
+    {
+        return $time === null ? null : ($time->micro === 0
+            ? $time->toIso8601String()
+            : $time->format('Y-m-d\TH:i:s.uP'));
     }
 }

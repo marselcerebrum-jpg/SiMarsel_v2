@@ -110,6 +110,8 @@ Detail beserta `versions`:
 
 Nama funnel/source di `versions` adalah nama **saat versi itu dibuat**, bukan nama master sekarang. `effective_until: null` adalah versi yang sedang berlaku.
 
+Waktu efektif dapat menyertakan enam digit pecahan detik, misalnya `2026-09-15T09:30:00.123456+07:00`. Setiap perubahan metadata memiliki versi tersendiri, termasuk perubahan dalam detik yang sama; versi sebelumnya tidak ditimpa. Waktu tanpa pecahan tetap memakai format lama. Snapshot transaksi yang sudah terhubung, termasuk nilai kosong, tidak diubah.
+
 ## `PUT` / `PATCH /api/promo-codes/{id}`
 
 Kirim hanya field yang diubah: `code`, `platform_id`, `funnel_id`, `source_id`. `funnel_id: null` atau `source_id: null` mengosongkannya.
