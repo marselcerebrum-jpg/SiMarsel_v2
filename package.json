@@ -4,6 +4,7 @@
     "type": "module",
     "scripts": {
         "build": "vite build",
+        "test:frontend": "node --experimental-vm-modules --test tests/Frontend/*.test.mjs",
         "dev": "vite"
     },
     "devDependencies": {

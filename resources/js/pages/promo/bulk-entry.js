@@ -15,6 +15,7 @@ const emptyRow = () => ({
     source_id: '',
     status: null,
     errors: {},
+    unmatched: {},
 });
 
 const toId = (value) => (value === '' || value === null || value === undefined ? null : Number(value));
@@ -63,7 +64,6 @@ export default function promoCodeBulkEntry() {
         },
 
         close() {
-            if (this.saving) return;
 
             this.isOpen = false;
         },
@@ -111,6 +111,7 @@ export default function promoCodeBulkEntry() {
 
         clearError(row, field) {
             if (row.errors[field]) row.errors = { ...row.errors, [field]: null };
+            delete row.unmatched[field];
         },
 
         /**
@@ -119,7 +120,7 @@ export default function promoCodeBulkEntry() {
          */
         paste(event, index) {
             const text = event.clipboardData?.getData('text') ?? '';
-            if (!/[\t\n]/.test(text.trim())) return;
+            if (!/[\t\n]/.test(text)) return;
 
             event.preventDefault();
 
@@ -138,6 +139,7 @@ export default function promoCodeBulkEntry() {
 
                 const [code = '', platform = '', funnel = '', source = ''] = line.split('\t');
                 const errors = {};
+                const unmatched = {};
                 const cells = [
                     ['platform_id', platform, this.options.platforms, 'Platform'],
                     ['funnel_id', funnel, this.options.funnels, 'Funnel'],
@@ -147,12 +149,16 @@ export default function promoCodeBulkEntry() {
                 row.code = code.trim();
                 cells.forEach(([field, value, options, label]) => {
                     const id = matchOption(options, value);
-                    row[field] = id ?? '';
-                    if (id === null) errors[field] = `${label} "${value.trim()}" tidak ditemukan.`;
+                    row[field] = id ?? `unmatched:${value.trim()}`;
+                    if (id === null) {
+                        unmatched[field] = value.trim();
+                        errors[field] = `${label} "${value.trim()}" tidak ditemukan.`;
+                    }
                 });
 
                 row.status = null;
                 row.errors = errors;
+                row.unmatched = unmatched;
             });
         },
 
@@ -164,17 +170,28 @@ export default function promoCodeBulkEntry() {
                 return;
             }
 
-            // Saved rows are sent empty so the backend ignores them and row numbers keep matching the grid.
-            const payload = this.rows.map((row) =>
-                row.status === 'created'
-                    ? {}
-                    : {
-                          code: row.code.trim(),
-                          platform_id: toId(row.platform_id),
-                          funnel_id: toId(row.funnel_id),
-                          source_id: toId(row.source_id),
-                      },
-            );
+            // Keep invalid pasted rows local; preserve placeholders for readable server row numbers.
+            const invalidRows = this.pendingRows.filter((row) => Object.keys(row.unmatched).length > 0);
+            invalidRows.forEach((row) => { row.status = 'failed'; });
+            const submittedRows = new Map();
+            const payload = this.rows.map((row) => {
+                if (row.status === 'created' || isBlank(row) || Object.keys(row.unmatched).length > 0) return {};
+
+                submittedRows.set(String(row.key), row);
+
+                return {
+                    code: row.code.trim(),
+                    platform_id: toId(row.platform_id),
+                    funnel_id: toId(row.funnel_id),
+                    source_id: toId(row.source_id),
+                };
+            });
+
+            if (submittedRows.size === 0) {
+                this.summary = { total: invalidRows.length, succeeded: 0, failed: invalidRows.length };
+                this.formError = 'Perbaiki Funnel, Source, atau Platform yang tidak ditemukan sebelum menyimpan baris tersebut.';
+                return;
+            }
 
             this.saving = true;
 
@@ -190,16 +207,20 @@ export default function promoCodeBulkEntry() {
                     if (result.promo_code) row.code = result.promo_code.code;
                 });
 
-                this.summary = data.summary;
+                this.summary = {
+                    ...data.summary,
+                    total: data.summary.total + invalidRows.length,
+                    failed: data.summary.failed + invalidRows.length,
+                };
 
                 if (data.summary.succeeded > 0) {
                     window.dispatchEvent(new CustomEvent('promo-codes-changed'));
                 }
 
                 showToast({
-                    type: data.summary.failed > 0 ? 'info' : 'success',
+                    type: this.summary.failed > 0 ? 'info' : 'success',
                     title: 'Bulk Entry Processed',
-                    text: `${data.summary.succeeded} kode berhasil disimpan, ${data.summary.failed} gagal.`,
+                    text: `${this.summary.succeeded} kode berhasil disimpan, ${this.summary.failed} gagal.`,
                 });
             } catch (error) {
                 this.formError = errorMessage(error, 'Gagal menyimpan kode promo. Silakan coba lagi.');
