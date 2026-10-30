@@ -127,6 +127,25 @@ class PromoHistoryRulesTest extends TestCase
         $this->assertSame($sales->id, $new->promoCodeUsages()->sole()->funnel_id_snapshot);
     }
 
+    public function test_success_filter_handles_both_status_transitions_and_backfill(): void
+    {
+        $transaction = $this->transaction(['UNKNOWN'], 'failed');
+        $repository = app(UnregisteredPromoCodeRepository::class);
+        $this->assertSame(0, $transaction->promoCodeUsages()->count());
+        $transaction->update(['status_message' => 'Success']);
+        $this->assertSame(1, $repository->paginate(null, null, 20)->total());
+        $transaction->update(['status_message' => 'failed']);
+        $this->assertSame(0, $repository->paginate(null, null, 20)->total());
+        $this->assertTrue($repository->rawCodes([
+            ['platform_id' => $this->platform->id, 'code' => 'UNKNOWN'],
+        ])->isEmpty());
+        $this->register('UNKNOWN');
+        $this->assertNull($transaction->promoCodeUsages()->sole()->promo_code_id);
+        $transaction->update(['status_message' => 'Success']);
+        $this->assertSame($this->funnel->id, $transaction->promoCodeUsages()->sole()->funnel_id_snapshot);
+        $this->assertSame(0, $repository->paginate(null, null, 20)->total());
+    }
+
     public function test_second_position_alone_has_source_and_full_revenue_but_no_funnel(): void
     {
         $this->register('RES');

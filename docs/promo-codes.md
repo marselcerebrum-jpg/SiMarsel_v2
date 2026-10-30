@@ -30,7 +30,7 @@ transaction_promo_codes (1 baris per posisi kode, dengan snapshot funnel/source)
 
 | Aturan | Perilaku |
 |---|---|
-| Kapan dijalankan | Setiap transaksi disimpan atau `promo_code`, `platform_id`, `paid_date`, `paid_time`-nya berubah (observer), dan lewat command backfill |
+| Kapan dijalankan | Saat transaksi dibuat atau `promo_code`, `platform_id`, `paid_date`, `paid_time`, `status_message` berubah (observer), dan lewat command backfill. Hanya transaksi `Success` yang dinormalisasi. |
 | Bentuk `promo_code` | Array teks dari Markaz, misalnya `["CPNS26", "RESELLER01"]`. Satu teks (`"CPNS26"`) dianggap posisi 1. |
 | Posisi | Mengikuti urutan array Markaz: `1` = kode utama, `2` = kode kedua/reseller. Entri kosong tidak dibuatkan baris, tapi posisinya tetap dihitung (`["", "X"]` → `X` di posisi 2). |
 | Transaksi tanpa kode | Tidak dibuatkan baris |
@@ -74,6 +74,7 @@ Jika Markaz mengirim payload valid kembali, normalisasi menghapus penanda anomal
 
 - Dikelompokkan per platform + kode yang dinormalisasi; semua penulisan asli dari Markaz ditampilkan di `raw_codes`.
 - Jumlah penggunaan dihitung dari baris `transaction_promo_codes` (satu transaksi bisa memakai kode yang sama di dua posisi).
+- Alert dan `raw_codes` hanya menghitung transaksi `Success` yang tidak berstatus anomali. Perubahan status ke gagal mengecualikan penggunaan dari alert/analisis; histori penggunaan tetap disimpan.
 - Kode yang **sudah terdaftar tapi belum pernah dipakai tidak muncul** di alert; kode itu ada di daftar master dengan `usages_count = 0`. Kode yang sudah punya master juga tidak muncul, walaupun ada penggunaan yang belum terhubung.
 - Transaksi dengan kode belum terdaftar tetap tersimpan dan tetap dihitung di analisis (scope `TransactionPromoCode::unmapped()`).
 - Mendaftarkan kode dari alert memakai `POST /api/promo-codes` (Single Entry) dengan data `register` dari alert. Setelah berhasil, kode itu hilang dari alert; kode lain yang belum terpetakan tetap tampil.
@@ -101,7 +102,7 @@ Dibuktikan oleh `tests/Feature/Promo/PromoCodeConcurrencyTest.php` (dua koneksi 
 ## Command
 
 ```bash
-php artisan promo-codes:normalize            # backfill semua transaksi yang punya kode promo
+php artisan promo-codes:normalize            # normalisasi transaksi sukses yang punya kode promo/penggunaan
 php artisan promo-codes:normalize --chunk=1000
 ```
 

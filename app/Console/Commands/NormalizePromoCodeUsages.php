@@ -23,6 +23,7 @@ class NormalizePromoCodeUsages extends Command
         $anomalies = 0;
 
         Transaction::query()
+            ->successful()
             ->where(fn (Builder $query) => $query->whereNotNull('promo_code')->orWhereHas('promoCodeUsages'))
             ->chunkById(max(1, (int) $this->option('chunk')), function (Collection $transactions) use ($promoCodeUsageService, &$processed, &$anomalies) {
                 foreach ($transactions as $transaction) {

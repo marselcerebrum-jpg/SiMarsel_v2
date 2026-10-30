@@ -39,6 +39,10 @@ class PromoCodeUsageService
 
     private function normalizeLocked(Transaction $transaction): bool
     {
+        if ($transaction->status_message !== Transaction::STATUS_SUCCESS) {
+            return true;
+        }
+
         $codes = PromoCodePayload::codesByPosition($transaction->promo_code);
         $anomaly = PromoCodePayload::anomalyReason($codes);
 

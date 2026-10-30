@@ -166,6 +166,7 @@ class PromoCodeUsageNormalizationTest extends TestCase
                 'trx_id' => 'jadiasn-1',
                 'paid_date' => '2026-09-10',
                 'nominal' => 100000,
+                'status_message' => Transaction::STATUS_SUCCESS,
                 'promo_code' => json_encode(['CPNS26', 'RESELLER01']),
             ],
             [
@@ -174,6 +175,7 @@ class PromoCodeUsageNormalizationTest extends TestCase
                 'trx_id' => 'jadiasn-2',
                 'paid_date' => '2026-09-10',
                 'nominal' => 100000,
+                'status_message' => Transaction::STATUS_SUCCESS,
                 'promo_code' => json_encode(['A', 'B', 'C']),
             ],
         ]);
