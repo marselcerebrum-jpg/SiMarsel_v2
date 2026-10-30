@@ -104,7 +104,7 @@ class PromoCodeUsageService
                 'code_snapshot' => $code,
                 ...($promoCode === null
                     ? PromoCodeService::EMPTY_SNAPSHOT
-                    : $this->promoCodeService->snapshotAt($promoCode, $transaction->paidAt())),
+                    : $this->promoCodeService->snapshotCurrent($promoCode)),
             ],
         );
     }

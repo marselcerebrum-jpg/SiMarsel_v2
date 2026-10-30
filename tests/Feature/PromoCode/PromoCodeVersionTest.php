@@ -124,11 +124,11 @@ class PromoCodeVersionTest extends TestCase
         ]);
     }
 
-    public function test_each_transaction_gets_the_version_valid_at_its_payment_time(): void
+    public function test_initial_classification_uses_current_master_regardless_of_payment_time(): void
     {
         $this->codeEditedOnSeptember15();
 
-        $this->assertSame(['Webinar', 'Instagram'], $this->snapshot($this->transaction('2026-09-15', '09:29:59')));
+        $this->assertSame(['Tryout Gratis', null], $this->snapshot($this->transaction('2026-09-15', '09:29:59')));
         $this->assertSame(['Tryout Gratis', null], $this->snapshot($this->transaction('2026-09-15', '09:30:00')));
     }
 
@@ -147,7 +147,7 @@ class PromoCodeVersionTest extends TestCase
         $this->assertSame(['Webinar', 'Instagram'], $this->snapshot($transaction));
     }
 
-    public function test_no_metadata_is_invented_for_a_date_before_the_first_version(): void
+    public function test_late_transactions_paid_before_registration_use_current_master(): void
     {
         $this->travelTo(CarbonImmutable::create(2026, 9, 1, 8));
         $promoCode = $this->service->create($this->platform->id, 'CPNS26', $this->webinar->id);
@@ -155,8 +155,9 @@ class PromoCodeVersionTest extends TestCase
         $usage = $this->transaction('2026-08-20', '10:00:00')->promoCodeUsages()->first();
 
         $this->assertSame($promoCode->id, $usage->promo_code_id);
-        $this->assertFalse($usage->isClassified());
-        $this->assertSame(1, TransactionPromoCode::unclassified()->count());
+        $this->assertSame($this->webinar->id, $usage->funnel_id_snapshot);
+        $this->assertSame('Webinar', $usage->funnel_name_snapshot);
+        $this->assertTrue($usage->isClassified());
     }
 
     public function test_registering_a_code_from_the_alert_links_unmapped_usages_and_keeps_classified_snapshots(): void

@@ -212,14 +212,14 @@ class PromoCodeService
      */
     public function linkUnmappedUsages(PromoCode $promoCode): int
     {
-        $version = $promoCode->currentVersion()->first();
+        $snapshot = $this->snapshotCurrent($promoCode);
         $unmapped = fn () => TransactionPromoCode::query()
             ->unmapped()
             ->whereHas('transaction', fn (Builder $query) => $query->promoAnalyzable())
             ->where('platform_id_snapshot', $promoCode->platform_id)
             ->where('code_snapshot', $promoCode->code);
 
-        $classifiedNow = $unmapped()->unclassified()->update(['promo_code_id' => $promoCode->id, ...$this->snapshotOf($version)]);
+        $classifiedNow = $unmapped()->unclassified()->update(['promo_code_id' => $promoCode->id, ...$snapshot]);
 
         return $classifiedNow + $unmapped()->update(['promo_code_id' => $promoCode->id]);
     }
@@ -233,6 +233,19 @@ class PromoCodeService
     public function snapshotAt(PromoCode $promoCode, CarbonInterface $moment): array
     {
         return $this->snapshotOf($promoCode->versions()->effectiveAt($moment)->first());
+    }
+
+    /** Classification at first processing comes from the current master, regardless of payment date. */
+    public function snapshotCurrent(PromoCode $promoCode): array
+    {
+        $promoCode->load(['funnel', 'source']);
+
+        return [
+            'funnel_id_snapshot' => $promoCode->funnel_id,
+            'funnel_name_snapshot' => $promoCode->funnel?->name,
+            'source_id_snapshot' => $promoCode->source_id,
+            'source_name_snapshot' => $promoCode->source?->name,
+        ];
     }
 
     /**

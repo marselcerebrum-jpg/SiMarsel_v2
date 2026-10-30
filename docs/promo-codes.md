@@ -1,6 +1,6 @@
 # Kode Promo: Penggunaan dan Riwayat Metadata
 
-Menyimpan penggunaan kode promo dari transaksi Markaz dalam bentuk yang bisa ditelusuri, beserta funnel dan source yang berlaku pada tanggal transaksi. Dengan begitu analisis penggunaan, atribusi revenue, dan riwayat perubahan metadata selalu dihitung dengan benar.
+Menyimpan penggunaan kode promo dari transaksi sukses Markaz beserta Funnel dan Source dari master saat transaksi pertama kali diproses SIMarsel. Hasil awal tetap disimpan, termasuk jika metadata kosong. Tanggal pembayaran tidak digunakan untuk mencari versi metadata klasifikasi awal.
 
 Struktur tabel dan aturan hapus relasi ada di [database.md](database.md).
 

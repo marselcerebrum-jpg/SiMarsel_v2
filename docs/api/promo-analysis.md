@@ -218,7 +218,7 @@ Berbeda dengan tabel Funnel yang menghitung **transaksi**, tabel Source menghitu
 | Posisi 1 kosong (`["", "RESELLER01"]`) | +1 untuk source kode itu | Seluruh nominal, karena hanya ada satu kode |
 | Tanpa kode | Tidak dihitung | Tidak masuk tabel Source; tetap ada di KPI dan Funnel |
 
-- Source diambil dari **snapshot** pada penggunaan kode itu sendiri (source yang berlaku pada waktu bayar). Kode utama dan kode kedua masing-masing memakai source-nya sendiri.
+- ID Source diambil dari **snapshot** master saat penggunaan kode pertama kali diproses, bukan dari versi pada waktu bayar. Kode utama dan kode kedua masing-masing memakai Source-nya sendiri.
 - Kode tanpa source, termasuk kode belum terdaftar, masuk **Tanpa Sumber** (`no_source`).
 - Source yang sudah dihapus dari master tampil sebagai baris tersendiri dengan nama saat transaksi (`deleted_source`).
 - Nama source memakai nama master **sekarang**, jadi source yang di-rename tetap satu baris.

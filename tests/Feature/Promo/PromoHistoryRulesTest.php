@@ -82,7 +82,7 @@ class PromoHistoryRulesTest extends TestCase
         $transaction->update(['promo_code' => ['HEMAT', 'RES']]);
         $this->assertFalse($transaction->fresh()->promo_code_anomaly);
         $this->assertSame($original['id'], $transaction->promoCodeUsages()->first()->id);
-        $this->assertSame($original['funnel_id_snapshot'], $transaction->promoCodeUsages()->first()->funnel_id_snapshot);
+        $this->assertSame($this->funnel->id, $transaction->promoCodeUsages()->first()->funnel_id_snapshot);
         app(PromoCodeUsageService::class)->normalize($transaction->fresh());
         $this->assertSame(2, $transaction->promoCodeUsages()->count());
         $this->assertSame(1, $analysis->summarize($this->filter())['kpis']['promo_transactions']['value']);
@@ -111,6 +111,20 @@ class PromoHistoryRulesTest extends TestCase
         $this->assertNull($transaction->promoCodeUsages()->sole()->promo_code_id);
         $transaction->update(['promo_code' => ['UNKNOWN']]);
         $this->assertNotNull($transaction->promoCodeUsages()->sole()->promo_code_id);
+    }
+
+    public function test_late_transaction_uses_current_master_and_identical_resync_keeps_that_snapshot(): void
+    {
+        $code = $this->register();
+        $transaction = $this->transaction();
+        $this->assertSame($this->funnel->id, $transaction->promoCodeUsages()->sole()->funnel_id_snapshot);
+        $this->travelTo(CarbonImmutable::parse('2026-09-02 08:00:00'));
+        $sales = Funnel::factory()->create(['name' => 'Sales']);
+        app(PromoCodeService::class)->updateMetadata($code, $sales->id, null);
+        $transaction->update(['paid_time' => '12:00:00']);
+        $this->assertSame($this->funnel->id, $transaction->promoCodeUsages()->sole()->funnel_id_snapshot);
+        $new = $this->transaction();
+        $this->assertSame($sales->id, $new->promoCodeUsages()->sole()->funnel_id_snapshot);
     }
 
     public function test_normalization_does_not_modify_source_timestamps(): void
