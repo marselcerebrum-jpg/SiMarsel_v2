@@ -68,7 +68,7 @@ Menyimpan banyak kode sekaligus dari form bergaya spreadsheet. Setiap baris diva
 
 | Aturan | Perilaku |
 |---|---|
-| Kolom | `code`, `platform_id`, `funnel_id`, `source_id` (ID dari dropdown). Field lain diabaikan; tidak ada tipe/status. |
+| Kolom | `code`, `platform_id`, `funnel_id`, `source_id` (ID dari dropdown). `client_row_id` opsional untuk korelasi respons; tidak disimpan. Field lain diabaikan; tidak ada tipe/status. |
 | Baris invalid | Tidak membatalkan baris lain. Baris yang valid tetap disimpan. |
 | Kode sudah terdaftar | Baris **gagal** dengan alasan `Kode promo CPNS26 sudah terdaftar di platform JADIASN.` Data yang ada tidak diubah dan tidak diduplikasi. |
 | Kode sama dua kali dalam satu kiriman | Baris pertama disimpan; baris berikutnya gagal dengan `Duplikat dengan baris 1.` |
@@ -91,8 +91,11 @@ Menyimpan banyak kode sekaligus dari form bergaya spreadsheet. Setiap baris diva
 ```
 
 - `row` = nomor baris di form (mulai dari 1), sehingga baris yang diabaikan tidak menggeser nomor baris lain.
+- `client_row_id` = string ID sementara dari client (maksimal 100 karakter dan unik dalam kiriman), dikembalikan pada setiap hasil termasuk yang gagal; `null` untuk client lama yang tidak mengirimnya. FE memasangkan hasil berdasarkan ID ini. Ini bukan kunci idempotensi dan tidak memerlukan kolom database.
+- Hasil paste Platform/Funnel/Source yang tidak ditemukan ditandai invalid di FE dan tidak dikirim sebagai `null`; baris valid lain tetap disimpan. Backend tetap menolak ID yang invalid atau tidak ditemukan. Pengguna boleh memilih kosong secara sengaja untuk Funnel/Source.
+- Selama request berlangsung, aksi yang mengubah baris dan submit ulang dinonaktifkan. Ringkasan FE juga mencakup baris paste invalid yang ditahan di layar.
 - `status` = `created` atau `failed`. `errors` memakai key yang sama dengan field (`code`, `platform_id`, `funnel_id`, `source_id`), jadi bisa ditampilkan langsung di sel yang salah.
-- **422** hanya untuk bentuk kiriman yang salah: `rows` kosong (`Isi minimal satu baris kode promo.`), lebih dari 500 baris (`Maksimal 500 baris kode promo dalam sekali simpan.`), atau baris yang bukan objek.
+- **422** untuk bentuk kiriman yang salah: `rows` kosong (`Isi minimal satu baris kode promo.`), lebih dari 500 baris (`Maksimal 500 baris kode promo dalam sekali simpan.`), baris yang bukan objek, atau `client_row_id` invalid/duplikat.
 
 ## `GET /api/promo-codes/{id}`
 

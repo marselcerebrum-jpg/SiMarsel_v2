@@ -56,6 +56,7 @@ export default function promoCodeBulkEntry() {
         },
 
         open() {
+            if (this.saving) return;
             // Keep unsaved rows between openings; start fresh once everything was saved.
             if (this.pendingRows.length === 0) this.reset();
 
@@ -64,11 +65,13 @@ export default function promoCodeBulkEntry() {
         },
 
         close() {
+            if (this.saving) return;
 
             this.isOpen = false;
         },
 
         reset() {
+            if (this.saving) return;
             this.rows = Array.from({ length: INITIAL_ROWS }, emptyRow);
             this.summary = null;
             this.formError = '';
@@ -94,16 +97,19 @@ export default function promoCodeBulkEntry() {
         },
 
         addRows(count = 1) {
+            if (this.saving) return;
             const room = MAX_ROWS - this.rows.length;
             this.rows.push(...Array.from({ length: Math.min(count, room) }, emptyRow));
         },
 
         removeRow(index) {
+            if (this.saving) return;
             this.rows.splice(index, 1);
             if (this.rows.length === 0) this.addRows();
         },
 
         removeSavedRows() {
+            if (this.saving) return;
             this.rows = this.rows.filter((row) => row.status !== 'created');
             if (this.rows.length === 0) this.addRows(INITIAL_ROWS);
             this.summary = null;
@@ -119,6 +125,7 @@ export default function promoCodeBulkEntry() {
          * fills the grid from the focused row downwards.
          */
         paste(event, index) {
+            if (this.saving) return;
             const text = event.clipboardData?.getData('text') ?? '';
             if (!/[\t\n]/.test(text)) return;
 
@@ -163,6 +170,7 @@ export default function promoCodeBulkEntry() {
         },
 
         async submit() {
+            if (this.saving) return;
             this.formError = '';
 
             if (this.pendingRows.length === 0) {
@@ -174,12 +182,14 @@ export default function promoCodeBulkEntry() {
             const invalidRows = this.pendingRows.filter((row) => Object.keys(row.unmatched).length > 0);
             invalidRows.forEach((row) => { row.status = 'failed'; });
             const submittedRows = new Map();
+            const submittedByPosition = [...this.rows];
             const payload = this.rows.map((row) => {
                 if (row.status === 'created' || isBlank(row) || Object.keys(row.unmatched).length > 0) return {};
 
                 submittedRows.set(String(row.key), row);
 
                 return {
+                    client_row_id: String(row.key),
                     code: row.code.trim(),
                     platform_id: toId(row.platform_id),
                     funnel_id: toId(row.funnel_id),
@@ -199,7 +209,9 @@ export default function promoCodeBulkEntry() {
                 const { data } = await bulkCreatePromoCodes(payload);
 
                 data.rows.forEach((result) => {
-                    const row = this.rows[result.row - 1];
+                    const row = result.client_row_id == null
+                        ? submittedByPosition[result.row - 1]
+                        : submittedRows.get(result.client_row_id);
                     if (!row) return;
 
                     row.status = result.status;

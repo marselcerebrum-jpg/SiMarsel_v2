@@ -150,4 +150,33 @@ class PromoHistoryRulesTest extends TestCase
         $this->assertEquals($timestamps, [$transaction->fresh()->created_at, $transaction->fresh()->updated_at]);
         $this->assertSame($snapshot, $transaction->promoCodeUsages()->sole()->toArray());
     }
+
+    public function test_bulk_echoes_stable_ids_and_rejects_invalid_metadata_without_blocking_valid_rows(): void
+    {
+        $this->seed(DatabaseSeeder::class);
+        $account = Account::where('username', 'manager')->firstOrFail();
+        $response = $this->actingAs($account)->postJson('/api/promo-codes/bulk', ['rows' => [
+            ['client_row_id' => 'bad', 'code' => 'BAD', 'platform_id' => $this->platform->id, 'funnel_id' => 'Marketng'],
+            ['client_row_id' => 'good', 'code' => 'GOOD', 'platform_id' => $this->platform->id, 'funnel_id' => null],
+        ]])->assertOk();
+        $response->assertJsonPath('data.rows.0.client_row_id', 'bad')
+            ->assertJsonPath('data.rows.0.status', 'failed')
+            ->assertJsonPath('data.rows.1.client_row_id', 'good')
+            ->assertJsonPath('data.rows.1.status', 'created');
+        $this->assertDatabaseMissing('promo_codes', ['code' => 'BAD']);
+        $this->assertDatabaseHas('promo_codes', ['code' => 'GOOD', 'funnel_id' => null]);
+    }
+
+    public function test_bulk_rejects_duplicate_or_structured_correlation_ids(): void
+    {
+        $this->seed(DatabaseSeeder::class);
+        $this->actingAs(Account::where('username', 'manager')->firstOrFail());
+        $this->postJson('/api/promo-codes/bulk', ['rows' => [
+            ['client_row_id' => 'same', 'code' => 'A', 'platform_id' => $this->platform->id],
+            ['client_row_id' => 'same', 'code' => 'B', 'platform_id' => $this->platform->id],
+        ]])->assertUnprocessable()->assertJsonValidationErrors('rows.0.client_row_id');
+        $this->postJson('/api/promo-codes/bulk', ['rows' => [
+            ['client_row_id' => ['unexpected'], 'code' => 'A', 'platform_id' => $this->platform->id],
+        ]])->assertUnprocessable()->assertJsonValidationErrors('rows.0.client_row_id');
+    }
 }
