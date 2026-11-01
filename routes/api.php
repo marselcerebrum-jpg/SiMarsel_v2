@@ -17,6 +17,7 @@ use App\Http\Controllers\Promo\PromoCodeController;
 use App\Http\Controllers\Promo\PromoSourceController;
 use App\Http\Controllers\Promo\UnregisteredPromoCodeController;
 use App\Http\Controllers\Task\TaskController;
+use App\Http\Controllers\Task\TaskMonitoringController;
 use App\Http\Controllers\Task\TaskReviewController;
 use App\Models\Account;
 use App\Models\Division;
@@ -160,6 +161,7 @@ Route::middleware('auth')->group(function () {
     Route::prefix('tasks')->name('api.tasks.')->group(function () {
         Route::get('/meta', [TaskController::class, 'meta'])->name('meta');
         Route::get('/timeline', [TaskController::class, 'timeline'])->name('timeline');
+        Route::get('/monitoring', TaskMonitoringController::class)->name('monitoring');
         Route::get('/', [TaskController::class, 'index'])
             ->can('viewAny', Task::class)
             ->name('index');
