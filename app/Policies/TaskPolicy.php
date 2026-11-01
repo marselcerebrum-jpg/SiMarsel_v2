@@ -38,4 +38,14 @@ class TaskPolicy
     {
         return $task->managedBy($user);
     }
+
+    public function submitEvidence(Account $user, Task $task): bool
+    {
+        return $task->pic_id === $user->id;
+    }
+
+    public function submit(Account $user, Task $task): bool
+    {
+        return $task->pic_id === $user->id;
+    }
 }

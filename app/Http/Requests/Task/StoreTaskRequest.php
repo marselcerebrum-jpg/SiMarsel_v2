@@ -50,6 +50,7 @@ class StoreTaskRequest extends FormRequest
                 ...($this->filled('start_date') ? ['after_or_equal:start_date'] : []),
             ],
             'requires_review' => ['nullable', 'boolean'],
+            'evidence_required' => ['nullable', 'boolean'],
         ];
     }
 
@@ -94,6 +95,7 @@ class StoreTaskRequest extends FormRequest
             'start_date' => 'Tanggal mulai',
             'deadline' => 'Deadline',
             'requires_review' => 'Kewajiban QA',
+            'evidence_required' => 'Kewajiban evidence',
         ];
     }
 

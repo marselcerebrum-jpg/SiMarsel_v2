@@ -31,6 +31,7 @@ class TaskResource extends JsonResource
             'deadline' => $this->deadline?->toDateString(),
             'requires_review' => $this->requires_review,
             'evidence_required' => $this->evidence_required,
+            'evidence_count' => $this->whenCounted('evidences'),
             'can_view_detail' => $request->user()->can('view', $this->resource),
             'can_edit' => $request->user()->can('update', $this->resource),
             'updated_at' => $this->updated_at?->toIso8601ZuluString(),

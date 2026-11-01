@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 #[Fillable([
     'title', 'description', 'category_id', 'division_id', 'platform_id', 'pic_id', 'creator_id', 'priority', 'status',
@@ -61,6 +62,11 @@ class Task extends Model
     public function creator(): BelongsTo
     {
         return $this->belongsTo(Account::class, 'creator_id');
+    }
+
+    public function evidences(): HasMany
+    {
+        return $this->hasMany(TaskEvidence::class)->latest();
     }
 
     /**

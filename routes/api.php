@@ -171,5 +171,17 @@ Route::middleware('auth')->group(function () {
             ->whereNumber('task')
             ->can('view', 'task')
             ->name('show');
+        Route::get('/{task}/evidences', [TaskController::class, 'evidences'])
+            ->can('view', 'task')
+            ->name('evidences.index');
+        Route::post('/{task}/evidences', [TaskController::class, 'storeEvidence'])
+            ->can('submitEvidence', 'task')
+            ->name('evidences.store');
+        Route::get('/{task}/evidences/{evidence}/download', [TaskController::class, 'downloadEvidence'])
+            ->can('view', 'task')
+            ->name('evidences.download');
+        Route::post('/{task}/submit', [TaskController::class, 'submit'])
+            ->can('submit', 'task')
+            ->name('submit');
     });
 });

@@ -37,7 +37,7 @@ class TaskService
         $query = $this->tasks->visible($account, $filters);
         $statusCounts = $this->tasks->countByStatus($query);
 
-        $query = $this->tasks->sort($query, $sort, $direction)->with(['division', 'pic']);
+        $query = $this->tasks->sort($query, $sort, $direction)->with(['division', 'pic'])->withCount('evidences');
 
         return [
             'tasks' => $perPage ? $query->paginate($perPage)->withQueryString() : $query->get(),
@@ -47,7 +47,8 @@ class TaskService
 
     public function detail(Task $task): Task
     {
-        return $task->load(['category', 'division', 'platform', 'pic', 'creator']);
+        return $task->load(['category', 'division', 'platform', 'pic', 'creator', 'evidences.submitter'])
+            ->loadCount('evidences');
     }
 
     /**
@@ -70,6 +71,7 @@ class TaskService
             'priority' => $data['priority'] ?? TaskPriority::Medium->value,
             'status' => $data['status'] ?? TaskStatus::Backlog->value,
             'requires_review' => $this->requiresReview($data),
+            'evidence_required' => $this->evidenceRequired($data),
         ];
 
         $lock = Cache::lock($this->submissionFingerprint($attributes), self::DUPLICATE_WINDOW_SECONDS);
@@ -114,7 +116,7 @@ class TaskService
                 ->all(),
             'categories' => TaskCategory::query()
                 ->orderBy('name')
-                ->get(['id', 'name', 'requires_review'])
+                ->get(['id', 'name', 'requires_review', 'evidence_required'])
                 ->map(fn (TaskCategory $category) => $category->only(['id', 'name', 'requires_review']))
                 ->all(),
             'platforms' => Platform::query()
@@ -163,6 +165,15 @@ class TaskService
             && TaskCategory::whereKey($data['category_id'])->value('requires_review');
 
         return $categoryRequiresReview || (bool) ($data['requires_review'] ?? false);
+    }
+
+    /** A category may require evidence; callers can additionally require it for an individual task. */
+    private function evidenceRequired(array $data): bool
+    {
+        $categoryRequiresEvidence = isset($data['category_id'])
+            && TaskCategory::whereKey($data['category_id'])->value('evidence_required');
+
+        return (bool) ($categoryRequiresEvidence || ($data['evidence_required'] ?? false));
     }
 
     /**

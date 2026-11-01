@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 /**
  * Task category master; requires_review is the QA configuration applied to tasks of this category.
  */
-#[Fillable(['name', 'requires_review'])]
+#[Fillable(['name', 'requires_review', 'evidence_required'])]
 class TaskCategory extends Model
 {
     /**
@@ -21,6 +21,7 @@ class TaskCategory extends Model
     {
         return [
             'requires_review' => 'boolean',
+            'evidence_required' => 'boolean',
         ];
     }
 

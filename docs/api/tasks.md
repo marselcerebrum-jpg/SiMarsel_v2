@@ -2,7 +2,7 @@
 
 Kontrak data untuk halaman **Tasklist** (`/tasks`): Board, Table, ringkasan, Timeline, Calendar, detail tugas, pembuatan tugas, penugasan PIC, workflow status, evidence, review, dan histori (TASK-01 s.d. TASK-11).
 
-**Status: frontend selesai, backend belum dibuat.** Semua panggilan API ada di `resources/js/services/tasks.js`. Selama `VITE_TASK_API_READY` bukan `true`, frontend tidak memanggil server dan menampilkan keterangan "Menunggu Back End". Setelah endpoint di bawah tersedia, isi `VITE_TASK_API_READY=true` di `.env` lalu jalankan `npm run build`.
+Semua panggilan API frontend ada di `resources/js/services/tasks.js`. Kontrak di bawah mencakup API task dan evidence.
 
 Wajib login. Header dan kode error umum mengikuti [authentication.md](authentication.md). Tanggal memakai format `YYYY-MM-DD`; waktu memakai ISO 8601.
 
@@ -61,6 +61,8 @@ Backend **wajib** menerapkan cakupan ini di setiap endpoint. Staff yang mengubah
 | `GET /api/tasks/assignees` | `division` | `{ data: [{ id, fullname, division }] }`, hanya user yang memenuhi aturan penugasan |
 | `GET /api/tasks/{id}/evidences` | – | `{ data: [Evidence] }` |
 | `POST /api/tasks/{id}/evidences` | multipart: `file` **atau** `url`, `note` | `201 { data: Evidence, message }` |
+| `GET /api/tasks/{id}/evidences/{evidence}/download` | – | File bukti (hanya untuk user yang berhak melihat tugas) |
+| `POST /api/tasks/{id}/submit` | – | `{ data: TaskDetail, message }`; dari `in_progress` ke `ready_for_qa` jika QA wajib, selain itu ke `done` |
 | `POST /api/tasks/{id}/reviews` | `decision`* (`approve`\|`revision`), `note` (wajib untuk `revision`), `updated_at`* | `{ data: TaskDetail, message }` |
 | `GET /api/tasks/{id}/activities` | – | `{ data: [Activity] }` |
 | `GET /api/tasks/schedule` | `from`*, `to`*, `division` | `{ data: [ScheduleItem] }` |
@@ -68,7 +70,7 @@ Backend **wajib** menerapkan cakupan ini di setiap endpoint. Staff yang mengubah
 
 `*` = wajib.
 
-- **Evidence**: `{ id, file_name, file_url, url, note, submitter: { id, fullname }, created_at }`. Isi `file_name`/`file_url` untuk file, atau `url` untuk tautan.
+- **Evidence**: `{ id, task_id, type, file_name, file_url, url, note, submitter: { id, fullname }, created_at }`. Isi `file_name`/`file_url` untuk file, atau `url` untuk tautan. File disimpan privat dan diunduh melalui endpoint terautentikasi.
 - **Activity**: `{ id, type, label, description, before, after, causer: { id, fullname }, created_at }`. `type` mencakup `created`, `updated`, `assigned`, `status_changed`, `evidence_submitted`, `approved`, `revision_requested`, `resubmitted`. Isi `before`/`after` untuk perubahan penting. Histori hanya ditambahkan oleh sistem, tidak bisa diedit.
 - **ScheduleItem**: `{ id, type: "task"|"event", title, division, start_date, end_date, status, priority, can_view_detail }`. `status` dan `priority` dipakai agar filter Tasklist ikut berlaku di Timeline (agenda bersama tidak disaring). Agenda bersama (`event`) dan tugas lintas divisi boleh tampil untuk semua role, tetapi `can_view_detail` hanya `true` bila user berhak membuka detailnya.
 - **Event** (Calendar): `{ id, title, division, start_date, end_date, description, task_id, can_view_detail }`. `task_id` diisi bila agenda terkait sebuah tugas (tombol "Lihat Detail Tugas Terkait"); `null` untuk agenda murni yang tidak dibuka di Board. `deadlines` hanya berisi tugas dalam cakupan user dan yang memiliki deadline; sertakan `description` (boleh `null`) agar ringkasan Calendar dapat menampilkan deskripsi singkat.
@@ -82,6 +84,7 @@ Backend **wajib** menerapkan cakupan ini di setiap endpoint. Staff yang mengubah
 - Manajer hanya boleh membuat tugas untuk divisinya.
 - Status awal hanya `backlog` atau `todo`. Status `todo` wajib memiliki `pic_id` yang valid.
 - `requires_review` ditentukan dari kategori dan disimpan bersama tugas.
+- `evidence_required` aktif bila diwajibkan kategori atau diminta pada pembuatan tugas; konfigurasi wajib evidence tersedia per kategori.
 - Pembuat tugas diambil dari akun yang login.
 - `client_request_id` sama berarti permintaan yang sama: jangan buat tugas ganda, kembalikan tugas yang sudah dibuat.
 - Field Poin dari sistem lama tidak ada.
@@ -112,6 +115,7 @@ Backend **wajib** menerapkan cakupan ini di setiap endpoint. Staff yang mengubah
 - File yang diterima frontend: PDF, JPG, JPEG, PNG, WEBP, DOC, DOCX, XLS, XLSX, PPT, PPTX, ZIP, maks. 10 MB. Backend tetap memvalidasi ulang jenis dan ukuran file.
 - Tautan wajib `http://` atau `https://`.
 - Evidence lama tetap tersimpan setelah revisi.
+- Submit hanya dapat dilakukan PIC saat status `in_progress`. Jika `evidence_required = true`, minimal satu evidence harus sudah tersimpan. Tugas dengan QA wajib masuk `ready_for_qa`; tugas tanpa QA langsung menjadi `done` dan mengisi `completed_at`.
 
 **Data lama (409)**: setiap perubahan membawa `updated_at` terakhir yang dilihat user. Jika berbeda dengan data di database, tolak dengan `409 Conflict`. Frontend lalu memuat ulang data dan meminta user memeriksa kembali.
 
