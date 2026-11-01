@@ -452,24 +452,16 @@ Alpine.data('tasklist', () => ({
             return;
         }
 
-        // Revisi wajib memiliki catatan alasan: buka form review di panel detail.
-        if (rule.review === 'revision') {
-            this.openTask(task, { focus: 'revision' });
-            return;
-        }
-
         await this.moveTask(task, rule);
     },
 
-    // Approve lewat drag-and-drop (On QA → Done) memakai endpoint review; transisi lain memakai endpoint status.
+    // Respons API menjadi satu-satunya sumber status baru; syncTask menyegarkan Board, Table, dan ringkasan.
     async moveTask(task, transition) {
         this.movingId = task.id;
 
         try {
-            const { data, message } = transition.review === 'approve'
-                ? await reviewTask(task.id, { decision: 'approve', updated_at: task.updated_at })
-                : await changeTaskStatus(task.id, { status: transition.to, updated_at: task.updated_at });
-            this.syncTask(data);
+            const { data, message } = await changeTaskStatus(task.id, { status: transition.to, version: task.version });
+            this.syncTask(listFields(data));
             showToast({ title: 'Status diperbarui', text: message ?? `${task.title} → ${statusOf(transition.to).label}` });
         } catch (error) {
             notifyFailure(error, 'Status tugas gagal diperbarui.');
@@ -816,19 +808,10 @@ Alpine.data('taskDetail', () => ({
     // --- Workflow status (TASK-05) & review (TASK-07) -----------------------------------------
 
     async runTransition(transition) {
-        if (transition.review === 'revision') {
-            this.startReview('revision');
-            return;
-        }
-        if (transition.review === 'approve') {
-            this.startReview('approve');
-            return;
-        }
-
         this.acting = transition.to;
 
         try {
-            const { data, message } = await changeTaskStatus(this.task.id, { status: transition.to, updated_at: this.task.updated_at });
+            const { data, message } = await changeTaskStatus(this.task.id, { status: transition.to, version: this.task.version });
             this.applyTask(data);
             showToast({ title: 'Status diperbarui', text: message ?? `Status menjadi ${statusOf(transition.to).label}.` });
         } catch (error) {

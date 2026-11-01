@@ -10,7 +10,8 @@ import { http } from '../http';
  * POST   /api/tasks                            → { data: Task, message }
  * GET    /api/tasks/{id}                       → { data: TaskDetail }
  * PATCH  /api/tasks/{id}                       → { data: TaskDetail, message }         (kirim updated_at)
- * PATCH  /api/tasks/{id}/status                → { data: TaskDetail, message }         (kirim status, updated_at)
+ * PATCH  /api/tasks/{id}/status                → { data: TaskDetail, message }         (kirim status, version)
+ * GET    /api/tasks/create-options             → { data: { categories, platforms, … } } (tersambung; Admin & Manajer)
  * PATCH  /api/tasks/{id}/assignee              → { data: TaskDetail, message }         (kirim pic_id, note, updated_at)
  * GET    /api/tasks/assignees?division         → { data: [{ id, fullname, division }] }
  * GET    /api/tasks/{id}/evidences             → { data: [Evidence] }
