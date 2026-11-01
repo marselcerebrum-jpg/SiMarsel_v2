@@ -159,6 +159,7 @@ Route::middleware('auth')->group(function () {
 
     Route::prefix('tasks')->name('api.tasks.')->group(function () {
         Route::get('/meta', [TaskController::class, 'meta'])->name('meta');
+        Route::get('/timeline', [TaskController::class, 'timeline'])->name('timeline');
         Route::get('/', [TaskController::class, 'index'])
             ->can('viewAny', Task::class)
             ->name('index');

@@ -6,15 +6,19 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Task\StoreTaskRequest;
 use App\Http\Requests\Task\StoreTaskEvidenceRequest;
 use App\Http\Requests\Task\TaskListRequest;
+use App\Http\Requests\Task\TaskTimelineRequest;
 use App\Http\Resources\TaskDetailResource;
 use App\Http\Resources\TaskResource;
 use App\Http\Resources\TaskEvidenceResource;
+use App\Http\Resources\TaskTimelineResource;
 use App\Models\Task;
 use App\Services\TaskService;
 use App\Services\TaskEvidenceService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Carbon\CarbonImmutable;
+use Illuminate\Database\Eloquent\Builder;
 
 class TaskController extends Controller
 {
@@ -42,6 +46,40 @@ class TaskController extends Controller
 
     public function createOptions(Request $request): JsonResponse
     {
+    public function timeline(TaskTimelineRequest $request): JsonResponse
+    {
+        $start = CarbonImmutable::parse($request->date())->startOfWeek();
+        $end = $start->addDays($request->period() === 'two_weeks' ? 13 : 6);
+        $account = $request->user();
+
+        $tasks = Task::query()
+            ->with('division:id,code_division,name')
+            ->when(! $account->isAdmin(), function (Builder $query) use ($account) {
+                $query->where(function (Builder $visible) use ($account) {
+                    $visible->visibleTo($account)
+                        ->orWhere('is_shared', true);
+                });
+            })
+            ->whereNotNull('division_id')
+            ->whereRaw('COALESCE(start_date, deadline) <= ?', [$end->toDateString()])
+            ->whereRaw('COALESCE(deadline, start_date) >= ?', [$start->toDateString()])
+            ->when($request->validated('division'), fn (Builder $query, string $division) =>
+                $query->whereHas('division', fn (Builder $divisionQuery) => $divisionQuery->where('code_division', $division)))
+            ->orderByRaw('COALESCE(start_date, deadline) asc')
+            ->orderBy('title')
+            ->get();
+
+        return response()->json([
+            'data' => TaskTimelineResource::collection($tasks),
+            'meta' => [
+                'period' => $request->period(),
+                'start_date' => $start->toDateString(),
+                'end_date' => $end->toDateString(),
+                'division' => $request->validated('division'),
+            ],
+        ]);
+    }
+
         return response()->json(['data' => $this->taskService->createOptions($request->user())]);
     }
 

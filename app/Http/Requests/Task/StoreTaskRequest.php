@@ -49,6 +49,7 @@ class StoreTaskRequest extends FormRequest
                 'after_or_equal:today',
                 ...($this->filled('start_date') ? ['after_or_equal:start_date'] : []),
             ],
+            'is_shared' => ['nullable', 'boolean'],
             'requires_review' => ['nullable', 'boolean'],
             'evidence_required' => ['nullable', 'boolean'],
         ];

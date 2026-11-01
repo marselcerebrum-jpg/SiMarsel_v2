@@ -14,7 +14,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 #[Fillable([
     'title', 'description', 'category_id', 'division_id', 'platform_id', 'pic_id', 'creator_id', 'priority', 'status',
-    'start_date', 'deadline', 'requires_review', 'evidence_required', 'completed_at',
+    'start_date', 'deadline', 'is_shared', 'requires_review', 'evidence_required', 'completed_at',
 ])]
 class Task extends Model
 {
@@ -33,6 +33,7 @@ class Task extends Model
             'status' => TaskStatus::class,
             'start_date' => 'date',
             'deadline' => 'date',
+            'is_shared' => 'boolean',
             'requires_review' => 'boolean',
             'evidence_required' => 'boolean',
             'completed_at' => 'datetime',
