@@ -69,6 +69,11 @@ class Task extends Model
         return $this->hasMany(TaskEvidence::class)->latest();
     }
 
+    public function reviews(): HasMany
+    {
+        return $this->hasMany(TaskReview::class)->with('reviewer')->latest();
+    }
+
     /**
      * Limit tasks to what the account may see: Admin sees every division, a Manager sees the
      * division they manage, and Staff only sees tasks assigned to them as PIC.

@@ -31,6 +31,7 @@ class TaskDetailResource extends TaskResource
             'created_at' => $this->created_at?->toIso8601ZuluString(),
             'completed_at' => $this->completed_at?->toIso8601ZuluString(),
             'evidences' => TaskEvidenceResource::collection($this->whenLoaded('evidences')),
+            'reviews' => TaskReviewResource::collection($this->whenLoaded('reviews')),
         ];
     }
 }

@@ -48,4 +48,9 @@ class TaskPolicy
     {
         return $task->pic_id === $user->id;
     }
+
+    public function review(Account $user, Task $task): bool
+    {
+        return $task->requires_review && $task->managedBy($user);
+    }
 }

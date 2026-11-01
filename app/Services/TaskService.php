@@ -47,7 +47,7 @@ class TaskService
 
     public function detail(Task $task): Task
     {
-        return $task->load(['category', 'division', 'platform', 'pic', 'creator', 'evidences.submitter'])
+        return $task->load(['category', 'division', 'platform', 'pic', 'creator', 'evidences.submitter', 'reviews.reviewer'])
             ->loadCount('evidences');
     }
 

@@ -17,6 +17,7 @@ use App\Http\Controllers\Promo\PromoCodeController;
 use App\Http\Controllers\Promo\PromoSourceController;
 use App\Http\Controllers\Promo\UnregisteredPromoCodeController;
 use App\Http\Controllers\Task\TaskController;
+use App\Http\Controllers\Task\TaskReviewController;
 use App\Models\Account;
 use App\Models\Division;
 use App\Models\Funnel;
@@ -183,5 +184,14 @@ Route::middleware('auth')->group(function () {
         Route::post('/{task}/submit', [TaskController::class, 'submit'])
             ->can('submit', 'task')
             ->name('submit');
+        Route::get('/{task}/reviews', [TaskReviewController::class, 'index'])
+            ->can('view', 'task')
+            ->name('reviews.index');
+        Route::post('/{task}/review/start', [TaskReviewController::class, 'start'])
+            ->can('review', 'task')
+            ->name('review.start');
+        Route::post('/{task}/review/decision', [TaskReviewController::class, 'decide'])
+            ->can('review', 'task')
+            ->name('review.decision');
     });
 });
