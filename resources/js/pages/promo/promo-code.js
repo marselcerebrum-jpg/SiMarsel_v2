@@ -23,6 +23,7 @@ export default function promoCodeManagement() {
         optionsError: '',
 
         modal: null,
+        registering: null,
         confirming: false,
         editing: null,
         deleting: null,
@@ -127,11 +128,20 @@ export default function promoCodeManagement() {
 
         openCreate(prefill = {}) {
             this.editing = null;
+            this.registering = null;
             this.form = { ...emptyForm(), ...prefill };
             this.resetErrors();
             this.confirming = false;
             this.modal = 'form';
             this.fetchOptions();
+        },
+
+        /**
+         * Single Entry prefilled from an unregistered code in the alert (code and platform from `register`).
+         */
+        openRegister(item) {
+            this.openCreate({ code: item.register.code, platform_id: String(item.register.platform_id) });
+            this.registering = item;
         },
 
         openEdit(item) {
@@ -160,6 +170,7 @@ export default function promoCodeManagement() {
             this.modal = null;
             this.confirming = false;
             this.editing = null;
+            this.registering = null;
             this.deleting = null;
             this.resetErrors();
         },
@@ -214,6 +225,7 @@ export default function promoCodeManagement() {
 
         async save() {
             const editing = this.editing;
+            const registering = this.registering;
             const body = this.changes();
 
             this.confirming = false;
@@ -230,12 +242,23 @@ export default function promoCodeManagement() {
                     this.items = this.items.map((item) => (item.id === editing.id ? result.data : item));
                     showToast({ title: 'Changes Saved', text: `Kode promo ${result.data.code} sudah diperbarui.` });
                 } else {
-                    this.reload();
-                    showToast({ title: 'Promo Code Created', text: `${result.data.code} sudah ditambahkan.` });
+                    // Reloads the list and the unregistered code alert.
+                    window.dispatchEvent(new CustomEvent('promo-codes-changed'));
+                    showToast(
+                        registering
+                            ? {
+                                  title: 'Promo Code Registered',
+                                  text: `${result.data.code} terdaftar dan ${result.data.usages_count ?? 0} penggunaan transaksi sudah terhubung.`,
+                              }
+                            : { title: 'Promo Code Created', text: `${result.data.code} sudah ditambahkan.` },
+                    );
                 }
             } catch (error) {
                 if (error.status === 422 && error.data?.errors) {
                     this.errors = validationErrors(error);
+
+                    // The code may have been registered since the alert was loaded; show the latest alert.
+                    if (registering) window.dispatchEvent(new CustomEvent('promo-codes-changed'));
                 } else {
                     this.formError = errorMessage(error);
                 }

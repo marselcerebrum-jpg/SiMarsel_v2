@@ -24,8 +24,13 @@
         x-transition
         class="relative max-h-[calc(100vh-2rem)] w-full max-w-md overflow-y-auto rounded-panel border border-line bg-surface p-5 shadow-lg"
     >
-        <h2 id="promo-code-form-title" class="text-base font-semibold text-ink" x-text="editing ? 'Edit Promo Code' : 'Add Promo Code'">Add Promo Code</h2>
+        <h2 id="promo-code-form-title" class="text-base font-semibold text-ink" x-text="editing ? 'Edit Promo Code' : (registering ? 'Register Promo Code' : 'Add Promo Code')">Add Promo Code</h2>
         <p x-show="!editing" class="mt-1 text-sm text-muted">Daftarkan satu kode promo beserta platform, funnel, dan source-nya.</p>
+        <p x-show="registering" class="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+            Kode ini ditemukan di <span class="font-semibold" x-text="registering?.usages_count + ' penggunaan'"></span> transaksi Markaz.
+            Setelah didaftarkan, penggunaan historis yang belum terhubung akan dihubungkan dan klasifikasi yang belum tersedia dilengkapi dengan funnel/source yang dipilih.
+            Snapshot penggunaan yang sudah terhubung tetap dipertahankan, termasuk nilai kosong.
+        </p>
         <p x-show="editing" class="mt-1 text-sm text-muted">Perubahan disimpan sebagai versi baru yang berlaku sejak disimpan.</p>
 
         <p x-show="optionsError" class="mt-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700" role="alert">

@@ -47,6 +47,13 @@ export function fetchPromoCodes(query) {
     return http(`${PROMO_CODES}${query ? `?${query}` : ''}`);
 }
 
+/**
+ * Codes used in Markaz transactions that have no master for their platform yet; same query as the list.
+ */
+export function fetchUnregisteredCodes(query) {
+    return http(`${PROMO_CODES}/unregistered${query ? `?${query}` : ''}`);
+}
+
 export function createPromoCode(body) {
     return http(PROMO_CODES, { method: 'POST', body });
 }
