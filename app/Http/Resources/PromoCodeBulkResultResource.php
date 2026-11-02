@@ -21,6 +21,7 @@ class PromoCodeBulkResultResource extends JsonResource
             'summary' => $this->resource['summary'],
             'rows' => array_map(fn (array $row) => [
                 'row' => $row['row'],
+                'client_row_id' => $row['client_row_id'],
                 'status' => $row['status'],
                 'code' => $row['code'],
                 'promo_code' => $row['promo_code'] === null ? null : PromoCodeResource::make($row['promo_code'])->resolve($request),

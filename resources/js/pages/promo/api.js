@@ -52,7 +52,7 @@ export function createPromoCode(body) {
 }
 
 /**
- * Always 200: { data: { summary, rows: [{ row, status, code, promo_code, errors }] } }.
+ * Valid submissions return { data: { summary, rows: [{ row, client_row_id, status, code, promo_code, errors }] } }.
  */
 export function bulkCreatePromoCodes(rows) {
     return http(`${PROMO_CODES}/bulk`, { method: 'POST', body: { rows } });

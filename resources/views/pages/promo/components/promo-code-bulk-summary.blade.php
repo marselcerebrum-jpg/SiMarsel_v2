@@ -15,6 +15,7 @@
     <button
         type="button"
         x-show="summary?.succeeded"
+        :disabled="saving"
         class="text-xs font-semibold text-primary hover:text-primary-hover"
         @click="removeSavedRows()"
     >Remove Saved Rows</button>

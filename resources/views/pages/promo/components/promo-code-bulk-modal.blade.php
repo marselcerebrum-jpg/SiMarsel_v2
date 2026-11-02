@@ -93,6 +93,9 @@
                                         :aria-invalid="Boolean(row.errors.{{ $column['field'] }})"
                                     >
                                         <option value="">{{ $column['empty'] }}</option>
+                                        <template x-if="row.unmatched.{{ $column['field'] }}">
+                                            <option :value="row.{{ $column['field'] }}" x-text="row.unmatched.{{ $column['field'] }} + ' (tidak ditemukan)'" selected></option>
+                                        </template>
                                         <template x-for="option in options.{{ $column['options'] }}" :key="option.id">
                                             <option :value="String(option.id)" x-text="option.name" :selected="String(option.id) === row.{{ $column['field'] }}"></option>
                                         </template>

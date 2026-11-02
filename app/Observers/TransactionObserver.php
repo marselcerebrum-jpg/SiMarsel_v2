@@ -14,7 +14,7 @@ class TransactionObserver
      */
     public function saved(Transaction $transaction): void
     {
-        if ($transaction->wasRecentlyCreated || $transaction->wasChanged(['promo_code', 'platform_id', 'paid_date', 'paid_time'])) {
+        if ($transaction->wasRecentlyCreated || $transaction->wasChanged(['promo_code', 'platform_id', 'paid_date', 'paid_time', 'status_message'])) {
             $this->promoCodeUsageService->normalize($transaction);
         }
     }

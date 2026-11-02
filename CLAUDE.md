@@ -10,8 +10,8 @@ The primary objective is to build a structured, maintainable web application for
 
 ### Backend
 
-- PHP 8.3+
-- Laravel 13
+- PHP 8.3.36 or newer, below 9.0 (`"php": "^8.3.36"` in `composer.json`)
+- Laravel 13.33.0, pinned exactly in `composer.json`; do not upgrade it without approval
 - Eloquent ORM for database access
 - PHPUnit for testing
 - Composer for dependency management
