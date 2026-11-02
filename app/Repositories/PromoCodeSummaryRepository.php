@@ -31,12 +31,20 @@ class PromoCodeSummaryRepository
     public function __construct(private PromoAnalysisRepository $promoAnalysisRepository) {}
 
     /**
-     * One row per platform + normalized code + historical funnel and source, so a code whose metadata changed
-     * during the period is split by the metadata that applied to each usage. Unregistered codes stay in.
+     * One page of the rekap per kode promo.
      *
      * @return LengthAwarePaginator<int, object>
      */
     public function paginate(PromoAnalysisFilter $filter, string $sort, string $direction, int $perPage): LengthAwarePaginator
+    {
+        return $this->codes($filter, $sort, $direction)->paginate($perPage)->withQueryString();
+    }
+
+    /**
+     * One row per platform + normalized code + metadata snapshot, so a code whose usages carry different funnel or
+     * source snapshots is split by them. Unregistered codes stay in. Used for the page and, unpaginated, the export.
+     */
+    public function codes(PromoAnalysisFilter $filter, string $sort, string $direction): Builder
     {
         $codes = DB::query()
             ->fromSub($this->promoAnalysisRepository->creditedUsages($filter), 'usages')
@@ -64,9 +72,7 @@ class PromoCodeSummaryRepository
             ->orderBy('codes.code')
             ->orderBy('platforms.name')
             ->orderBy('funnel_name')
-            ->orderBy('source_name')
-            ->paginate($perPage)
-            ->withQueryString();
+            ->orderBy('source_name');
     }
 
     /**
@@ -115,10 +121,10 @@ class PromoCodeSummaryRepository
     /**
      * The distinct raw values written by Markaz for the given platform + code pairs, exactly as written.
      *
-     * @param  list<array{platform_id: int, code: string}>  $pairs
+     * @param  list<array{platform_id: int, code: string}>|null  $pairs  Null for every code in the filter.
      * @return Collection<string, list<string>> Keyed by "platform_id|code".
      */
-    public function rawCodes(PromoAnalysisFilter $filter, array $pairs): Collection
+    public function rawCodes(PromoAnalysisFilter $filter, ?array $pairs): Collection
     {
         if ($pairs === []) {
             return collect();
@@ -126,11 +132,11 @@ class PromoCodeSummaryRepository
 
         return DB::query()
             ->fromSub($this->promoAnalysisRepository->creditedUsages($filter), 'usages')
-            ->where(function (Builder $query) use ($pairs) {
+            ->when($pairs !== null, fn (Builder $query) => $query->where(function (Builder $query) use ($pairs) {
                 foreach ($pairs as $pair) {
                     $query->orWhere(fn (Builder $query) => $query->where('platform_id', $pair['platform_id'])->where('code', $pair['code']));
                 }
-            })
+            }))
             // Grouped by the exact bytes: MySQL's case-insensitive collation would merge "CPNS26" and "cpns26".
             ->groupBy('platform_id', 'code')
             ->groupByRaw('HEX(raw_code)')
@@ -138,6 +144,31 @@ class PromoCodeSummaryRepository
             ->get()
             ->groupBy(fn (object $row) => $row->platform_id.'|'.$row->code)
             ->map(fn (Collection $rows) => $rows->pluck('raw_code')->sort(fn (string $a, string $b) => strcmp($a, $b))->values()->all());
+    }
+
+    /**
+     * Every code usage of the filter, newest transaction first, with its platform, registration, and the current
+     * name of its funnel and source snapshot: the rows of the code detail, for every code at once.
+     */
+    public function usages(PromoAnalysisFilter $filter): Builder
+    {
+        return DB::query()
+            ->fromSub($this->promoAnalysisRepository->creditedUsages($filter), 'usages')
+            ->join('platforms', 'platforms.id', '=', 'usages.platform_id')
+            ->leftJoin('funnels', 'funnels.id', '=', 'usages.funnel_id')
+            ->leftJoin('promo_sources', 'promo_sources.id', '=', 'usages.source_id')
+            ->leftJoin('promo_codes', fn (JoinClause $join) => $join
+                ->on('promo_codes.platform_id', '=', 'usages.platform_id')
+                ->on('promo_codes.code', '=', 'usages.code'))
+            ->selectRaw(
+                'usages.*, platforms.name as platform_name, promo_codes.id as promo_code_id, '
+                .'COALESCE(funnels.name, usages.deleted_funnel_name) as funnel_name, '
+                .'COALESCE(promo_sources.name, usages.deleted_source_name) as source_name'
+            )
+            ->orderByDesc('usages.paid_date')
+            ->orderByDesc('usages.paid_time')
+            ->orderByDesc('usages.transaction_id')
+            ->orderBy('usages.code_position');
     }
 
     /**
