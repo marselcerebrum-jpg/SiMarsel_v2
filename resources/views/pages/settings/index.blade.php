@@ -13,7 +13,7 @@
     <div x-data="organizationManagement(@js($initialTab))" class="min-w-0">
         <header>
             <h1 class="text-2xl font-bold tracking-tight text-ink">Organization Management</h1>
-            <p class="mt-1 text-sm text-muted">Manage user accounts and organizational divisions.</p>
+            <p class="mt-1 text-sm text-muted">Kelola akun pengguna dan divisi organisasi.</p>
         </header>
 
         @include('pages.settings.components.organization-tabs')

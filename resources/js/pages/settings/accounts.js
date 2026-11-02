@@ -58,6 +58,17 @@ Alpine.data('accountSettings', (roles = [], divisions = [], canManage = false, i
         });
     },
 
+    get accountSummary() {
+        const roleCounts = Object.fromEntries(this.roles.map((role) => [role.code_role, 0]));
+
+        this.users.forEach((user) => {
+            const role = user.role?.code_role;
+            if (role) roleCounts[role] = (roleCounts[role] ?? 0) + 1;
+        });
+
+        return { total: this.users.length, roleCounts };
+    },
+
     async fetchUsers() {
         this.loading = true;
         this.loadError = '';
@@ -71,14 +82,6 @@ Alpine.data('accountSettings', (roles = [], divisions = [], canManage = false, i
         } finally {
             this.loading = false;
         }
-    },
-
-    countByRole(code) {
-        return this.users.filter((user) => user.role.code_role === code).length;
-    },
-
-    countWithoutDivision() {
-        return this.users.filter((user) => !user.division).length;
     },
 
     roleIdByCode(code) {

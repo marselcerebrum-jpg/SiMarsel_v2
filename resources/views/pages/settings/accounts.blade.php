@@ -3,11 +3,6 @@
     $tileLabel = 'text-xs font-semibold text-label';
     $tileValue = 'mt-1 text-2xl font-bold text-ink';
 
-    $roleHints = [
-        'MGR' => 'Akses penuh',
-        'EMP' => 'Anggota tim',
-    ];
-
     // Every role can read the account list; only Manager can create, edit, and delete.
     $canManageAccounts = auth()->user()->can('create', App\Models\Account::class);
 @endphp
@@ -18,28 +13,24 @@
     class="min-w-0"
 >
         {{-- Ringkasan --}}
-        <section class="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-label="Account Summary">
-            <article class="{{ $card }} p-4">
+        <section class="{{ $card }} mt-6 p-5" aria-label="Account Summary">
+            <div class="flex flex-col sm:flex-row sm:items-stretch">
+                <div class="pb-4 sm:w-1/4 sm:pb-0 sm:pr-6">
                 <p class="{{ $tileLabel }}">Total Accounts</p>
-                <p class="{{ $tileValue }}" x-text="loading ? '—' : users.length">—</p>
+                <p class="{{ $tileValue }}" x-text="loading ? '—' : accountSummary.total">—</p>
                 <p class="mt-1 text-sm text-muted">Terdaftar di sistem</p>
-            </article>
+                </div>
 
-            @foreach ($roles as $role)
-                <article class="{{ $card }} p-4">
-                    <p class="{{ $tileLabel }}">{{ $role->name }}</p>
-                    <p class="{{ $tileValue }}" x-text="loading ? '—' : countByRole(@js($role->code_role))">—</p>
-                    <p class="mt-1 text-sm text-muted">{{ $roleHints[$role->code_role] ?? 'Role '.$role->name }}</p>
-                </article>
-            @endforeach
-
-            <article class="{{ $card }} p-4">
-                <p class="{{ $tileLabel }}">Divisions</p>
-                <p class="{{ $tileValue }}">{{ $divisions->count() }}</p>
-                <p class="mt-1 text-sm text-muted">
-                    <span x-text="loading ? '—' : countWithoutDivision()">—</span> akun tanpa divisi
-                </p>
-            </article>
+                <div class="grid flex-1 divide-y divide-line border-t border-line sm:grid-cols-3 sm:divide-x sm:divide-y-0 sm:border-t-0 sm:border-l">
+                    @foreach ($roles as $role)
+                        <div class="py-4 sm:px-6 sm:py-0">
+                            <p class="{{ $tileLabel }}">{{ $role->name }}</p>
+                            <p class="{{ $tileValue }}" x-text="loading ? '—' : (accountSummary.roleCounts[@js($role->code_role)] ?? 0)">—</p>
+                            <p class="mt-1 text-sm text-muted">Jumlah akun dengan role {{ $role->name }}</p>
+                        </div>
+                    @endforeach
+                </div>
+            </div>
         </section>
 
         <section class="{{ $card }} mt-6 p-5" aria-labelledby="account-list-title">
