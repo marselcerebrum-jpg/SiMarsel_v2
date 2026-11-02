@@ -177,6 +177,31 @@ class PromoCodeSummaryTest extends TestCase
         $this->assertEquals(['transactions' => 2, 'usages' => 2, 'revenue' => 100000], $this->detail('APP26')['totals']);
     }
 
+    public function test_rekap_follows_the_dev_snapshot_rules_for_labels_empty_metadata_and_failed_status(): void
+    {
+        $this->seedCodeData();
+        // A registered code with intentionally empty metadata stays registered, without funnel or source.
+        app(PromoCodeService::class)->register($this->jadiasn->id, 'EMPTY26');
+        $this->transaction(['EMPTY26'], 80000, '2026-09-22');
+        // A transaction that turns failed keeps its usage history but leaves the analysis.
+        $this->transaction(['APP26'], 90000, '2026-09-23')->update(['status_message' => 'failed']);
+
+        // Renaming the funnel changes the label; deleting the source falls back to its snapshot name.
+        Funnel::where('name', 'Aplikasi')->first()->update(['name' => 'Aplikasi Mobile']);
+        $instagram = PromoSource::where('name', 'Instagram')->first();
+        $this->appCode->update(['source_id' => null]);
+        $instagram->delete();
+
+        $rows = collect($this->summary()['data'])->keyBy('code');
+
+        $this->assertSame([true, null, null, 1, 80000], [
+            $rows['EMPTY26']['is_registered'], $rows['EMPTY26']['funnel'], $rows['EMPTY26']['source'], $rows['EMPTY26']['usages'], (int) $rows['EMPTY26']['revenue'],
+        ]);
+        $this->assertSame('Aplikasi Mobile', $rows['APP26']['funnel']['name']);
+        $this->assertSame(['id' => null, 'name' => 'Instagram'], $rows['APP26']['source']);
+        $this->assertSame([2, 100000], [$rows['APP26']['usages'], (int) $rows['APP26']['revenue']]);
+    }
+
     public function test_sorting_and_pagination(): void
     {
         $this->seedCodeData();
