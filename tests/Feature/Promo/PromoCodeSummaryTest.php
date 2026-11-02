@@ -146,8 +146,9 @@ class PromoCodeSummaryTest extends TestCase
         ]);
     }
 
-    public function test_a_code_is_split_by_the_historical_metadata_of_each_usage(): void
+    public function test_a_code_is_split_by_the_metadata_snapshot_of_each_usage(): void
     {
+        // Each usage keeps the master metadata of the moment it was first processed.
         $this->seedCodeData();
         $this->travelTo(CarbonImmutable::create(2026, 9, 15, 8));
         app(PromoCodeService::class)->updateMetadata($this->appCode, Funnel::where('name', 'Marketing')->value('id'), $this->appCode->source_id);
@@ -160,6 +161,20 @@ class PromoCodeSummaryTest extends TestCase
             ->all();
 
         $this->assertEquals([['Aplikasi', 2, 100000], ['Marketing', 1, 50000]], $app);
+    }
+
+    public function test_anomalous_transactions_are_left_out_of_the_rekap_and_detail(): void
+    {
+        $this->seedCodeData();
+        $transaction = $this->transaction(['APP26'], 70000, '2026-09-25');
+        // An invalid payload keeps the earlier valid usage, but the transaction leaves every promo aggregate.
+        $transaction->update(['promo_code' => ['APP26', 'RESELLER01', 'EXTRA']]);
+        $this->assertTrue($transaction->fresh()->promo_code_anomaly);
+
+        $summary = $this->summary();
+        $this->assertEquals([2, 100000], array_slice(collect($this->rows($summary))->firstWhere(0, 'APP26'), 2, 2));
+        $this->assertEquals(['transactions' => 6, 'revenue' => 2100000, 'usages' => 7, 'code_revenue' => 1500000], $summary['totals']);
+        $this->assertEquals(['transactions' => 2, 'usages' => 2, 'revenue' => 100000], $this->detail('APP26')['totals']);
     }
 
     public function test_sorting_and_pagination(): void
