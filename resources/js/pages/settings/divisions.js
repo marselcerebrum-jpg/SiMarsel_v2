@@ -6,7 +6,7 @@ const ENDPOINT = '/api/divisions';
 
 const emptyForm = () => ({ code_division: '', name: '' });
 
-Alpine.data('divisionManagement', (canManage = false) => ({
+Alpine.data('divisionManagement', (canManage = false, initiallyActive = false) => ({
     canManage,
     divisions: [],
 
@@ -15,7 +15,8 @@ Alpine.data('divisionManagement', (canManage = false) => ({
     draftError: '',
     creating: false,
 
-    loading: true,
+    loaded: false,
+    loading: false,
     loadError: '',
     saving: false,
 
@@ -29,7 +30,11 @@ Alpine.data('divisionManagement', (canManage = false) => ({
     deletingDivision: null,
 
     init() {
-        this.fetchDivisions();
+        if (initiallyActive) this.activate('divisions');
+    },
+
+    activate(tab) {
+        if (tab === 'divisions' && !this.loaded && !this.loading) this.fetchDivisions();
     },
 
     get filteredDivisions() {
@@ -56,6 +61,7 @@ Alpine.data('divisionManagement', (canManage = false) => ({
         try {
             const { data } = await http(ENDPOINT);
             this.divisions = data;
+            this.loaded = true;
         } catch (error) {
             this.loadError = errorMessage(error, 'Gagal memuat daftar divisi.');
         } finally {
