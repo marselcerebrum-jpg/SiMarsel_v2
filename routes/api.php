@@ -132,6 +132,7 @@ Route::middleware('auth')->group(function () {
 
     Route::prefix('promo-analysis')->name('api.promo-analysis.')->group(function () {
         Route::get('/filters', [PromoAnalysisController::class, 'filters'])->name('filters');
+        Route::get('/product-types', [PromoAnalysisController::class, 'productTypes'])->name('product-types');
         Route::get('/summary', [PromoAnalysisController::class, 'summary'])->name('summary');
         Route::get('/funnels', [PromoAnalysisController::class, 'funnels'])->name('funnels');
         Route::get('/sources', [PromoAnalysisController::class, 'sources'])->name('sources');
