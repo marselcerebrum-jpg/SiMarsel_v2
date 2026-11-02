@@ -70,6 +70,34 @@ class PromoCodeSummaryRepository
     }
 
     /**
+     * The most used codes, one row per platform + normalized code whatever their metadata snapshots. Ordered by
+     * usages, the same usage count as the rekap per kode, then by credited revenue, code, and platform.
+     *
+     * @return Collection<int, object{platform_id: int, code: string, usages: int, revenue: string|float, platform_slug: string, platform_name: string, promo_code_id: int|null}>
+     */
+    public function topCodes(PromoAnalysisFilter $filter, int $limit): Collection
+    {
+        $codes = DB::query()
+            ->fromSub($this->promoAnalysisRepository->creditedUsages($filter), 'usages')
+            ->groupBy('platform_id', 'code')
+            ->selectRaw('platform_id, code, COUNT(*) as usages, COALESCE(SUM(revenue), 0) as revenue');
+
+        return DB::query()
+            ->fromSub($codes, 'codes')
+            ->join('platforms', 'platforms.id', '=', 'codes.platform_id')
+            ->leftJoin('promo_codes', fn (JoinClause $join) => $join
+                ->on('promo_codes.platform_id', '=', 'codes.platform_id')
+                ->on('promo_codes.code', '=', 'codes.code'))
+            ->selectRaw('codes.*, platforms.slug as platform_slug, platforms.name as platform_name, promo_codes.id as promo_code_id')
+            ->orderByDesc('codes.usages')
+            ->orderByDesc('codes.revenue')
+            ->orderBy('codes.code')
+            ->orderBy('platforms.name')
+            ->limit($limit)
+            ->get();
+    }
+
+    /**
      * Usages and credited revenue of every code in the filter.
      *
      * @return array{usages: int, revenue: float}
