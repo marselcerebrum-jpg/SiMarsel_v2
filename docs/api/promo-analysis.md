@@ -8,6 +8,7 @@ Wajib login. **Semua user yang login** boleh mengakses. Aturan header dan kode e
 |---|---|
 | `GET /api/promo-analysis/filters` | Pilihan dropdown filter |
 | `GET /api/promo-analysis/summary` | Kartu KPI |
+| `GET /api/promo-analysis/product-types` | Transaksi dan revenue promo per tipe produk (Perdana / Perpanjangan) |
 | `GET /api/promo-analysis/funnels` | Tabel transaksi dan revenue per funnel |
 | `GET /api/promo-analysis/sources` | Tabel penggunaan dan revenue per source |
 | `GET /api/promo-analysis/codes` | Tabel rekap per kode promo |
@@ -139,6 +140,62 @@ Setiap KPI berisi nilai periode sekarang dan periode pembanding:
 ```
 
 Jika tidak ada transaksi untuk filter itu, respons tetap **200** dengan `is_empty: true` dan `message: "Data tidak tersedia untuk filter yang dipilih."`.
+
+## `GET /api/promo-analysis/product-types`
+
+Transaksi dan revenue **promo** menurut tipe produk (`transactions.product_type`), untuk membandingkan segmen Perdana dan Perpanjangan. Endpoint ini menerima semua filter di atas.
+
+- Hanya **transaksi unik yang punya minimal satu kode promo**. Transaksi dua-kode dihitung **satu kali**, dan nominalnya dijumlahkan satu kali.
+- Yang ditampilkan adalah jumlah **transaksi** dan **revenue**, bukan jumlah penggunaan kode.
+- Dasar transaksinya sama dengan KPI: hanya `Success`, dan transaksi anomali dikecualikan. `totals` selalu sama dengan **Transaksi dengan Promo** dan **Revenue dengan Promo** di `/summary`.
+- Pencarian kode (`search`) mempersempit transaksi ke yang memakai kode yang cocok, sama seperti KPI.
+
+### Kelompok tipe produk
+
+| `key` | Kondisi | Nama |
+|---|---|---|
+| `first_purchase` | `product_type` = `Perdana` | Perdana |
+| `renewal` | `product_type` = `Perpanjangan` | Perpanjangan |
+| `other` | Nilai lain | Nilai `product_type` apa adanya, satu baris per nilai |
+| `unknown` | Kosong atau `null` | Tidak diketahui |
+
+- Perdana dan Perpanjangan dicocokkan dengan cara yang sama seperti **Pengguna Baru** dan **Repeat Order** di Ringkasan Performa, jadi angkanya konsisten.
+- Nilai lain atau kosong **tidak pernah** dimasukkan diam-diam ke Perdana atau Perpanjangan.
+- Urutan: Perdana dan Perpanjangan (selalu tampil, walaupun 0), lalu tipe lain A-Z, lalu Tidak diketahui (hanya jika ada).
+
+### Rumus
+
+| Field | Rumus |
+|---|---|
+| `transactions` | Transaksi promo unik di kelompok itu |
+| `revenue` | Jumlah `nominal` transaksi promo di kelompok itu, satu kali per transaksi |
+| `transaction_percentage` | `transactions` ÷ total transaksi promo hasil filter × 100, 2 desimal; `0` jika total 0 |
+| `revenue_percentage` | `revenue` ÷ total revenue promo hasil filter × 100, 2 desimal; `0` jika total 0 |
+
+Export tabel ini, jika nanti dibuat, wajib memakai `PromoProductTypeService::breakdown()` yang sama, supaya angkanya tidak berbeda dengan halaman.
+
+### 200 OK
+
+`GET /api/promo-analysis/product-types?year=2026&month=9`:
+
+```json
+{
+    "data": {
+        "filter": { "mode": "month", "date_from": "2026-09-01", "date_to": "2026-09-30", "...": "sama dengan /summary" },
+        "is_empty": false,
+        "message": null,
+        "totals": { "transactions": 6, "revenue": 1950000 },
+        "product_types": [
+            { "key": "first_purchase", "name": "Perdana", "transactions": 2, "revenue": 300000, "transaction_percentage": 33.33, "revenue_percentage": 15.38 },
+            { "key": "renewal", "name": "Perpanjangan", "transactions": 1, "revenue": 300000, "transaction_percentage": 16.67, "revenue_percentage": 15.38 },
+            { "key": "other", "name": "Bundling", "transactions": 1, "revenue": 400000, "transaction_percentage": 16.67, "revenue_percentage": 20.51 },
+            { "key": "unknown", "name": "Tidak diketahui", "transactions": 2, "revenue": 950000, "transaction_percentage": 33.33, "revenue_percentage": 48.72 }
+        ]
+    }
+}
+```
+
+Jika tidak ada transaksi promo, respons tetap **200** dengan `is_empty: true`, `message`, dan Perdana/Perpanjangan bernilai 0.
 
 ## `GET /api/promo-analysis/funnels`
 
