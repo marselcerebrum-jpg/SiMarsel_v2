@@ -1,6 +1,6 @@
 # API Analisis Promo
 
-Filter analisis, kartu KPI ringkasan, rekap per funnel, per source, dan per kode promo, serta detail penggunaan kode untuk halaman Analisis Promo. Semua komponen analisis promo memakai **filter yang sama**, jadi kirim query parameter yang sama ke setiap endpoint.
+Filter analisis, kartu KPI ringkasan, rekap per funnel, per source, dan per kode promo, detail penggunaan kode, serta grafik tren dan Top 5 kode untuk halaman Analisis Promo. Semua komponen analisis promo memakai **filter yang sama**, jadi kirim query parameter yang sama ke setiap endpoint.
 
 Wajib login. **Semua user yang login** boleh mengakses. Aturan header dan kode error umum ada di [authentication.md](authentication.md). Cara penggunaan kode promo disimpan ada di [promo-codes.md](../promo-codes.md).
 
@@ -12,6 +12,8 @@ Wajib login. **Semua user yang login** boleh mengakses. Aturan header dan kode e
 | `GET /api/promo-analysis/sources` | Tabel penggunaan dan revenue per source |
 | `GET /api/promo-analysis/codes` | Tabel rekap per kode promo |
 | `GET /api/promo-analysis/codes/usages` | Detail penggunaan satu kode (saat baris rekap diklik) |
+| `GET /api/promo-analysis/trend` | Grafik tren transaksi dan revenue promo, dengan overlay total penjualan |
+| `GET /api/promo-analysis/top-codes` | Top 5 kode berdasarkan jumlah penggunaan |
 
 ## Sumber data
 
@@ -421,6 +423,103 @@ Detail penggunaan satu kode, dibuka saat baris rekap diklik. Kirim `platform_id`
 | `revenue` | Revenue atribusi kode ini dari transaksi itu (Rp0 jika kode utama di transaksi dua-kode) |
 | `transaction_nominal` | Nominal transaksi seluruhnya |
 
+## `GET /api/promo-analysis/trend`
+
+Grafik transaksi dan revenue promo dari waktu ke waktu, dengan **total penjualan** pada periode yang sama sebagai pembanding. Endpoint ini menerima semua filter di atas, ditambah:
+
+| Parameter | Format | Keterangan |
+|---|---|---|
+| `period` | `daily`, `weekly`, `monthly` | Ukuran bucket grafik. Default `daily`. |
+
+- Bucket dihitung dari `paid_date`, sama dengan grafik Ringkasan Performa: **mingguan** = Senin-Minggu, **bulanan** = bulan kalender. Bucket pertama dan terakhir dipotong mengikuti rentang filter.
+- `daily` dan `weekly` maksimal **366 hari**; `monthly` tidak dibatasi.
+- Bucket yang dimulai **setelah hari ini** bernilai `null` (belum terjadi), bukan `0`.
+
+### Dataset
+
+| `key` | Label | Rumus |
+|---|---|---|
+| `promo_transactions` | Transaksi dengan Promo | Transaksi unik yang punya minimal satu penggunaan kode. Transaksi dua-kode dihitung **satu kali**. |
+| `promo_revenue` | Revenue dengan Promo | Nominal transaksi promo, **satu kali per transaksi** (bukan atribusi per kode) |
+| `total_transactions` | Total Transaksi | Seluruh transaksi di bucket itu, dengan dan tanpa promo |
+| `total_sales` | Total Penjualan | Nominal seluruh transaksi di bucket itu (overlay) |
+
+- Semua dataset memakai dasar transaksi yang sama dengan KPI: hanya transaksi `Success`, dan transaksi **anomali dikecualikan**, termasuk dari overlay total penjualan. Jadi `totals` grafik selalu sama dengan KPI `/summary`.
+- Filter platform, metode pembayaran, dan periode berlaku untuk semua dataset.
+- **Pencarian kode** (`search`) hanya mempersempit garis promo. Overlay total penjualan tetap menampilkan **seluruh** transaksi hasil filter lain, supaya tetap bisa dibandingkan.
+
+### 200 OK
+
+`GET /api/promo-analysis/trend?year=2026&month=9&period=weekly`:
+
+```json
+{
+    "data": {
+        "filter": { "mode": "month", "date_from": "2026-09-01", "date_to": "2026-09-30", "...": "sama dengan /summary" },
+        "period": "weekly",
+        "is_empty": false,
+        "message": null,
+        "totals": { "promo_transactions": 4, "promo_revenue": 1150000, "total_transactions": 6, "total_sales": 2150000 },
+        "labels": ["01 - 06 Sep 2026", "07 - 13 Sep 2026", "14 - 20 Sep 2026", "21 - 27 Sep 2026", "28 - 30 Sep 2026"],
+        "datasets": [
+            { "key": "promo_transactions", "label": "Transaksi dengan Promo", "data": [1, 2, 1, 0, 0] },
+            { "key": "promo_revenue", "label": "Revenue dengan Promo", "data": [100000, 500000, 550000, 0, 0] },
+            { "key": "total_transactions", "label": "Total Transaksi", "data": [2, 2, 2, 0, 0] },
+            { "key": "total_sales", "label": "Total Penjualan", "data": [500000, 500000, 1150000, 0, 0] }
+        ],
+        "rows": [
+            { "label": "01 - 06 Sep 2026", "period_start": "2026-09-01", "period_end": "2026-09-06", "promo_transactions": 1, "promo_revenue": 100000, "total_transactions": 2, "total_sales": 500000 }
+        ]
+    }
+}
+```
+
+(`rows` dipersingkat; satu baris per bucket.)
+
+Jika tidak ada transaksi, respons tetap **200** dengan `is_empty: true`, `message`, dan semua bucket bernilai 0 (atau `null` untuk bucket setelah hari ini).
+
+## `GET /api/promo-analysis/top-codes`
+
+Lima kode promo dengan **jumlah penggunaan** terbanyak. Endpoint ini menerima semua filter di atas.
+
+- **Penggunaan** dan **revenue** memakai definisi yang sama dengan rekap per kode (`/codes`): setiap kemunculan kode per transaksi = 1 penggunaan; satu kode mendapat seluruh nominal, dan pada dua kode posisi 1 mendapat Rp0 sedangkan posisi 2 mendapat seluruh nominal.
+- Urutan: **penggunaan** terbanyak (bukan transaksi unik dan bukan revenue). Jika sama, revenue terbesar, lalu kode A-Z, lalu nama platform.
+- Revenue dan kontribusi ditampilkan sebagai metrik pendamping. Kontribusi = revenue kode ÷ total revenue seluruh transaksi hasil filter × 100.
+- Satu baris per platform + kode yang dinormalisasi. Berbeda dengan `/codes`, kode yang punya beberapa snapshot funnel/source **tetap satu baris**, karena Top 5 mengurutkan kode.
+- Kode belum terdaftar ikut dihitung (`is_registered: false`). Transaksi anomali dikecualikan.
+- Saat `search` aktif, hanya kode yang cocok yang masuk Top 5.
+- Bisa berisi kurang dari 5 kode jika kode yang dipakai lebih sedikit.
+
+### 200 OK
+
+`GET /api/promo-analysis/top-codes?year=2026&month=9`:
+
+```json
+{
+    "data": {
+        "filter": { "...": "sama dengan /summary" },
+        "is_empty": false,
+        "message": null,
+        "codes": [
+            {
+                "rank": 1,
+                "code": "RESELLER01",
+                "raw_codes": ["RESELLER01"],
+                "is_registered": true,
+                "promo_code_id": 7,
+                "platform": { "id": 2, "slug": "jadiasn", "name": "JADIASN" },
+                "usages": 2,
+                "revenue": 500000,
+                "contribution_percentage": 23.26,
+                "detail": { "platform_id": 2, "code": "RESELLER01" }
+            }
+        ]
+    }
+}
+```
+
+`detail` bisa dipakai untuk membuka detail penggunaan kode (`/codes/usages`), sama seperti baris rekap.
+
 ## 422 Validasi gagal
 
 | Kondisi | Key | Pesan |
@@ -434,5 +533,7 @@ Detail penggunaan satu kode, dibuka saat baris rekap diklik. Kirim `platform_id`
 | `per_page` di luar 1-100 (`/codes`, `/codes/usages`) | `per_page` | `Jumlah per halaman harus di antara 1 dan 100.` |
 | `platform_id` / `code` kosong (`/codes/usages`) | `platform_id` / `code` | `Platform wajib diisi.` / `Kode promo wajib diisi.` |
 | `platform_id` tidak ada (`/codes/usages`) | `platform_id` | `Platform tidak ditemukan.` |
+| `period` tidak dikenal (`/trend`) | `period` | `Periode tidak valid.` |
+| Rentang lebih dari 366 hari untuk `daily`/`weekly` (`/trend`) | `date_to` | `Rentang tanggal untuk periode daily maksimal 366 hari.` |
 
 Validasi tanggal, bulan, dan tahun lainnya sama dengan [filter Ringkasan Performa](performance-filter.md#422-validasi-gagal).
