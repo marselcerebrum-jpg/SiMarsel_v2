@@ -59,6 +59,25 @@ class PromoAnalysisRepository
     }
 
     /**
+     * Transactions and revenue per paid date, with and without a promo code. Like the KPIs, each
+     * transaction counts once and adds its nominal once, also when it uses two codes.
+     *
+     * @return Collection<int, object{day: string, transactions: int, revenue: string|float, promo_transactions: int, promo_revenue: string|float}>
+     */
+    public function dailyTransactionTotals(PromoAnalysisFilter $filter): Collection
+    {
+        return $this->transactions($filter)
+            ->toBase()
+            ->selectRaw(
+                'DATE(paid_date) as day, COUNT(*) as transactions, COALESCE(SUM(nominal), 0) as revenue, '
+                .'COALESCE(SUM(CASE WHEN '.self::HAS_PROMO.' THEN 1 ELSE 0 END), 0) as promo_transactions, '
+                .'COALESCE(SUM(CASE WHEN '.self::HAS_PROMO.' THEN nominal ELSE 0 END), 0) as promo_revenue'
+            )
+            ->groupByRaw('DATE(paid_date)')
+            ->get();
+    }
+
+    /**
      * Distinct platform + normalized codes used by the filtered transactions, registered or not.
      * With a search, only the codes matching it are counted.
      */
