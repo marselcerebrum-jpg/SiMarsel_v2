@@ -1,10 +1,3 @@
-@extends('layouts.dashboard')
-
-@section('title', 'Settings')
-@push('scripts')
-    @vite('resources/js/pages/settings/accounts.js')
-@endpush
-
 @php
     $card = 'rounded-panel border border-line bg-surface shadow-sm';
     $tileLabel = 'text-xs font-semibold text-label';
@@ -16,18 +9,14 @@
     ];
 
     // Every role can read the account list; only Manager can create, edit, and delete.
-    $canManage = auth()->user()->can('create', App\Models\Account::class);
+    $canManageAccounts = auth()->user()->can('create', App\Models\Account::class);
 @endphp
 
-@section('page')
-    <div x-data="accountSettings(@js($roles), @js($divisions), @js($canManage))" class="min-w-0">
-        <header>
-            <h1 class="text-2xl font-bold tracking-tight text-ink">Settings</h1>
-            <p class="mt-1 text-sm text-muted">
-                {{ $canManage ? 'Kelola akun anggota tim beserta role dan divisinya.' : 'Lihat daftar akun anggota tim beserta role dan divisinya.' }}
-            </p>
-        </header>
-
+<div
+    x-data="accountSettings(@js($roles), @js($divisions), @js($canManageAccounts), tab === 'accounts')"
+    @organization-tab-changed.window="activate($event.detail)"
+    class="min-w-0"
+>
         {{-- Ringkasan --}}
         <section class="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-label="Account Summary">
             <article class="{{ $card }} p-4">
@@ -58,11 +47,11 @@
                 <div>
                     <h2 id="account-list-title" class="text-base font-semibold text-ink">Account List</h2>
                     <p class="mt-1 text-sm text-muted">
-                        {{ $canManage ? 'Tambah, ubah, atau hapus akun anggota tim beserta role dan divisinya.' : 'Cari akun anggota tim dan saring berdasarkan divisi.' }}
+                        {{ $canManageAccounts ? 'Tambah, ubah, atau hapus akun anggota tim beserta role dan divisinya.' : 'Cari akun anggota tim dan saring berdasarkan divisi.' }}
                     </p>
                 </div>
 
-                @if ($canManage)
+                @if ($canManageAccounts)
                     <button
                         type="button"
                         class="inline-flex h-9 shrink-0 items-center justify-center gap-2 self-start rounded-lg bg-primary px-4 text-sm font-semibold text-white hover:bg-primary-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-50"
@@ -74,13 +63,12 @@
             </div>
 
             @include('pages.settings.components.account-filter')
-            @include('pages.settings.components.account-table')
+            @include('pages.settings.components.account-table', ['canManage' => $canManageAccounts])
         </section>
 
-        @if ($canManage)
+        @if ($canManageAccounts)
             @include('pages.settings.components.account-create-modal')
             @include('pages.settings.components.account-edit-modal')
             @include('pages.settings.components.account-delete-modal')
         @endif
-    </div>
-@endsection
+</div>

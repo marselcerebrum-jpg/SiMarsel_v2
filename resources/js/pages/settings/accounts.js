@@ -6,7 +6,7 @@ const ENDPOINT = '/api/accounts';
 
 const emptyForm = () => ({ fullname: '', username: '', password: '', role_id: '', division_id: '' });
 
-Alpine.data('accountSettings', (roles = [], divisions = [], canManage = false) => ({
+Alpine.data('accountSettings', (roles = [], divisions = [], canManage = false, initiallyActive = false) => ({
     roles,
     divisions,
     canManage,
@@ -18,7 +18,8 @@ Alpine.data('accountSettings', (roles = [], divisions = [], canManage = false) =
     creating: false,
     showDraftPassword: false,
 
-    loading: true,
+    loaded: false,
+    loading: false,
     loadError: '',
     saving: false,
 
@@ -35,7 +36,11 @@ Alpine.data('accountSettings', (roles = [], divisions = [], canManage = false) =
 
     init() {
         this.resetDraft();
-        this.fetchUsers();
+        if (initiallyActive) this.activate('accounts');
+    },
+
+    activate(tab) {
+        if (tab === 'accounts' && !this.loaded && !this.loading) this.fetchUsers();
     },
 
     get currentUserId() {
@@ -60,6 +65,7 @@ Alpine.data('accountSettings', (roles = [], divisions = [], canManage = false) =
         try {
             const { data } = await http(ENDPOINT);
             this.users = data;
+            this.loaded = true;
         } catch (error) {
             this.loadError = errorMessage(error, 'Gagal memuat daftar akun.');
         } finally {
@@ -223,4 +229,3 @@ Alpine.data('accountSettings', (roles = [], divisions = [], canManage = false) =
         showToast({ title: 'Account Deleted', text: `${user.fullname} sudah dihapus.` });
     },
 }));
-
