@@ -16,6 +16,7 @@ use App\Http\Controllers\Promo\PromoAnalysisController;
 use App\Http\Controllers\Promo\PromoCodeController;
 use App\Http\Controllers\Promo\PromoCodeSummaryController;
 use App\Http\Controllers\Promo\PromoSourceController;
+use App\Http\Controllers\Promo\PromoTrendController;
 use App\Http\Controllers\Promo\UnregisteredPromoCodeController;
 use App\Http\Controllers\Task\TaskController;
 use App\Models\Account;
@@ -138,6 +139,8 @@ Route::middleware('auth')->group(function () {
         Route::get('/sources', [PromoAnalysisController::class, 'sources'])->name('sources');
         Route::get('/codes', [PromoCodeSummaryController::class, 'index'])->name('codes');
         Route::get('/codes/usages', [PromoCodeSummaryController::class, 'usages'])->name('codes.usages');
+        Route::get('/trend', PromoTrendController::class)->name('trend');
+        Route::get('/top-codes', [PromoCodeSummaryController::class, 'top'])->name('top-codes');
     });
 
     Route::get('/performance/summary', PerformanceSummaryController::class)
