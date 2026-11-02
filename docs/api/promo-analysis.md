@@ -291,7 +291,8 @@ Pencarian memakai `search` dari filter bersama: hanya kode yang cocok yang ditam
 ### Aturan
 
 - **Satu baris** per platform + kode yang dinormalisasi (` cpns26 ` dan `CPNS26` adalah kode yang sama). Kode yang sama di platform lain adalah baris lain.
-- Funnel dan source diambil dari **snapshot historis** setiap penggunaan. Jika metadata kode diubah di tengah periode, barisnya dipecah per metadata yang berlaku saat itu, misalnya `CPNS26 · Aplikasi` dan `CPNS26 · Marketing`. Dengan begitu angkanya selalu cocok dengan tabel Funnel dan Source.
+- Funnel dan source diambil dari **snapshot** setiap penggunaan, yaitu master saat penggunaan itu pertama kali diproses (bukan versi pada waktu bayar), sama dengan tabel Funnel dan Source. Jika mapping kode diubah, penggunaan lama dan baru bisa punya snapshot berbeda, sehingga barisnya dipecah, misalnya `CPNS26 · Aplikasi` dan `CPNS26 · Marketing`. Dengan begitu angkanya selalu cocok dengan tabel Funnel dan Source.
+- Transaksi anomali dikecualikan dari rekap, detail, dan denominator kontribusi, termasuk penggunaan valid lama yang masih disimpan.
 - **Penggunaan** = setiap kemunculan kode per transaksi. Transaksi dua-kode menambah satu penggunaan ke masing-masing kode.
 - **Revenue atribusi**, sama dengan tabel Source: satu kode mendapat seluruh nominal. Pada dua kode, kode posisi 1 mendapat **Rp0** dan kode posisi 2 mendapat **seluruh** nominal. Ini atribusi khusus rekap kode, bukan revenue funnel.
 - **Kode belum terdaftar** tetap muncul dengan `is_registered: false`, tanpa funnel/source, dan semua penulisan aslinya ada di `raw_codes`.
