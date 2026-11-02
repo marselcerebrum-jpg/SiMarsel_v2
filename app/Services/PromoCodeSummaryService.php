@@ -12,6 +12,8 @@ use Illuminate\Support\Collection;
 
 class PromoCodeSummaryService
 {
+    public const TOP_CODES = 5;
+
     public function __construct(
         private PromoCodeSummaryRepository $promoCodeSummaryRepository,
         private PromoAnalysisRepository $promoAnalysisRepository,
@@ -63,6 +65,42 @@ class PromoCodeSummaryService
             ],
             'is_empty' => $isEmpty,
             'message' => $isEmpty ? 'Data tidak tersedia untuk filter yang dipilih.' : null,
+        ];
+    }
+
+    /**
+     * The five most used codes with their credited revenue as a companion metric.
+     *
+     * @return array<string, mixed>
+     */
+    public function topCodes(PromoAnalysisFilter $filter): array
+    {
+        $codes = $this->promoCodeSummaryRepository->topCodes($filter, self::TOP_CODES);
+        $transactions = $this->promoAnalysisRepository->transactionTotals($filter);
+        $totalRevenue = round($transactions['promo_revenue'] + $transactions['non_promo_revenue'], 2);
+
+        $rawCodes = $this->promoCodeSummaryRepository->rawCodes($filter, $codes
+            ->map(fn (object $row) => ['platform_id' => (int) $row->platform_id, 'code' => $row->code])
+            ->all());
+
+        $isEmpty = $transactions['transactions'] === 0;
+
+        return [
+            'filter' => $filter->toArray(),
+            'is_empty' => $isEmpty,
+            'message' => $isEmpty ? 'Data tidak tersedia untuk filter yang dipilih.' : null,
+            'codes' => $codes->values()->map(fn (object $row, int $index) => [
+                'rank' => $index + 1,
+                'code' => $row->code,
+                'raw_codes' => $rawCodes->get($row->platform_id.'|'.$row->code, []),
+                'is_registered' => $row->promo_code_id !== null,
+                'promo_code_id' => $row->promo_code_id === null ? null : (int) $row->promo_code_id,
+                'platform' => ['id' => (int) $row->platform_id, 'slug' => $row->platform_slug, 'name' => $row->platform_name],
+                'usages' => (int) $row->usages,
+                'revenue' => round((float) $row->revenue, 2),
+                'contribution_percentage' => $this->percentage((float) $row->revenue, $totalRevenue),
+                'detail' => ['platform_id' => (int) $row->platform_id, 'code' => $row->code],
+            ])->all(),
         ];
     }
 
