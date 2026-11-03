@@ -33,6 +33,7 @@ class PromoCodeSummaryController extends Controller
             $request->promoFilter(),
             $request->platformId(),
             $request->code(),
+            $request->group(),
             $request->perPage(),
         );
 
