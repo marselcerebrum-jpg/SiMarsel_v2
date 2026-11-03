@@ -150,8 +150,9 @@ class PromoPageTest extends TestCase
             ->assertSee('@promo-code-register.window="openRegister($event.detail)"', false)
             ->assertSee('@promo-codes-changed.window="refresh()"', false)
             ->assertSee('Register Promo Code')
-            ->assertSee('penggunaan historis yang belum terhubung akan dihubungkan')
-            ->assertSee('Snapshot penggunaan yang sudah terhubung tetap dipertahankan, termasuk nilai kosong.')
+            ->assertSee('Mendaftarkan kode dari alert juga dapat melengkapi')
+            ->assertSee('penggunaan historis yang sebelumnya belum terpetakan akan dihubungkan')
+            ->assertSee('Penggunaan yang sudah memiliki klasifikasi Funnel/Source tidak akan ditimpa.')
             ->assertDontSee('Deactivate');
     }
 

@@ -42,9 +42,9 @@
     </div>
 
     <p x-show="total > 0" x-cloak class="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-        Transaksi dengan kode ini tetap tersimpan dan tetap dihitung dalam analisis. Mendaftarkan kode dari daftar ini juga menghubungkan
-        penggunaan historis yang belum terhubung dan melengkapi klasifikasi yang belum tersedia dengan funnel/source yang didaftarkan.
-        Snapshot penggunaan yang sudah terhubung tetap dipertahankan, termasuk nilai kosong.
+        Transaksi dengan kode ini tetap tersimpan dan tetap dihitung dalam analisis. Mendaftarkan kode dari alert juga dapat melengkapi
+        penggunaan historis yang sebelumnya belum terpetakan dengan funnel/source yang didaftarkan.
+        Penggunaan yang sudah memiliki klasifikasi Funnel/Source tidak akan ditimpa.
     </p>
 
     <div x-show="loading || loadError || items.length || hasFilter" x-cloak class="mt-4 overflow-hidden rounded-lg border border-line">
