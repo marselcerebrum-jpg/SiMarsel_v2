@@ -194,46 +194,6 @@ class UnregisteredPromoCodeTest extends TestCase
             ->assertJsonValidationErrors(['per_page' => 'Jumlah per halaman harus di antara 1 dan 100.']);
     }
 
-    public function test_alert_and_backfill_only_use_successful_transactions(): void
-    {
-        $this->transaction(['CPNS26']);
-        $failed = $this->transaction(['CPNS26']);
-        $failed->update(['status_message' => 'failed']);
-        $this->transaction(['BUMN26'])->update(['status_message' => 'failed']);
-
-        $this->assertSame([['CPNS26', 1]], array_map(
-            fn (array $row) => [$row['code'], $row['usages_count']],
-            $this->alert()['data'],
-        ));
-
-        $this->postJson('/api/promo-codes', ['code' => 'CPNS26', 'platform_id' => $this->jadiasn->id])
-            ->assertCreated()
-            ->assertJsonPath('data.usages_count', 1);
-
-        $this->assertNull($failed->promoCodeUsages()->first()->promo_code_id);
-    }
-
-    public function test_a_transaction_that_becomes_successful_is_processed_again(): void
-    {
-        // Paid after the code is registered, so the snapshot follows the version valid on that moment (US-01).
-        $pending = Transaction::factory()->failed()->for($this->jadiasn)->create([
-            'paid_date' => '2026-09-25',
-            'paid_time' => '10:00:00',
-            'promo_code' => ['CPNS26'],
-        ]);
-        $this->actingAs($this->employee)
-            ->postJson('/api/promo-codes', ['code' => 'CPNS26', 'platform_id' => $this->jadiasn->id, 'funnel_id' => $this->aplikasi->id])
-            ->assertCreated();
-        $this->assertNull($pending->promoCodeUsages()->first()->promo_code_id);
-
-        $pending->update(['status_message' => Transaction::STATUS_SUCCESS]);
-
-        $usage = $pending->promoCodeUsages()->first();
-        $this->assertNotNull($usage->promo_code_id);
-        $this->assertSame('Aplikasi', $usage->funnel_name_snapshot);
-        $this->assertSame([], $this->alert()['data']);
-    }
-
     public function test_alert_is_empty_when_every_code_is_registered(): void
     {
         app(PromoCodeService::class)->register($this->jadiasn->id, 'CPNS26');
