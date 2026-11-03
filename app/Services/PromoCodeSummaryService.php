@@ -7,6 +7,7 @@ use App\Models\PromoCode;
 use App\Repositories\PromoAnalysisRepository;
 use App\Repositories\PromoCodeSummaryRepository;
 use App\Support\PromoAnalysisFilter;
+use App\Support\PromoCodeGroup;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 use Illuminate\Support\LazyCollection;
@@ -144,22 +145,25 @@ class PromoCodeSummaryService
     /**
      * The transactions that used one code, newest first, grouped per paid date. Each date carries the totals of
      * the whole day, also when the day continues on the next page; the pagination counts transactions.
+     * With a snapshot group (from the clicked rekap row) only that group's usages are shown, so the totals equal
+     * that row; without one, every usage of the code.
      *
+     * @param  array{funnel_id: int|null, funnel_name: string|null, source_id: int|null, source_name: string|null}|null  $group
      * @return array{days: LengthAwarePaginator, filter: array<string, mixed>, code: array<string, mixed>, totals: array<string, int|float>, is_empty: bool, message: string|null}
      */
-    public function usages(PromoAnalysisFilter $filter, int $platformId, string $code, int $perPage): array
+    public function usages(PromoAnalysisFilter $filter, int $platformId, string $code, ?array $group, int $perPage): array
     {
         $code = PromoCode::normalizeCode($code);
         $platform = Platform::query()->findOrFail($platformId);
 
-        $transactions = $this->promoCodeSummaryRepository->usageTransactions($filter, $platformId, $code, $perPage);
+        $transactions = $this->promoCodeSummaryRepository->usageTransactions($filter, $platformId, $code, $group, $perPage);
         $page = collect($transactions->items());
 
         $usages = $this->promoCodeSummaryRepository
-            ->usagesOfTransactions($filter, $platformId, $code, $page->pluck('transaction_id')->map(fn ($id) => (int) $id)->all())
+            ->usagesOfTransactions($filter, $platformId, $code, $group, $page->pluck('transaction_id')->map(fn ($id) => (int) $id)->all())
             ->groupBy('transaction_id');
         $days = $this->promoCodeSummaryRepository
-            ->dayTotals($filter, $platformId, $code, $page->pluck('paid_date')->unique()->values()->all())
+            ->dayTotals($filter, $platformId, $code, $group, $page->pluck('paid_date')->unique()->values()->all())
             ->keyBy(fn (object $day) => $this->date($day->paid_date));
         $platformData = ['id' => $platform->id, 'slug' => $platform->slug, 'name' => $platform->name];
 
@@ -191,7 +195,7 @@ class PromoCodeSummaryService
             ])
             ->values());
 
-        $totals = $this->promoCodeSummaryRepository->usageTotals($filter, $platformId, $code);
+        $totals = $this->promoCodeSummaryRepository->usageTotals($filter, $platformId, $code, $group);
         $isEmpty = $totals['usages'] === 0;
 
         return [
@@ -201,6 +205,9 @@ class PromoCodeSummaryService
                 'code' => $code,
                 'is_registered' => PromoCode::query()->where('platform_id', $platformId)->where('code', $code)->exists(),
                 'platform' => $platformData,
+                'funnel' => $group === null ? null : $this->metadata($group['funnel_id'], $group['funnel_name']),
+                'source' => $group === null ? null : $this->metadata($group['source_id'], $group['source_name']),
+                'group' => $group === null ? null : PromoCodeGroup::encode($group),
             ],
             'totals' => [...$totals, 'revenue' => round($totals['revenue'], 2)],
             'is_empty' => $isEmpty,
@@ -225,7 +232,16 @@ class PromoCodeSummaryService
             'usages' => (int) $row->usages,
             'revenue' => round((float) $row->revenue, 2),
             'contribution_percentage' => $this->percentage((float) $row->revenue, $totalRevenue),
-            'detail' => ['platform_id' => (int) $row->platform_id, 'code' => $row->code],
+            'detail' => [
+                'platform_id' => (int) $row->platform_id,
+                'code' => $row->code,
+                'group' => PromoCodeGroup::encode([
+                    'funnel_id' => $row->funnel_id === null ? null : (int) $row->funnel_id,
+                    'funnel_name' => $row->funnel_name,
+                    'source_id' => $row->source_id === null ? null : (int) $row->source_id,
+                    'source_name' => $row->source_name,
+                ]),
+            ],
         ];
     }
 

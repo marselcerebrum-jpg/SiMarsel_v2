@@ -2,6 +2,8 @@
 
 namespace App\Http\Requests\Promo;
 
+use App\Support\PromoCodeGroup;
+use Closure;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Validation\Rule;
 
@@ -25,6 +27,11 @@ class PromoCodeUsageRequest extends PromoAnalysisFilterRequest
             ...parent::rules(),
             'platform_id' => ['required', 'integer', Rule::exists('platforms', 'id')],
             'code' => ['required', 'string', 'max:100'],
+            'group' => ['nullable', 'string', 'max:1000', function (string $attribute, mixed $value, Closure $fail) {
+                if (is_string($value) && PromoCodeGroup::decode($value) === null) {
+                    $fail('Grup klasifikasi tidak valid. Buka detail dari baris rekap kode promo.');
+                }
+            }],
             'per_page' => ['nullable', 'integer', 'between:1,'.self::MAX_PER_PAGE],
             'page' => ['nullable', 'integer', 'min:1'],
         ];
@@ -38,6 +45,18 @@ class PromoCodeUsageRequest extends PromoAnalysisFilterRequest
     public function code(): string
     {
         return $this->validated('code');
+    }
+
+    /**
+     * The funnel and source snapshot group of the clicked rekap row, or null for every usage of the code.
+     *
+     * @return array{funnel_id: int|null, funnel_name: string|null, source_id: int|null, source_name: string|null}|null
+     */
+    public function group(): ?array
+    {
+        $group = $this->validated('group');
+
+        return $group === null ? null : PromoCodeGroup::decode($group);
     }
 
     public function perPage(): int
@@ -70,6 +89,7 @@ class PromoCodeUsageRequest extends PromoAnalysisFilterRequest
             ...parent::attributes(),
             'platform_id' => 'Platform',
             'code' => 'Kode promo',
+            'group' => 'Grup klasifikasi',
             'per_page' => 'Jumlah per halaman',
             'page' => 'Halaman',
         ];

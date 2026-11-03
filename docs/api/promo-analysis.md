@@ -351,7 +351,10 @@ Pencarian memakai `search` dari filter bersama: hanya kode yang cocok yang ditam
 ### Aturan
 
 - **Satu baris** per platform + kode yang dinormalisasi (` cpns26 ` dan `CPNS26` adalah kode yang sama). Kode yang sama di platform lain adalah baris lain.
-- Funnel dan source diambil dari **snapshot** setiap penggunaan, yaitu master saat penggunaan itu pertama kali diproses (bukan versi pada waktu bayar), sama dengan tabel Funnel dan Source. Jika mapping kode diubah, penggunaan lama dan baru bisa punya snapshot berbeda, sehingga barisnya dipecah, misalnya `CPNS26 · Aplikasi` dan `CPNS26 · Marketing`. Dengan begitu angkanya selalu cocok dengan tabel Funnel dan Source.
+- Funnel dan source diambil dari **snapshot** setiap penggunaan, yaitu master saat penggunaan itu pertama kali diproses (bukan versi pada waktu bayar).
+- **Label historis:** nama funnel/source yang ditampilkan adalah **nama yang tersimpan di penggunaan** (`funnel_name_snapshot`, `source_name_snapshot`), walaupun master-nya sudah di-rename. Nama master sekarang hanya dipakai jika data lama belum punya nama snapshot. Contoh: penggunaan dengan snapshot `Marketing` tetap tampil `Marketing` setelah master diubah menjadi `Digital Marketing`.
+- Satu baris per platform + kode + **grup snapshot** (ID dan label funnel, ID dan label source). Jika klasifikasi kode berubah, misalnya mapping diganti atau master di-rename lalu dipakai transaksi baru, barisnya dipecah, misalnya `CPNS26 · Aplikasi` dan `CPNS26 · Marketing`.
+- Berbeda dengan tabel Funnel dan Source, yang memakai nama master **sekarang** sesuai aturan `docs/promo-codes.md`. Jumlah penggunaan dan revenue tetap sama, tetapi labelnya bisa berbeda setelah master di-rename.
 - Transaksi anomali dikecualikan dari rekap, detail, dan denominator kontribusi, termasuk penggunaan valid lama yang masih disimpan.
 - **Penggunaan** = setiap kemunculan kode per transaksi. Transaksi dua-kode menambah satu penggunaan ke masing-masing kode.
 - **Revenue atribusi**, sama dengan tabel Source: satu kode mendapat seluruh nominal. Pada dua kode, kode posisi 1 mendapat **Rp0** dan kode posisi 2 mendapat **seluruh** nominal. Ini atribusi khusus rekap kode, bukan revenue funnel.
@@ -363,11 +366,11 @@ Pencarian memakai `search` dari filter bersama: hanya kode yang cocok yang ditam
 | `code` | Kode yang dinormalisasi |
 | `raw_codes` | Semua penulisan asli dari Markaz di hasil filter |
 | `is_registered`, `promo_code_id` | Apakah kode sudah ada di master, dan id master-nya (`null` jika belum terdaftar) |
-| `funnel`, `source` | `{ id, name }` dengan nama master sekarang. `id: null` dengan nama saat transaksi untuk funnel/source yang sudah dihapus dari master; `null` jika tidak ada. |
+| `funnel`, `source` | `{ id, name }`: `id` snapshot dan nama yang tersimpan di penggunaan (label historis). `id: null` untuk funnel/source yang sudah dihapus dari master; `null` jika tidak ada. |
 | `usages` | Jumlah penggunaan kode |
 | `revenue` | Revenue atribusi kode |
 | `contribution_percentage` | `revenue` ÷ total revenue **seluruh** transaksi hasil filter × 100, 2 desimal; `0` jika total 0 |
-| `detail` | Parameter untuk membuka detail penggunaan: `platform_id` dan `code` |
+| `detail` | Parameter untuk membuka detail penggunaan baris ini: `platform_id`, `code`, dan `group` (identitas grup snapshot baris ini). Kirim ketiganya apa adanya ke `/codes/usages`. |
 | `totals` | `transactions` dan `revenue` seluruh transaksi hasil filter (sama dengan `/summary`), serta `usages` dan `code_revenue` semua kode (bukan hanya halaman ini) |
 
 Urutan cadangan, jika nilai `sort` sama: kode A-Z, lalu nama platform, funnel, dan source.
@@ -390,7 +393,7 @@ Urutan cadangan, jika nilai `sort` sama: kode A-Z, lalu nama platform, funnel, d
             "usages": 2,
             "revenue": 500000,
             "contribution_percentage": 23.81,
-            "detail": { "platform_id": 2, "code": "RESELLER01" }
+            "detail": { "platform_id": 2, "code": "RESELLER01", "group": "WzMsIlNhbGVzIiw4LCJSZXNlbGxlciJd" }
         },
         {
             "code": "UNREG26",
@@ -403,7 +406,7 @@ Urutan cadangan, jika nilai `sort` sama: kode A-Z, lalu nama platform, funnel, d
             "usages": 2,
             "revenue": 400000,
             "contribution_percentage": 19.05,
-            "detail": { "platform_id": 2, "code": "UNREG26" }
+            "detail": { "platform_id": 2, "code": "UNREG26", "group": "W251bGwsbnVsbCxudWxsLG51bGxd" }
         }
     ],
     "links": { "...": "..." },
@@ -417,12 +420,13 @@ Urutan cadangan, jika nilai `sort` sama: kode A-Z, lalu nama platform, funnel, d
 
 ## `GET /api/promo-analysis/codes/usages`
 
-Detail penggunaan satu kode, dibuka saat baris rekap diklik. Kirim `platform_id` dan `code` dari `detail` di baris rekap, beserta **filter yang sama** dengan rekap, supaya periodenya sama.
+Detail penggunaan satu baris rekap, dibuka saat baris itu diklik. Kirim `platform_id`, `code`, dan `group` dari `detail` di baris rekap, beserta **filter yang sama** dengan rekap. Dengan `group`, detail hanya berisi penggunaan dengan klasifikasi snapshot baris itu, jadi totalnya **selalu sama** dengan penggunaan dan revenue baris yang diklik.
 
 | Parameter | Wajib | Keterangan |
 |---|---|---|
 | `platform_id` | Ya | Platform kode |
 | `code` | Ya | Kode promo; dinormalisasi, jadi ` cpns26 ` = `CPNS26` |
+| `group` | Tidak | Identitas grup snapshot dari `detail.group` baris rekap. Tanpa `group`, detail berisi **semua** penggunaan kode itu dari semua klasifikasi (dipakai Top 5, yang menggabungkan klasifikasi). Nilai yang tidak valid → 422. |
 | `per_page` | Tidak | 1-100 transaksi per halaman, default 15 |
 | `page` | Tidak | Default 1 |
 | filter bersama | Tidak | `platforms[]`, `payment_methods[]`, periode, `search` |
@@ -431,7 +435,8 @@ Detail penggunaan satu kode, dibuka saat baris rekap diklik. Kirim `platform_id`
 - Setiap tanggal membawa total **sehari penuh** (`transactions_count`, `usages`, `revenue`), juga jika transaksi tanggal itu berlanjut ke halaman berikutnya.
 - Pagination menghitung **transaksi** (`meta.total` = jumlah transaksi).
 - Transaksi yang memakai kode yang sama di dua posisi adalah satu baris dengan `usages: 2`.
-- Revenue memakai atribusi yang sama dengan rekap, jadi `totals` detail selalu sama dengan jumlah baris kode itu di rekap.
+- Revenue memakai atribusi yang sama dengan rekap, jadi `totals` detail selalu sama dengan baris rekap yang diklik (dengan `group`), atau dengan jumlah semua baris kode itu (tanpa `group`).
+- `code.funnel` dan `code.source` menampilkan klasifikasi grup yang dibuka (`null` tanpa `group`). Funnel/source tiap transaksi memakai label historis yang sama dengan rekap.
 - Seperti rekap, saat `search` aktif hanya kode yang cocok yang dihitung.
 - Tidak ada fitur import di detail.
 
@@ -467,7 +472,14 @@ Detail penggunaan satu kode, dibuka saat baris rekap diklik. Kirim `platform_id`
     "links": { "...": "..." },
     "meta": { "current_page": 1, "per_page": 15, "total": 2, "...": "..." },
     "filter": { "...": "sama dengan /summary" },
-    "code": { "code": "RESELLER01", "is_registered": true, "platform": { "id": 2, "slug": "jadiasn", "name": "JADIASN" } },
+    "code": {
+        "code": "RESELLER01",
+        "is_registered": true,
+        "platform": { "id": 2, "slug": "jadiasn", "name": "JADIASN" },
+        "funnel": { "id": 3, "name": "Sales" },
+        "source": { "id": 8, "name": "Reseller" },
+        "group": "WzMsIlNhbGVzIiw4LCJSZXNlbGxlciJd"
+    },
     "totals": { "transactions": 2, "usages": 2, "revenue": 500000 },
     "is_empty": false,
     "message": null
@@ -576,7 +588,7 @@ Lima kode promo dengan **jumlah penggunaan** terbanyak. Endpoint ini menerima se
 }
 ```
 
-`detail` bisa dipakai untuk membuka detail penggunaan kode (`/codes/usages`), sama seperti baris rekap.
+`detail` bisa dipakai untuk membuka detail penggunaan kode (`/codes/usages`). Karena Top 5 menggabungkan klasifikasi, `detail` di sini **tanpa** `group`, sehingga detail berisi semua penggunaan kode itu dan totalnya sama dengan baris Top 5.
 
 ## `GET /api/promo-analysis/export`
 
@@ -640,6 +652,7 @@ Tombol **Salin** menyalin data komponen yang sedang dipilih dari respons endpoin
 | `per_page` di luar 1-100 (`/codes`, `/codes/usages`) | `per_page` | `Jumlah per halaman harus di antara 1 dan 100.` |
 | `platform_id` / `code` kosong (`/codes/usages`) | `platform_id` / `code` | `Platform wajib diisi.` / `Kode promo wajib diisi.` |
 | `platform_id` tidak ada (`/codes/usages`) | `platform_id` | `Platform tidak ditemukan.` |
+| `group` tidak valid (`/codes/usages`) | `group` | `Grup klasifikasi tidak valid. Buka detail dari baris rekap kode promo.` |
 | `period` tidak dikenal (`/trend`) | `period` | `Periode tidak valid.` |
 | Rentang lebih dari 366 hari untuk `daily`/`weekly` (`/trend`) | `date_to` | `Rentang tanggal untuk periode daily maksimal 366 hari.` |
 
