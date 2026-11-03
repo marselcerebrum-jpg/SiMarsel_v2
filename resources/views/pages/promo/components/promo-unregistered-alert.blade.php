@@ -15,7 +15,7 @@
             <div class="flex flex-wrap items-center gap-2">
                 <h2 id="unregistered-title" class="text-base font-semibold text-ink">Unregistered Promo Codes</h2>
                 <span
-                    x-show="!loading || meta"
+                    x-show="!loadError && (!loading || meta)"
                     x-cloak
                     class="inline-flex items-center rounded-md px-2 py-0.5 text-xs font-semibold"
                     :class="total > 0 ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-700'"
