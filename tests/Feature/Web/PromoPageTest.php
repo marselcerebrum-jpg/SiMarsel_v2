@@ -152,7 +152,7 @@ class PromoPageTest extends TestCase
             ->assertSee('Register Promo Code')
             ->assertSee('Mendaftarkan kode dari alert juga dapat melengkapi')
             ->assertSee('penggunaan historis yang sebelumnya belum terpetakan akan dihubungkan')
-            ->assertSee('Penggunaan yang sudah memiliki klasifikasi Funnel/Source tidak akan ditimpa.')
+            ->assertSee('Hanya penggunaan yang belum terhubung ke kode promo yang diproses; penggunaan yang sudah terhubung tidak diproses ulang meskipun funnel/source-nya kosong. Klasifikasi Funnel/Source yang sudah ada tidak akan ditimpa.')
             ->assertDontSee('Deactivate');
     }
 
