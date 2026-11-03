@@ -218,6 +218,17 @@ class PromoAnalysisExportTest extends TestCase
         );
     }
 
+    public function test_rekap_and_detail_sheets_keep_the_saved_labels_after_a_rename(): void
+    {
+        $this->seedExportData();
+        Funnel::where('name', 'Aplikasi')->first()->update(['name' => 'Aplikasi Mobile']);
+
+        $sheets = $this->sheets($this->export()->assertOk());
+
+        $this->assertSame('Aplikasi', collect($sheets['Rekap Kode Promo'])->firstWhere(0, 'APP26')[4]);
+        $this->assertSame(['Aplikasi'], collect($sheets['Detail Penggunaan'])->where(4, 'APP26')->pluck(8)->unique()->values()->all());
+    }
+
     public function test_anomalous_transactions_are_left_out(): void
     {
         $this->seedExportData();
