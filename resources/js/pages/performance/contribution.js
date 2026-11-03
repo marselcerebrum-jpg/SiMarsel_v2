@@ -1,6 +1,6 @@
 import { errorMessage } from '../../http';
 import { fetchPlatformContribution } from './api';
-import { formatValue } from './format';
+import { formatValue } from '../../format';
 import { contributionRows } from './table';
 
 const EMPTY_MESSAGE = 'Tidak ada data kontribusi platform untuk filter yang dipilih.';
