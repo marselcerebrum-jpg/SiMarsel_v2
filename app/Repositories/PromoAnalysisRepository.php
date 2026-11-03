@@ -74,6 +74,33 @@ class PromoAnalysisRepository
     }
 
     /**
+     * Promo transactions and their revenue per product_type. Each transaction with at least one code counts once
+     * and adds its nominal once. Perdana and Perpanjangan are matched like the Ringkasan Performa new users and
+     * repeat orders; any other value is kept as its own group, and an empty value is unknown.
+     *
+     * @return Collection<int, object{group_key: string, name: string|null, transactions: int, revenue: string|float}>
+     */
+    public function productTypeTotals(PromoAnalysisFilter $filter): Collection
+    {
+        $classified = $this->transactions($filter)
+            ->toBase()
+            ->whereRaw(self::HAS_PROMO)
+            ->selectRaw(
+                'transactions.nominal, '
+                ."CASE WHEN product_type = ? THEN 'first_purchase' WHEN product_type = ? THEN 'renewal' "
+                ."WHEN product_type IS NULL OR TRIM(product_type) = '' THEN 'unknown' ELSE 'other' END as group_key, "
+                ."CASE WHEN product_type = ? OR product_type = ? OR product_type IS NULL OR TRIM(product_type) = '' THEN NULL ELSE product_type END as name",
+                [Transaction::TYPE_FIRST, Transaction::TYPE_RENEWAL, Transaction::TYPE_FIRST, Transaction::TYPE_RENEWAL],
+            );
+
+        return DB::query()
+            ->fromSub($classified, 'classified')
+            ->groupBy('group_key', 'name')
+            ->selectRaw('group_key, name, COUNT(*) as transactions, COALESCE(SUM(nominal), 0) as revenue')
+            ->get();
+    }
+
+    /**
      * Transactions and full revenue per funnel of each transaction's main code, so every transaction
      * falls in exactly one group. Only position 1 determines the funnel. A code standing alone in
      * position 2 still counts as a promo transaction, but belongs to Tanpa Funnel.
