@@ -9,9 +9,12 @@ use App\Models\PromoCode;
 use App\Models\PromoSource;
 use App\Models\Transaction;
 use App\Services\PromoCodeService;
+use App\Support\PromoCodeGroup;
 use Carbon\CarbonImmutable;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 class PromoCodeSummaryTest extends TestCase
@@ -136,7 +139,11 @@ class PromoCodeSummaryTest extends TestCase
             [['id' => Funnel::where('name', 'Aplikasi')->value('id'), 'name' => 'Aplikasi'], ['id' => PromoSource::where('name', 'Instagram')->value('id'), 'name' => 'Instagram']],
             [$app['funnel'], $app['source']],
         );
-        $this->assertSame(['platform_id' => $this->jadiasn->id, 'code' => 'APP26'], $app['detail']);
+        $this->assertSame(['platform_id' => $this->jadiasn->id, 'code' => 'APP26'], Arr::except($app['detail'], 'group'));
+        $this->assertSame([
+            'funnel_id' => Funnel::where('name', 'Aplikasi')->value('id'), 'funnel_name' => 'Aplikasi',
+            'source_id' => PromoSource::where('name', 'Instagram')->value('id'), 'source_name' => 'Instagram',
+        ], PromoCodeGroup::decode($app['detail']['group']));
         $this->assertArrayNotHasKey('type', $app);
 
         // Unregistered codes stay in the rekap, with every raw value Markaz sent.
@@ -163,6 +170,36 @@ class PromoCodeSummaryTest extends TestCase
         $this->assertEquals([['Aplikasi', 2, 100000], ['Marketing', 1, 50000]], $app);
     }
 
+    public function test_each_classification_row_opens_its_own_detail(): void
+    {
+        $this->seedCodeData();
+        $this->travelTo(CarbonImmutable::create(2026, 9, 15, 8));
+        app(PromoCodeService::class)->updateMetadata($this->appCode, Funnel::where('name', 'Marketing')->value('id'), $this->appCode->source_id);
+        $this->transaction(['APP26'], 50000, '2026-09-20');
+
+        $rows = collect($this->summary(self::SEPTEMBER.'&search=app26')['data'])->keyBy('funnel.name');
+        $this->assertNotSame($rows['Aplikasi']['detail']['group'], $rows['Marketing']['detail']['group']);
+
+        foreach (['Aplikasi' => [2, 100000, ['2026-09-10', '2026-09-05']], 'Marketing' => [1, 50000, ['2026-09-20']]] as $funnel => [$usages, $revenue, $dates]) {
+            $row = $rows[$funnel];
+            $detail = $this->detail('APP26', query: self::SEPTEMBER.'&group='.$row['detail']['group']);
+
+            // The detail of a row always has the usages and revenue of that row, and only its classification.
+            $this->assertEquals([$row['usages'], $row['revenue']], [$detail['totals']['usages'], $detail['totals']['revenue']]);
+            $this->assertEquals([$usages, $revenue], [$detail['totals']['usages'], $detail['totals']['revenue']]);
+            $this->assertSame($dates, array_column($detail['data'], 'date'));
+            $this->assertSame($funnel, $detail['code']['funnel']['name']);
+            $this->assertSame($row['detail']['group'], $detail['code']['group']);
+        }
+
+        // Without a group the detail shows every usage of the code (used by the Top 5).
+        $this->assertEquals(['transactions' => 3, 'usages' => 3, 'revenue' => 150000], $this->detail('APP26')['totals']);
+
+        $this->getJson(self::DETAIL_URL.'?platform_id='.$this->jadiasn->id.'&code=APP26&group=not-a-group')
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['group' => 'Grup klasifikasi tidak valid. Buka detail dari baris rekap kode promo.']);
+    }
+
     public function test_anomalous_transactions_are_left_out_of_the_rekap_and_detail(): void
     {
         $this->seedCodeData();
@@ -186,8 +223,7 @@ class PromoCodeSummaryTest extends TestCase
         // A transaction that turns failed keeps its usage history but leaves the analysis.
         $this->transaction(['APP26'], 90000, '2026-09-23')->update(['status_message' => 'failed']);
 
-        // Renaming the funnel changes the label; deleting the source falls back to its snapshot name.
-        Funnel::where('name', 'Aplikasi')->first()->update(['name' => 'Aplikasi Mobile']);
+        // Deleting the source keeps its snapshot name on the usages.
         $instagram = PromoSource::where('name', 'Instagram')->first();
         $this->appCode->update(['source_id' => null]);
         $instagram->delete();
@@ -197,9 +233,32 @@ class PromoCodeSummaryTest extends TestCase
         $this->assertSame([true, null, null, 1, 80000], [
             $rows['EMPTY26']['is_registered'], $rows['EMPTY26']['funnel'], $rows['EMPTY26']['source'], $rows['EMPTY26']['usages'], (int) $rows['EMPTY26']['revenue'],
         ]);
-        $this->assertSame('Aplikasi Mobile', $rows['APP26']['funnel']['name']);
         $this->assertSame(['id' => null, 'name' => 'Instagram'], $rows['APP26']['source']);
         $this->assertSame([2, 100000], [$rows['APP26']['usages'], (int) $rows['APP26']['revenue']]);
+    }
+
+    public function test_renaming_a_master_never_relabels_saved_usages(): void
+    {
+        $this->seedCodeData();
+        $aplikasi = Funnel::where('name', 'Aplikasi')->first();
+        $reseller = PromoSource::where('name', 'Reseller')->first();
+        $aplikasi->update(['name' => 'Aplikasi Mobile']);
+        $reseller->update(['name' => 'Mitra Reseller']);
+
+        $rows = collect($this->summary()['data'])->keyBy('code');
+
+        // Historical usages keep the names saved on them; the ids still point to the renamed masters.
+        $this->assertSame(['id' => $aplikasi->id, 'name' => 'Aplikasi'], $rows['APP26']['funnel']);
+        $this->assertSame(['id' => $reseller->id, 'name' => 'Reseller'], $rows['RESELLER01']['source']);
+
+        $detail = $this->detail('APP26', query: self::SEPTEMBER.'&group='.$rows['APP26']['detail']['group']);
+        $transactions = array_merge(...array_column($detail['data'], 'transactions'));
+        $this->assertSame(['Aplikasi'], array_values(array_unique(array_map(fn (array $row) => $row['funnel']['name'], $transactions))));
+        $this->assertSame('Aplikasi', $detail['code']['funnel']['name']);
+
+        // A usage without a saved name (older data) falls back to the current master name.
+        DB::table('transaction_promo_codes')->where('code_snapshot', 'RESELLER01')->update(['source_name_snapshot' => null]);
+        $this->assertSame('Mitra Reseller', collect($this->summary()['data'])->firstWhere('code', 'RESELLER01')['source']['name']);
     }
 
     public function test_sorting_and_pagination(): void
@@ -250,7 +309,10 @@ class PromoCodeSummaryTest extends TestCase
 
         $detail = $this->detail('RESELLER01');
 
-        $this->assertSame(['code' => 'RESELLER01', 'is_registered' => true, 'platform' => ['id' => $this->jadiasn->id, 'slug' => 'jadiasn', 'name' => 'JADIASN']], $detail['code']);
+        $this->assertSame(
+            ['code' => 'RESELLER01', 'is_registered' => true, 'platform' => ['id' => $this->jadiasn->id, 'slug' => 'jadiasn', 'name' => 'JADIASN'], 'funnel' => null, 'source' => null, 'group' => null],
+            $detail['code'],
+        );
         $this->assertEquals(['transactions' => 2, 'usages' => 2, 'revenue' => 500000], $detail['totals']);
         $this->assertCount(1, $detail['data']);
 
