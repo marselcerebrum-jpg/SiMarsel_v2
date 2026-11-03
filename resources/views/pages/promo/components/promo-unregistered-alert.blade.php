@@ -44,7 +44,7 @@
     <p x-show="total > 0" x-cloak class="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
         Transaksi dengan kode ini tetap tersimpan dan tetap dihitung dalam analisis. Mendaftarkan kode dari alert juga dapat melengkapi
         penggunaan historis yang sebelumnya belum terpetakan dengan funnel/source yang didaftarkan.
-        Penggunaan yang sudah memiliki klasifikasi Funnel/Source tidak akan ditimpa.
+        Hanya penggunaan yang belum terhubung ke kode promo yang diproses; penggunaan yang sudah terhubung tidak diproses ulang meskipun funnel/source-nya kosong. Klasifikasi Funnel/Source yang sudah ada tidak akan ditimpa.
     </p>
 
     <div x-show="loading || loadError || items.length || hasFilter" x-cloak class="mt-4 overflow-hidden rounded-lg border border-line">
