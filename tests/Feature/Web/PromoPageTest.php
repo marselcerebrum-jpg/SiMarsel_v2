@@ -58,6 +58,39 @@ class PromoPageTest extends TestCase
             ->assertSeeInOrder(['Promo Code Analysis', 'Promo Code List']);
     }
 
+    public function test_promo_analysis_filter_offers_platform_payment_method_search_and_two_period_modes(): void
+    {
+        $this->actingAs($this->employee)
+            ->get(route('promo.index'))
+            ->assertSee('x-data="promoAnalysis"', false)
+            ->assertSee('@promo-analysis-errors="showServerErrors($event.detail)"', false)
+            ->assertSeeInOrder(['Platform / Source App', 'Payment Method', 'Promo Code', 'Period'])
+            ->assertSee('id="promo-analysis-month"', false)
+            ->assertSee('id="promo-analysis-year"', false)
+            ->assertSee('id="promo-analysis-start"', false)
+            ->assertSee('id="promo-analysis-end"', false)
+            ->assertSee('@click="resetFilter()"', false)
+            ->assertSee('tanggal bayar Markaz');
+    }
+
+    public function test_promo_analysis_kpi_cards_follow_the_shared_filter(): void
+    {
+        $this->actingAs($this->employee)
+            ->get(route('promo.index'))
+            ->assertSee('x-data="promoAnalysisSummary"', false)
+            ->assertSee('@promo-analysis-filter.window="load($event.detail)"', false)
+            ->assertSeeInOrder([
+                'Total Transactions with Promo',
+                'Total Transactions without Promo',
+                'Revenue with Promo',
+                'Revenue without Promo',
+                'Promo Transaction Percentage',
+                'Promo Codes Used',
+            ])
+            ->assertDontSee('Active Codes')
+            ->assertDontSee('Kode Aktif');
+    }
+
     public function test_promo_code_list_shows_mapping_columns_with_search_and_pagination(): void
     {
         $this->actingAs($this->employee)
@@ -85,9 +118,12 @@ class PromoPageTest extends TestCase
     {
         $response = $this->actingAs($this->employee)->get(route('promo.index'));
 
-        foreach (['Code Type', 'Tipe Kode', 'Inactive', 'Nonaktif', 'is_active', 'Effective Date', 'Tanggal Efektif', 'type="date"'] as $text) {
+        foreach (['Code Type', 'Tipe Kode', 'Inactive', 'Nonaktif', 'is_active', 'Effective Date', 'Tanggal Efektif'] as $text) {
             $response->assertDontSee($text, false);
         }
+
+        // The analysis Date Range filter has date inputs; the promo code form itself must not.
+        $this->view('pages.promo.components.promo-code-form-modal')->assertDontSee('type="date"', false);
     }
 
     public function test_funnel_or_source_change_asks_for_confirmation_before_saving(): void
