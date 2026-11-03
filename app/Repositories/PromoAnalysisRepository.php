@@ -145,7 +145,8 @@ class PromoAnalysisRepository
      * One row per code usage of the filtered transactions, with the nominal credited to it: the full nominal
      * goes to the code in the highest position (the only code, or the second code of a two-code transaction),
      * the other code gets 0. With a search, only the codes matching it are included. Funnel and source come from
-     * the usage's snapshot; deleted_*_name is the snapshot name of a funnel or source removed from the master.
+     * the usage's snapshot: their ids, *_name_snapshot, and deleted_*_name, the snapshot name of a funnel or
+     * source removed from the master.
      */
     public function creditedUsages(PromoAnalysisFilter $filter): BaseBuilder
     {
@@ -157,9 +158,9 @@ class PromoAnalysisRepository
                 'transaction_promo_codes.transaction_id, transactions.trx_id, transactions.paid_date, transactions.paid_time, transactions.nominal, '
                 .'transaction_promo_codes.code_position, transaction_promo_codes.raw_code, '
                 .'transaction_promo_codes.platform_id_snapshot as platform_id, transaction_promo_codes.code_snapshot as code, '
-                .'transaction_promo_codes.funnel_id_snapshot as funnel_id, '
+                .'transaction_promo_codes.funnel_id_snapshot as funnel_id, transaction_promo_codes.funnel_name_snapshot, '
                 .'CASE WHEN transaction_promo_codes.funnel_id_snapshot IS NULL THEN transaction_promo_codes.funnel_name_snapshot END as deleted_funnel_name, '
-                .'transaction_promo_codes.source_id_snapshot as source_id, '
+                .'transaction_promo_codes.source_id_snapshot as source_id, transaction_promo_codes.source_name_snapshot, '
                 .'CASE WHEN transaction_promo_codes.source_id_snapshot IS NULL THEN transaction_promo_codes.source_name_snapshot END as deleted_source_name, '
                 .'CASE WHEN transaction_promo_codes.code_position = (SELECT MAX(positions.code_position) FROM transaction_promo_codes positions '
                 .'WHERE positions.transaction_id = transaction_promo_codes.transaction_id) THEN transactions.nominal ELSE 0 END as revenue'
