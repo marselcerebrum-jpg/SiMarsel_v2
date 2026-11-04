@@ -135,13 +135,16 @@ class PromoAnalysisExportService
     }
 
     /**
-     * @return list<list<string|int|float|null>>
+     * Streamed: rekap rows are read in chunks and written one by one, never held as a whole.
+     *
+     * @return iterable<list<string|int|float|null>>
      */
-    private function codeRows(PromoAnalysisFilter $filter, string $sort, string $direction): array
+    private function codeRows(PromoAnalysisFilter $filter, string $sort, string $direction): iterable
     {
-        return [
-            ['Kode Promo', 'Kode Asli Markaz', 'Status', 'Platform', 'Funnel', 'Source', 'Jumlah Penggunaan', 'Jumlah Revenue', 'Kontribusi (%)'],
-            ...$this->promoCodeSummaryService->allCodes($filter, $sort, $direction)->map(fn (array $row) => [
+        yield ['Kode Promo', 'Kode Asli Markaz', 'Status', 'Platform', 'Funnel', 'Source', 'Jumlah Penggunaan', 'Jumlah Revenue', 'Kontribusi (%)'];
+
+        foreach ($this->promoCodeSummaryService->allCodes($filter, $sort, $direction) as $row) {
+            yield [
                 $row['code'],
                 implode(', ', $row['raw_codes']),
                 $this->registrationText($row['is_registered']),
@@ -151,8 +154,8 @@ class PromoAnalysisExportService
                 $row['usages'],
                 $row['revenue'],
                 $row['contribution_percentage'],
-            ])->all(),
-        ];
+            ];
+        }
     }
 
     /**
