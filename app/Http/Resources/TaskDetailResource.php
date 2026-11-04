@@ -42,7 +42,7 @@ class TaskDetailResource extends TaskResource
             'history' => TaskActivityResource::collection($this->whenLoaded('activities', fn () => $this->activities, [])),
             'editable_fields' => $editableFields,
             'next_statuses' => in_array('status', $editableFields, true)
-                ? collect($this->status->nextStatuses($this->requires_review))
+                ? collect($this->resource->nextStatusesFor($request->user()))
                     ->map(fn (TaskStatus $status) => ['value' => $status->value, 'label' => $status->label()])
                     ->all()
                 : [],

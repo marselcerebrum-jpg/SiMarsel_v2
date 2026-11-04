@@ -5,6 +5,7 @@ namespace Tests\Feature\Task;
 use App\Enums\TaskStatus;
 use App\Models\Account;
 use App\Models\Division;
+use App\Models\Platform;
 use App\Models\Role;
 use App\Models\Task;
 use App\Models\TaskActivity;
@@ -69,13 +70,131 @@ class TaskUpdateTest extends TestCase
         $this->patchJson($this->url(), $this->payload(['title' => 'Baru']))->assertUnauthorized();
     }
 
-    public function test_staff_cannot_update_even_their_own_task(): void
+    public function test_staff_cannot_change_the_main_information_of_their_task(): void
     {
-        $this->actingAs($this->staff)
-            ->patchJson($this->url(), $this->payload(['title' => 'Baru']))
-            ->assertForbidden();
+        $this->task->forceFill(['description' => null, 'priority' => 'medium', 'platform_id' => null])->save();
+
+        $changes = [
+            ['title' => 'Baru'],
+            ['description' => 'Deskripsi baru'],
+            ['category_id' => $this->unreviewed->id],
+            ['division_id' => $this->finance->id, 'pic_id' => $this->financeStaff->id],
+            ['platform_id' => Platform::factory()->create()->id],
+            ['pic_id' => $this->otherStaff->id],
+            ['priority' => 'high'],
+            ['start_date' => '2026-10-25'],
+            ['deadline' => '2026-11-15'],
+            ['requires_review' => false],
+        ];
+
+        foreach ($changes as $change) {
+            $this->actingAs($this->staff)
+                ->patchJson($this->url(), $this->payload([...$change, 'status' => 'in_progress']))
+                ->assertUnprocessable()
+                ->assertJsonValidationErrors(array_fill_keys(array_keys($change), 'PIC hanya dapat mengubah status tugas.'));
+        }
+
+        $this->assertSame(TaskStatus::Todo, $this->task->fresh()->status);
 
         $this->assertSame('Desain banner promo', $this->task->fresh()->title);
+        $this->assertSame(1, $this->task->fresh()->version);
+        $this->assertDatabaseCount('task_activities', 0);
+    }
+
+    public function test_staff_can_update_the_status_of_their_task(): void
+    {
+        $this->actingAs($this->staff)
+            ->patchJson($this->url(), $this->payload(['status' => 'in_progress']))
+            ->assertOk()
+            ->assertJsonPath('data.status', 'in_progress')
+            ->assertJsonPath('data.version', 2)
+            ->assertJsonPath('data.history.0.action', 'updated')
+            ->assertJsonPath('data.history.0.actor.id', $this->staff->id)
+            ->assertJsonPath('data.history.0.changes', ['status' => ['old' => 'todo', 'new' => 'in_progress']]);
+
+        $this->patchJson($this->url(), ['version' => 2, 'status' => 'ready_for_qa'])
+            ->assertOk()
+            ->assertJsonPath('data.status', 'ready_for_qa');
+    }
+
+    public function test_staff_may_resend_unchanged_main_information_with_a_status_change(): void
+    {
+        $this->actingAs($this->staff)
+            ->patchJson($this->url(), $this->payload(['title' => 'Desain banner promo', 'status' => 'in_progress']))
+            ->assertOk()
+            ->assertJsonPath('data.status', 'in_progress');
+    }
+
+    public function test_staff_status_changes_follow_the_workflow(): void
+    {
+        $this->actingAs($this->staff)
+            ->patchJson($this->url(), $this->payload(['status' => 'done']))
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['status' => 'Status tidak dapat diubah dari To Do ke Done. Tugas ini wajib melalui QA sebelum Done.']);
+
+        $this->task->forceFill(['status' => TaskStatus::InProgress])->save();
+
+        $this->patchJson($this->url(), $this->payload(['status' => 'done']))
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['status' => 'Status tidak dapat diubah dari On Process ke Done. Tugas ini wajib melalui QA sebelum Done.']);
+    }
+
+    public function test_staff_leaves_the_qa_decision_and_reopening_to_admin_or_manager(): void
+    {
+        $cases = [
+            [TaskStatus::ReadyForQa, 'on_qa', 'Status Ready for QA ke On QA hanya dapat diubah oleh Admin atau Manager divisi.'],
+            [TaskStatus::OnQa, 'done', 'Status On QA ke Done hanya dapat diubah oleh Admin atau Manager divisi.'],
+            [TaskStatus::OnQa, 'in_progress', 'Status On QA ke On Process hanya dapat diubah oleh Admin atau Manager divisi.'],
+            [TaskStatus::Done, 'in_progress', 'Status Done ke On Process hanya dapat diubah oleh Admin atau Manager divisi.'],
+        ];
+
+        foreach ($cases as [$current, $next, $message]) {
+            $this->task->forceFill(['status' => $current])->save();
+
+            $this->actingAs($this->staff)
+                ->patchJson($this->url(), $this->payload(['status' => $next]))
+                ->assertUnprocessable()
+                ->assertJsonValidationErrors(['status' => $message]);
+
+            $this->assertSame($current, $this->task->fresh()->status);
+        }
+    }
+
+    public function test_staff_can_finish_a_task_without_qa(): void
+    {
+        $task = $this->task(['category_id' => $this->unreviewed->id, 'requires_review' => false, 'status' => TaskStatus::InProgress]);
+
+        $this->actingAs($this->staff)
+            ->patchJson("/api/tasks/{$task->id}", ['version' => 1, 'status' => 'done'])
+            ->assertOk()
+            ->assertJsonPath('data.status', 'done')
+            ->assertJsonPath('data.completed_at', now()->toIso8601ZuluString());
+    }
+
+    public function test_staff_cannot_update_a_task_assigned_to_someone_else(): void
+    {
+        foreach ([$this->otherStaff, $this->financeStaff] as $account) {
+            $this->actingAs($account)
+                ->patchJson($this->url(), $this->payload(['status' => 'in_progress']))
+                ->assertForbidden();
+        }
+
+        $this->assertSame(TaskStatus::Todo, $this->task->fresh()->status);
+    }
+
+    public function test_staff_loses_access_once_the_task_is_reassigned(): void
+    {
+        $this->actingAs($this->manager)
+            ->patchJson($this->url(), $this->payload(['pic_id' => $this->otherStaff->id]))
+            ->assertOk();
+
+        $this->actingAs($this->staff)
+            ->patchJson($this->url(), ['version' => 2, 'status' => 'in_progress'])
+            ->assertForbidden();
+
+        $this->actingAs($this->otherStaff)
+            ->patchJson($this->url(), ['version' => 2, 'status' => 'in_progress'])
+            ->assertOk();
     }
 
     public function test_manager_cannot_update_a_task_of_another_division(): void

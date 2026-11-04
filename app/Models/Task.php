@@ -128,6 +128,40 @@ class Task extends Model
             || ($account->isManager() && $account->division_id !== null && $this->division_id === $account->division_id);
     }
 
+    public function assignedTo(Account $account): bool
+    {
+        return $this->pic_id !== null && $this->pic_id === $account->id;
+    }
+
+    /**
+     * Admin, the division's Manager, and the PIC may change the task; the PIC only its status.
+     */
+    public function updatableBy(Account $account): bool
+    {
+        return $this->managedBy($account) || $this->assignedTo($account);
+    }
+
+    /**
+     * Statuses the account may move the task to. The PIC follows the same workflow but leaves the QA
+     * decision and reopening a finished task to Admin or the Manager.
+     *
+     * @return array<int, TaskStatus>
+     */
+    public function nextStatusesFor(Account $account): array
+    {
+        $next = $this->status->nextStatuses($this->requires_review);
+
+        if ($this->managedBy($account)) {
+            return $next;
+        }
+
+        if (! $this->assignedTo($account) || in_array($this->status, [TaskStatus::OnQa, TaskStatus::Done], true)) {
+            return [];
+        }
+
+        return array_values(array_filter($next, fn (TaskStatus $status) => $status !== TaskStatus::OnQa));
+    }
+
     /**
      * Editable fields the account may not change in the task's current condition, with the reason.
      *
@@ -135,6 +169,13 @@ class Task extends Model
      */
     public function lockedFieldsFor(Account $account): array
     {
+        if (! $this->managedBy($account)) {
+            return collect(self::EDITABLE_FIELDS)
+                ->reject(fn (string $field) => $field === 'status')
+                ->mapWithKeys(fn (string $field) => [$field => 'PIC hanya dapat mengubah status tugas.'])
+                ->all();
+        }
+
         if ($this->status === TaskStatus::Done) {
             return collect(self::EDITABLE_FIELDS)
                 ->reject(fn (string $field) => $field === 'status')
@@ -160,10 +201,16 @@ class Task extends Model
      */
     public function editableFieldsFor(Account $account): array
     {
-        if (! $this->managedBy($account)) {
+        if (! $this->updatableBy($account)) {
             return [];
         }
 
-        return array_values(array_diff(self::EDITABLE_FIELDS, array_keys($this->lockedFieldsFor($account))));
+        $fields = array_diff(self::EDITABLE_FIELDS, array_keys($this->lockedFieldsFor($account)));
+
+        if ($this->nextStatusesFor($account) === []) {
+            $fields = array_diff($fields, ['status']);
+        }
+
+        return array_values($fields);
     }
 }

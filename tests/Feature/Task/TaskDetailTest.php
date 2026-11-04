@@ -168,14 +168,36 @@ class TaskDetailTest extends TestCase
             ->assertJsonPath('message', 'Anda tidak memiliki akses untuk melakukan aksi ini.');
     }
 
-    public function test_staff_can_open_their_task_but_not_edit_it(): void
+    public function test_staff_can_open_their_task_and_only_change_its_status(): void
     {
         $this->actingAs($this->staff)
             ->getJson("/api/tasks/{$this->task->id}")
             ->assertOk()
-            ->assertJsonPath('data.can_edit', false)
-            ->assertJsonPath('data.editable_fields', [])
-            ->assertJsonPath('data.next_statuses', []);
+            ->assertJsonPath('data.can_edit', true)
+            ->assertJsonPath('data.editable_fields', ['status'])
+            ->assertJsonPath('data.next_statuses', [
+                ['value' => 'backlog', 'label' => 'Back Log'],
+                ['value' => 'in_progress', 'label' => 'On Process'],
+            ]);
+    }
+
+    public function test_staff_next_statuses_leave_out_qa_decisions(): void
+    {
+        $this->task->forceFill(['status' => TaskStatus::ReadyForQa, 'requires_review' => true])->save();
+
+        $this->actingAs($this->staff)
+            ->getJson("/api/tasks/{$this->task->id}")
+            ->assertJsonPath('data.editable_fields', ['status'])
+            ->assertJsonPath('data.next_statuses', [['value' => 'in_progress', 'label' => 'On Process']]);
+
+        foreach ([TaskStatus::OnQa, TaskStatus::Done] as $status) {
+            $this->task->forceFill(['status' => $status])->save();
+
+            $this->getJson("/api/tasks/{$this->task->id}")
+                ->assertJsonPath('data.can_edit', true)
+                ->assertJsonPath('data.editable_fields', [])
+                ->assertJsonPath('data.next_statuses', []);
+        }
     }
 
     public function test_staff_cannot_open_a_task_assigned_to_someone_else(): void

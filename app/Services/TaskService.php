@@ -103,7 +103,7 @@ class TaskService
     }
 
     /**
-     * Apply an edit from an Admin or the division's Manager. Only fields whose value actually changes are
+     * Apply an edit from an Admin, the division's Manager, or the task's PIC (status only). Only fields whose value actually changes are
      * checked against the task's current condition, so a form that resends unchanged values still saves.
      *
      * The edit must carry the version it was based on; the row is locked while that is compared, so of two
@@ -129,15 +129,19 @@ class TaskService
 
             $lockedFields = $locked->lockedFieldsFor($editor);
             $previousStatus = $locked->status;
+            // The PIC cannot change QA, so the statuses allowed before the edit still apply after it.
+            $picStatuses = $locked->managedBy($editor) ? null : $locked->nextStatusesFor($editor);
 
             $locked->fill($data);
+            // Report a locked field before the category's QA rule, which may also reject it.
+            $this->rejectLockedChanges($locked, $lockedFields);
             $this->applyCategoryReview($locked, $data);
 
             if (! $locked->isDirty()) {
                 return;
             }
 
-            $this->guardChanges($locked, $previousStatus, $lockedFields);
+            $this->guardChanges($locked, $previousStatus, $lockedFields, $picStatuses);
 
             if ($locked->isDirty('status')) {
                 $locked->completed_at = $locked->status === TaskStatus::Done ? now() : null;
@@ -258,17 +262,28 @@ class TaskService
     }
 
     /**
-     * @param  array<string, string>  $lockedFields  Fields locked in the task's condition before the edit, with the reason.
+     * @param  array<string, string>  $lockedFields
      *
      * @throws ValidationException
      */
-    private function guardChanges(Task $task, TaskStatus $previousStatus, array $lockedFields): void
+    private function rejectLockedChanges(Task $task, array $lockedFields): void
     {
         $errors = array_intersect_key($lockedFields, $task->getDirty());
 
         if ($errors !== []) {
             throw ValidationException::withMessages($errors);
         }
+    }
+
+    /**
+     * @param  array<string, string>  $lockedFields  Fields locked in the task's condition before the edit, with the reason.
+     * @param  array<int, TaskStatus>|null  $picStatuses  Statuses the PIC may move to; null for Admin and the Manager.
+     *
+     * @throws ValidationException
+     */
+    private function guardChanges(Task $task, TaskStatus $previousStatus, array $lockedFields, ?array $picStatuses): void
+    {
+        $this->rejectLockedChanges($task, $lockedFields);
 
         if ($task->isDirty('status') && ! $previousStatus->canMoveTo($task->status, $task->requires_review)) {
             $message = "Status tidak dapat diubah dari {$previousStatus->label()} ke {$task->status->label()}.";
@@ -278,6 +293,12 @@ class TaskService
             }
 
             throw ValidationException::withMessages(['status' => $message]);
+        }
+
+        if ($task->isDirty('status') && $picStatuses !== null && ! in_array($task->status, $picStatuses, true)) {
+            throw ValidationException::withMessages([
+                'status' => "Status {$previousStatus->label()} ke {$task->status->label()} hanya dapat diubah oleh Admin atau Manager divisi.",
+            ]);
         }
 
         if ($task->isDirty(['status', 'pic_id']) && $task->status !== TaskStatus::Backlog && $task->pic_id === null) {

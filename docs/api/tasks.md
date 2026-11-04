@@ -14,7 +14,7 @@ Role Tasklist berasal dari `GET /api/tasks/meta`. Sebelum endpoint itu ada, fron
 |---|---|---|---|---|
 | `admin` | Semua tugas, default Semua Divisi | Semua divisi | Semua tugas | Semua divisi |
 | `manager` | Tugas divisi yang dikelolanya | Divisinya | Tugas divisinya | Divisinya |
-| `staff` | Hanya tugas yang PIC-nya dia | Tidak | Tidak (hanya workflow & evidence) | Tidak |
+| `staff` | Hanya tugas yang PIC-nya dia | Tidak | Hanya status tugasnya (`editable_fields: ["status"]`); tidak bisa ke On QA, mengubah dari On QA, atau membuka kembali Done | Tidak |
 
 Backend **wajib** menerapkan cakupan ini di setiap endpoint. Staff yang mengubah parameter atau ID tugas harus mendapat `403` atau `404`. Aturan di frontend hanya untuk tampilan.
 

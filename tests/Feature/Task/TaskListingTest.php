@@ -160,12 +160,12 @@ class TaskListingTest extends TestCase
             ->assertNotFound();
     }
 
-    public function test_viewing_a_task_does_not_grant_editing_it(): void
+    public function test_pic_and_managers_can_edit_tasks_from_the_list(): void
     {
         $this->actingAs($this->staff)
             ->getJson('/api/tasks')
             ->assertJsonPath('data.0.can_view_detail', true)
-            ->assertJsonPath('data.0.can_edit', false);
+            ->assertJsonPath('data.0.can_edit', true);
 
         $this->actingAs($this->manager)
             ->getJson("/api/tasks/{$this->staffTask->id}")
@@ -195,7 +195,7 @@ class TaskListingTest extends TestCase
                 'requires_review' => true,
                 'evidence_required' => false,
                 'can_view_detail' => true,
-                'can_edit' => false,
+                'can_edit' => true,
                 'version' => 1,
                 'updated_at' => $this->staffTask->updated_at->toIso8601ZuluString(),
             ]);
