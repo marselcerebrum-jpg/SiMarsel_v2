@@ -17,6 +17,7 @@
 
         @include('pages.promo.components.promo-analysis-filter')
         @include('pages.promo.components.promo-analysis-summary')
+        @include('pages.promo.components.promo-analysis-funnel')
     </section>
 
     @include('pages.promo.components.promo-unregistered-alert')
