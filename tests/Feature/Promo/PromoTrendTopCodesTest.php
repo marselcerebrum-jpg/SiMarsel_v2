@@ -165,14 +165,22 @@ class PromoTrendTopCodesTest extends TestCase
         $this->assertSame([500000, 500000, null, null, null], $values['total_sales']);
     }
 
-    public function test_code_search_narrows_the_promo_lines_but_not_the_total_sales_overlay(): void
+    public function test_code_search_narrows_every_dataset_like_the_kpi_summary(): void
     {
         $this->seedTrendData();
 
-        $trend = $this->trend(self::SEPTEMBER.'&period=weekly&search=reseller');
+        $query = self::SEPTEMBER.'&period=weekly&search=reseller';
+        $trend = $this->trend($query);
+        $kpis = $this->getJson('/api/promo-analysis/summary'.$query)->json('data.kpis');
 
         $this->assertEquals([0, 2, 0, 0, 0], $this->datasets($trend)['promo_transactions']);
-        $this->assertEquals(['promo_transactions' => 2, 'promo_revenue' => 500000, 'total_transactions' => 6, 'total_sales' => 2150000], $trend['totals']);
+        $this->assertEquals([0, 2, 0, 0, 0], $this->datasets($trend)['total_transactions']);
+        $this->assertEquals([0, 500000, 0, 0, 0], $this->datasets($trend)['total_sales']);
+        $this->assertEquals(['promo_transactions' => 2, 'promo_revenue' => 500000, 'total_transactions' => 2, 'total_sales' => 500000], $trend['totals']);
+        $this->assertSame(
+            [$kpis['promo_transactions']['value'] + $kpis['non_promo_transactions']['value'], $kpis['promo_revenue']['value'] + $kpis['non_promo_revenue']['value']],
+            [$trend['totals']['total_transactions'], $trend['totals']['total_sales']],
+        );
         $this->assertSame('reseller', $trend['filter']['search']);
     }
 
@@ -279,6 +287,20 @@ class PromoTrendTopCodesTest extends TestCase
         $this->assertSame(['APP26'], array_column($this->top('?year=2026&month=10')['codes'], 'code'));
 
         $empty = $this->top('?year=2026&month=11');
-        $this->assertSame([true, []], [$empty['is_empty'], $empty['codes']]);
+        $this->assertSame([true, [], 'Data tidak tersedia untuk filter yang dipilih.'], [$empty['is_empty'], $empty['codes'], $empty['message']]);
+    }
+
+    public function test_top_codes_are_empty_when_the_period_only_has_transactions_without_promo(): void
+    {
+        $this->transaction(null, 400000, '2026-09-01');
+        $this->transaction(['', ''], 250000, '2026-09-05');
+
+        $top = $this->top();
+
+        $this->assertSame(
+            [true, [], 'Tidak ada penggunaan kode promo pada filter yang dipilih.'],
+            [$top['is_empty'], $top['codes'], $top['message']],
+        );
+        $this->assertFalse($this->trend(self::SEPTEMBER)['is_empty']);
     }
 }
