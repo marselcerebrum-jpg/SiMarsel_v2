@@ -89,3 +89,7 @@ export function fetchAnalysisSummary(query) {
 export function fetchAnalysisFunnels(query) {
     return http(`${PROMO_ANALYSIS}/funnels${query ? `?${query}` : ''}`);
 }
+
+export function fetchAnalysisSources(query) {
+    return http(`${PROMO_ANALYSIS}/sources${query ? `?${query}` : ''}`);
+}
