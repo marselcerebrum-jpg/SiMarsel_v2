@@ -43,8 +43,8 @@ class PromoCodeSummaryRepository
 
     /**
      * One row per platform + normalized code + funnel and source snapshot group, so a code whose usages carry
-     * different classifications is split by them. Unregistered codes stay in. Used for the page and, unpaginated,
-     * the export.
+     * different classifications is split by them. Unregistered codes stay in. Used for the page and, read in
+     * chunks, the export; the trailing ids make the order unique, so chunks never skip or repeat a row.
      */
     public function codes(PromoAnalysisFilter $filter, string $sort, string $direction): Builder
     {
@@ -67,7 +67,10 @@ class PromoCodeSummaryRepository
             ->orderBy('codes.code')
             ->orderBy('platforms.name')
             ->orderBy('codes.funnel_name')
-            ->orderBy('codes.source_name');
+            ->orderBy('codes.source_name')
+            ->orderBy('codes.platform_id')
+            ->orderBy('codes.funnel_id')
+            ->orderBy('codes.source_id');
     }
 
     /**
@@ -116,10 +119,10 @@ class PromoCodeSummaryRepository
     /**
      * The distinct raw values written by Markaz for the given platform + code pairs, exactly as written.
      *
-     * @param  list<array{platform_id: int, code: string}>|null  $pairs  Null for every code in the filter.
+     * @param  list<array{platform_id: int, code: string}>  $pairs
      * @return Collection<string, list<string>> Keyed by "platform_id|code".
      */
-    public function rawCodes(PromoAnalysisFilter $filter, ?array $pairs): Collection
+    public function rawCodes(PromoAnalysisFilter $filter, array $pairs): Collection
     {
         if ($pairs === []) {
             return collect();
@@ -127,11 +130,11 @@ class PromoCodeSummaryRepository
 
         return DB::query()
             ->fromSub($this->promoAnalysisRepository->creditedUsages($filter), 'usages')
-            ->when($pairs !== null, fn (Builder $query) => $query->where(function (Builder $query) use ($pairs) {
+            ->where(function (Builder $query) use ($pairs) {
                 foreach ($pairs as $pair) {
                     $query->orWhere(fn (Builder $query) => $query->where('platform_id', $pair['platform_id'])->where('code', $pair['code']));
                 }
-            }))
+            })
             // Grouped by the exact bytes: MySQL's case-insensitive collation would merge "CPNS26" and "cpns26".
             ->groupBy('platform_id', 'code')
             ->groupByRaw('HEX(raw_code)')
