@@ -18,8 +18,8 @@
                     x-show="!loadError && (!loading || meta)"
                     x-cloak
                     class="inline-flex items-center rounded-md px-2 py-0.5 text-xs font-semibold"
-                    :class="total > 0 ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-700'"
-                    x-text="total > 0 ? total + ' Unregistered' : 'All Registered'"
+                    :class="status.tone"
+                    x-text="status.text"
                 ></span>
             </div>
             <p class="mt-1 text-sm text-muted">Kode promo dari transaksi Markaz yang belum punya master untuk platformnya.</p>
