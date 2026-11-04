@@ -18,8 +18,8 @@
                     x-show="!loadError && (!loading || meta)"
                     x-cloak
                     class="inline-flex items-center rounded-md px-2 py-0.5 text-xs font-semibold"
-                    :class="total > 0 ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-700'"
-                    x-text="total > 0 ? total + ' Unregistered' : 'All Registered'"
+                    :class="status.tone"
+                    x-text="status.text"
                 ></span>
             </div>
             <p class="mt-1 text-sm text-muted">Kode promo dari transaksi Markaz yang belum punya master untuk platformnya.</p>
@@ -44,7 +44,7 @@
     <p x-show="total > 0" x-cloak class="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
         Transaksi dengan kode ini tetap tersimpan dan tetap dihitung dalam analisis. Mendaftarkan kode dari alert juga dapat melengkapi
         penggunaan historis yang sebelumnya belum terpetakan dengan funnel/source yang didaftarkan.
-        Penggunaan yang sudah memiliki klasifikasi Funnel/Source tidak akan ditimpa.
+        Hanya penggunaan yang belum terhubung ke kode promo yang diproses; penggunaan yang sudah terhubung tidak diproses ulang meskipun funnel/source-nya kosong. Klasifikasi Funnel/Source yang sudah ada tidak akan ditimpa.
     </p>
 
     <div x-show="loading || loadError || items.length || hasFilter" x-cloak class="mt-4 overflow-hidden rounded-lg border border-line">

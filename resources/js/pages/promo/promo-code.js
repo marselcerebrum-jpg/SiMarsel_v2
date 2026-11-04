@@ -238,12 +238,13 @@ export default function promoCodeManagement() {
                 this.saving = false;
                 this.closeModal();
 
+                // Reloads the list and the unregistered code alert; an edited code/platform can link alert usages too.
+                window.dispatchEvent(new CustomEvent('promo-codes-changed'));
+
                 if (editing) {
                     this.items = this.items.map((item) => (item.id === editing.id ? result.data : item));
                     showToast({ title: 'Changes Saved', text: `Kode promo ${result.data.code} sudah diperbarui.` });
                 } else {
-                    // Reloads the list and the unregistered code alert.
-                    window.dispatchEvent(new CustomEvent('promo-codes-changed'));
                     showToast(
                         registering
                             ? {
