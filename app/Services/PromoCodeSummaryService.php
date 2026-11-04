@@ -16,6 +16,11 @@ class PromoCodeSummaryService
 {
     public const TOP_CODES = 5;
 
+    /**
+     * Rekap rows read, and their raw codes looked up, per query in the export.
+     */
+    public const EXPORT_CHUNK = 500;
+
     public function __construct(
         private PromoCodeSummaryRepository $promoCodeSummaryRepository,
         private PromoAnalysisRepository $promoAnalysisRepository,
@@ -34,11 +39,7 @@ class PromoCodeSummaryService
         $totalRevenue = round($transactions['promo_revenue'] + $transactions['non_promo_revenue'], 2);
         $codeTotals = $this->promoCodeSummaryRepository->totals($filter);
 
-        $rawCodes = $this->promoCodeSummaryRepository->rawCodes($filter, collect($codes->items())
-            ->map(fn (object $row) => ['platform_id' => (int) $row->platform_id, 'code' => $row->code])
-            ->unique()
-            ->values()
-            ->all());
+        $rawCodes = $this->rawCodesOf($filter, $codes->items());
 
         $codes->setCollection($codes->getCollection()->map(fn (object $row) => $this->codeRow($row, $rawCodes, $totalRevenue)));
 
@@ -59,18 +60,24 @@ class PromoCodeSummaryService
     }
 
     /**
-     * Every row of the rekap per kode promo, unpaginated, in the same order and format as the page.
+     * Every row of the rekap per kode promo, unpaginated, in the same order and format as the page. Read in chunks
+     * of EXPORT_CHUNK rows, each with the raw codes of only its own codes, so the whole rekap is never in memory.
      *
-     * @return Collection<int, array<string, mixed>>
+     * @return LazyCollection<int, array<string, mixed>>
      */
-    public function allCodes(PromoAnalysisFilter $filter, string $sort, string $direction): Collection
+    public function allCodes(PromoAnalysisFilter $filter, string $sort, string $direction): LazyCollection
     {
         $transactions = $this->promoAnalysisRepository->transactionTotals($filter);
         $totalRevenue = round($transactions['promo_revenue'] + $transactions['non_promo_revenue'], 2);
-        $rawCodes = $this->promoCodeSummaryRepository->rawCodes($filter, null);
 
-        return $this->promoCodeSummaryRepository->codes($filter, $sort, $direction)->get()
-            ->map(fn (object $row) => $this->codeRow($row, $rawCodes, $totalRevenue));
+        return $this->promoCodeSummaryRepository->codes($filter, $sort, $direction)
+            ->lazy(static::EXPORT_CHUNK)
+            ->chunk(static::EXPORT_CHUNK)
+            ->flatMap(function (LazyCollection $rows) use ($filter, $totalRevenue) {
+                $rawCodes = $this->rawCodesOf($filter, $rows);
+
+                return $rows->map(fn (object $row) => $this->codeRow($row, $rawCodes, $totalRevenue));
+            });
     }
 
     /**
@@ -216,6 +223,21 @@ class PromoCodeSummaryService
             'is_empty' => $isEmpty,
             'message' => $isEmpty ? 'Data tidak tersedia untuk filter yang dipilih.' : null,
         ];
+    }
+
+    /**
+     * The raw codes of the platform + code pairs in the given rekap rows.
+     *
+     * @param  iterable<object>  $rows
+     * @return Collection<string, list<string>>
+     */
+    private function rawCodesOf(PromoAnalysisFilter $filter, iterable $rows): Collection
+    {
+        return $this->promoCodeSummaryRepository->rawCodes($filter, collect($rows)
+            ->map(fn (object $row) => ['platform_id' => (int) $row->platform_id, 'code' => $row->code])
+            ->unique()
+            ->values()
+            ->all());
     }
 
     /**
