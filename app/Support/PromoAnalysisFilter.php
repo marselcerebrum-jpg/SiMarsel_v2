@@ -25,14 +25,6 @@ final class PromoAnalysisFilter
         return new self($this->period->previous(), $this->paymentMethods, $this->search);
     }
 
-    /**
-     * The same filter without the promo code search, for totals that compare against every sale.
-     */
-    public function withoutSearch(): self
-    {
-        return new self($this->period, $this->paymentMethods);
-    }
-
     public function hasSearch(): bool
     {
         return $this->search !== null && trim($this->search) !== '';

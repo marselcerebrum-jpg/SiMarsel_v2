@@ -514,9 +514,9 @@ Grafik transaksi dan revenue promo dari waktu ke waktu, dengan **total penjualan
 | `total_transactions` | Total Transaksi | Seluruh transaksi di bucket itu, dengan dan tanpa promo |
 | `total_sales` | Total Penjualan | Nominal seluruh transaksi di bucket itu (overlay) |
 
-- Semua dataset memakai dasar transaksi yang sama dengan KPI: hanya transaksi `Success`, dan transaksi **anomali dikecualikan**, termasuk dari overlay total penjualan. Jadi `totals` grafik selalu sama dengan KPI `/summary`.
-- Filter platform, metode pembayaran, dan periode berlaku untuk semua dataset.
-- **Pencarian kode** (`search`) hanya mempersempit garis promo. Overlay total penjualan tetap menampilkan **seluruh** transaksi hasil filter lain, supaya tetap bisa dibandingkan.
+- Semua dataset memakai dasar transaksi yang sama dengan KPI: hanya transaksi `Success`, dan transaksi **anomali dikecualikan**, termasuk dari overlay total penjualan.
+- Semua filter aktif berlaku untuk **semua dataset**: platform, metode pembayaran, periode, dan **pencarian kode** (`search`). Jadi `totals` grafik selalu sama dengan KPI `/summary` untuk filter yang sama.
+- Saat `search` aktif, overlay Total Transaksi dan Total Penjualan juga hanya menghitung transaksi yang memakai kode yang cocok, sama seperti KPI. Akibatnya, overlay sama dengan garis promo.
 
 ### 200 OK
 
@@ -559,6 +559,9 @@ Lima kode promo dengan **jumlah penggunaan** terbanyak. Endpoint ini menerima se
 - Kode belum terdaftar ikut dihitung (`is_registered: false`). Transaksi anomali dikecualikan.
 - Saat `search` aktif, hanya kode yang cocok yang masuk Top 5.
 - Bisa berisi kurang dari 5 kode jika kode yang dipakai lebih sedikit.
+- Kondisi kosong ditentukan oleh **penggunaan kode promo**, bukan oleh ada atau tidaknya transaksi. Jika tidak ada kode yang dipakai, respons tetap **200** dengan `is_empty: true` dan `codes: []`:
+  - ada transaksi, tetapi semuanya tanpa promo → `message: "Tidak ada penggunaan kode promo pada filter yang dipilih."`;
+  - tidak ada transaksi sama sekali → `message: "Data tidak tersedia untuk filter yang dipilih."`.
 
 ### 200 OK
 

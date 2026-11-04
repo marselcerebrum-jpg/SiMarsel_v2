@@ -24,9 +24,9 @@ class PromoTrendService
 
     /**
      * Promo transactions and revenue per daily, weekly, or monthly bucket of paid_date, with the total sales of
-     * the same buckets as an overlay. Every transaction counts once, also with two codes. The overlay leaves out the
-     * promo code search, so it keeps showing every sale, and like every promo analysis it excludes anomalous
-     * transactions. Buckets that start after today have no data yet, so their values are null.
+     * the same buckets as an overlay. Every transaction counts once, also with two codes. Every dataset uses the
+     * same active filter as the KPI summary, including the promo code search, and like every promo analysis it
+     * excludes anomalous transactions. Buckets that start after today have no data yet, so their values are null.
      *
      * @return array<string, mixed>
      */
@@ -36,17 +36,12 @@ class PromoTrendService
         $bucketOfDay = TrendBuckets::bucketOfDay($buckets);
         $values = array_fill_keys(array_keys(self::DATASETS), array_fill(0, count($buckets), 0));
 
-        $promo = $this->promoAnalysisRepository->dailyTransactionTotals($filter);
-        $all = $filter->hasSearch() ? $this->promoAnalysisRepository->dailyTransactionTotals($filter->withoutSearch()) : $promo;
-
-        foreach ($promo as $row) {
-            $values['promo_transactions'][$bucketOfDay[$this->date($row->day)]] += (int) $row->promo_transactions;
-            $values['promo_revenue'][$bucketOfDay[$this->date($row->day)]] += (float) $row->promo_revenue;
-        }
-
-        foreach ($all as $row) {
-            $values['total_transactions'][$bucketOfDay[$this->date($row->day)]] += (int) $row->transactions;
-            $values['total_sales'][$bucketOfDay[$this->date($row->day)]] += (float) $row->revenue;
+        foreach ($this->promoAnalysisRepository->dailyTransactionTotals($filter) as $row) {
+            $bucket = $bucketOfDay[$this->date($row->day)];
+            $values['promo_transactions'][$bucket] += (int) $row->promo_transactions;
+            $values['promo_revenue'][$bucket] += (float) $row->promo_revenue;
+            $values['total_transactions'][$bucket] += (int) $row->transactions;
+            $values['total_sales'][$bucket] += (float) $row->revenue;
         }
 
         $totals = array_map(fn (array $data) => round(array_sum($data), 2), $values);
