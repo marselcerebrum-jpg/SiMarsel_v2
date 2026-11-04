@@ -19,6 +19,7 @@
         @include('pages.promo.components.promo-analysis-summary')
         @include('pages.promo.components.promo-analysis-funnel')
         @include('pages.promo.components.promo-analysis-source')
+        @include('pages.promo.components.promo-analysis-code')
     </section>
 
     @include('pages.promo.components.promo-unregistered-alert')

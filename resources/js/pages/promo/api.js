@@ -93,3 +93,17 @@ export function fetchAnalysisFunnels(query) {
 export function fetchAnalysisSources(query) {
     return http(`${PROMO_ANALYSIS}/sources${query ? `?${query}` : ''}`);
 }
+
+/**
+ * Takes the shared filter query plus sort, direction, page, and per_page.
+ */
+export function fetchAnalysisCodes(query) {
+    return http(`${PROMO_ANALYSIS}/codes${query ? `?${query}` : ''}`);
+}
+
+/**
+ * Takes the shared filter query plus the clicked row's detail (platform_id, code, group) and page.
+ */
+export function fetchAnalysisCodeUsages(query) {
+    return http(`${PROMO_ANALYSIS}/codes/usages${query ? `?${query}` : ''}`);
+}
