@@ -84,3 +84,10 @@ export function formatDateRange({ date_from, date_to }) {
 
     return `${date.format(parse(date_from))} – ${date.format(parse(date_to))}`;
 }
+
+/**
+ * A single YYYY-MM-DD date from the backend, e.g. "10 Sep 2026".
+ */
+export function formatDate(value) {
+    return value ? date.format(new Date(`${value}T00:00:00`)) : '—';
+}
