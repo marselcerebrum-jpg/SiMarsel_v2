@@ -79,7 +79,8 @@ class PromoCodeSummaryService
     }
 
     /**
-     * The five most used codes with their credited revenue as a companion metric.
+     * The five most used codes with their credited revenue as a companion metric. Empty when no promo code is
+     * used, also when the filter has transactions without promo.
      *
      * @return array<string, mixed>
      */
@@ -93,12 +94,14 @@ class PromoCodeSummaryService
             ->map(fn (object $row) => ['platform_id' => (int) $row->platform_id, 'code' => $row->code])
             ->all());
 
-        $isEmpty = $transactions['transactions'] === 0;
-
         return [
             'filter' => $filter->toArray(),
-            'is_empty' => $isEmpty,
-            'message' => $isEmpty ? 'Data tidak tersedia untuk filter yang dipilih.' : null,
+            'is_empty' => $codes->isEmpty(),
+            'message' => match (true) {
+                $transactions['transactions'] === 0 => 'Data tidak tersedia untuk filter yang dipilih.',
+                $codes->isEmpty() => 'Tidak ada penggunaan kode promo pada filter yang dipilih.',
+                default => null,
+            },
             'codes' => $codes->values()->map(fn (object $row, int $index) => [
                 'rank' => $index + 1,
                 'code' => $row->code,
