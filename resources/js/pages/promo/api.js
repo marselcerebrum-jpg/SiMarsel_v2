@@ -72,3 +72,16 @@ export function updatePromoCode(id, body) {
 export function deletePromoCode(id) {
     return http(`${PROMO_CODES}/${id}`, { method: 'DELETE' });
 }
+
+/**
+ * Promo analysis (docs/api/promo-analysis.md). Every analysis endpoint takes the same filter query.
+ */
+const PROMO_ANALYSIS = '/api/promo-analysis';
+
+export function fetchAnalysisFilters() {
+    return http(`${PROMO_ANALYSIS}/filters`);
+}
+
+export function fetchAnalysisSummary(query) {
+    return http(`${PROMO_ANALYSIS}/summary${query ? `?${query}` : ''}`);
+}

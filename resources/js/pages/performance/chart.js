@@ -1,5 +1,5 @@
 import Chart from 'chart.js/auto';
-import { formatAxis, formatValue } from './format';
+import { formatAxis, formatValue } from '../../format';
 
 const COLORS = {
     primary: '#059669',

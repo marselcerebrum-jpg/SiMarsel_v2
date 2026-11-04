@@ -1,4 +1,6 @@
 import Alpine from 'alpinejs';
+import promoAnalysis from './analysis';
+import promoAnalysisSummary from './analysis-summary';
 import promoCodeBulkEntry from './bulk-entry';
 import promoCodeManagement from './promo-code';
 import { promoMasterTable, promoPlatformTable } from './table';
@@ -36,6 +38,8 @@ Alpine.data('promoManagement', () => ({
     },
 }));
 
+Alpine.data('promoAnalysis', promoAnalysis);
+Alpine.data('promoAnalysisSummary', promoAnalysisSummary);
 Alpine.data('promoCodeManagement', promoCodeManagement);
 Alpine.data('promoCodeBulkEntry', promoCodeBulkEntry);
 Alpine.data('promoUnregisteredCodes', promoUnregisteredCodes);

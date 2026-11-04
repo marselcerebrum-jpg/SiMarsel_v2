@@ -1,15 +1,22 @@
 <div class="mt-6 grid gap-4">
-    <section class="{{ $card }} p-5" aria-labelledby="promo-analysis-title">
-        <h2 id="promo-analysis-title" class="text-base font-semibold text-ink">Promo Code Analysis</h2>
-        <p class="mt-1 text-sm text-muted">Analisis penggunaan kode promo berdasarkan funnel, source, dan platform.</p>
-
-        <div class="mt-4 rounded-lg border border-dashed border-line px-4 py-10 text-center">
-            <p class="text-sm font-medium text-ink">Analisis kode promo belum tersedia.</p>
-            <p class="mt-1 text-xs text-muted">
-                Transaksi tanpa kode promo, funnel, atau source akan dikelompokkan otomatis oleh sistem sebagai
-                Tanpa Kode, Tanpa Funnel, dan Tanpa Sumber.
-            </p>
+    <section
+        x-data="promoAnalysis"
+        @promo-analysis-errors="showServerErrors($event.detail)"
+        class="{{ $card }} min-w-0 p-5"
+        aria-labelledby="promo-analysis-title"
+    >
+        <div class="flex items-start justify-between gap-3">
+            <div>
+                <h2 id="promo-analysis-title" class="text-base font-semibold text-ink">Promo Code Analysis</h2>
+                <p class="mt-1 text-sm text-muted">Bandingkan transaksi dan revenue dengan promo dan tanpa promo berdasarkan tanggal bayar Markaz.</p>
+            </div>
+            <button type="button" class="inline-flex h-9 shrink-0 items-center rounded-lg px-3 text-sm font-semibold text-muted hover:bg-soft hover:text-ink" @click="resetFilter()">
+                Reset
+            </button>
         </div>
+
+        @include('pages.promo.components.promo-analysis-filter')
+        @include('pages.promo.components.promo-analysis-summary')
     </section>
 
     @include('pages.promo.components.promo-unregistered-alert')

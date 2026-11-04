@@ -1,7 +1,7 @@
 import { errorMessage } from '../../http';
 import { fetchPaymentMethods } from './api';
 import { distributionChartConfig, highlightSlice, renderChart } from './chart';
-import { formatValue } from './format';
+import { formatValue } from '../../format';
 import { paymentMethodRows } from './table';
 
 const EMPTY_MESSAGE = 'Tidak ada data metode pembayaran untuk filter yang dipilih.';

@@ -15,7 +15,7 @@ import {
     today,
     validateFilter,
 } from './filter';
-import { formatDateRange, formatDateTime, formatValue } from './format';
+import { formatDateRange, formatDateTime, formatValue } from '../../format';
 import performanceContribution from './contribution';
 import performancePaymentMethod from './payment-method';
 import performancePurchaseTime from './purchase-time';
