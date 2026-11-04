@@ -1,5 +1,6 @@
 import Alpine from 'alpinejs';
 import promoAnalysis from './analysis';
+import promoAnalysisFunnel from './analysis-funnel';
 import promoAnalysisSummary from './analysis-summary';
 import promoCodeBulkEntry from './bulk-entry';
 import promoCodeManagement from './promo-code';
@@ -40,6 +41,7 @@ Alpine.data('promoManagement', () => ({
 
 Alpine.data('promoAnalysis', promoAnalysis);
 Alpine.data('promoAnalysisSummary', promoAnalysisSummary);
+Alpine.data('promoAnalysisFunnel', promoAnalysisFunnel);
 Alpine.data('promoCodeManagement', promoCodeManagement);
 Alpine.data('promoCodeBulkEntry', promoCodeBulkEntry);
 Alpine.data('promoUnregisteredCodes', promoUnregisteredCodes);

@@ -91,6 +91,21 @@ class PromoPageTest extends TestCase
             ->assertDontSee('Kode Aktif');
     }
 
+    public function test_promo_funnel_table_follows_the_shared_filter_inside_the_analysis_section(): void
+    {
+        $this->actingAs($this->employee)
+            ->get(route('promo.index'))
+            ->assertSeeInOrder([
+                'x-data="promoAnalysis"',
+                'x-data="promoAnalysisSummary"',
+                'x-data="promoAnalysisFunnel"',
+                'Promo Code List',
+            ], false)
+            ->assertSee('@promo-analysis-filter.window="load($event.detail)"', false)
+            ->assertSeeInOrder(['Promo Analysis by Funnel', 'Funnel', 'Jumlah Transaksi', 'Jumlah Revenue', 'Kontribusi Funnel (%)'])
+            ->assertSee('Memuat rekap funnel');
+    }
+
     public function test_promo_code_list_shows_mapping_columns_with_search_and_pagination(): void
     {
         $this->actingAs($this->employee)
