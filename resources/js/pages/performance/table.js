@@ -1,5 +1,5 @@
 import { pieColor } from './chart';
-import { formatShare, formatValue, trendBadge } from './format';
+import { formatShare, formatValue, trendBadge } from '../../format';
 
 /**
  * Rows for the trend table, one per backend row. The change column uses the
