@@ -14,11 +14,8 @@ export default function promoAnalysisSource() {
         loadError: '',
         requestId: 0,
 
-        /**
-         * The backend always sends Tanpa Sumber; list it only when a code usage falls into it.
-         */
         get rows() {
-            return (this.result?.sources ?? []).filter((row) => row.key !== 'no_source' || row.usages > 0);
+            return this.result?.sources ?? [];
         },
 
         /**

@@ -76,15 +76,20 @@ test('source table shows every backend source in order with consistent formattin
     assert.equal(table.format(table.rows[2].revenue, 'currency').replace(/\s/g, ''), 'Rp0');
 });
 
-test('Tanpa Sumber is listed only when a code usage falls into it', async () => {
+test('Tanpa Sumber stays listed at 0 when no code usage falls into it', async () => {
     const { default: promoAnalysisSource } = await sourceModule(async () => sourceResponse({
-        sources: [source(2, 'Instagram', 2, 100000, 4.76), noSource(0, 0, 0)],
+        sources: [source(1, 'Aplikasi', 0, 0, 0), source(2, 'Instagram', 2, 100000, 4.76), noSource(0, 0, 0)],
     }));
     const table = promoAnalysisSource();
 
     await table.load('');
 
-    assert.deepEqual(table.visibleRows.map((row) => row.name), ['Instagram']);
+    assert.deepEqual(table.visibleRows.map((row) => row.name), ['Aplikasi', 'Instagram', 'Tanpa Sumber']);
+
+    const noSourceRow = table.visibleRows.at(-1);
+    assert.equal(table.format(noSourceRow.usages, 'number'), '0');
+    assert.equal(table.format(noSourceRow.revenue, 'currency').replace(/\s/g, ''), 'Rp0');
+    assert.equal(table.format(noSourceRow.contribution_percentage, 'percent'), '0,0%');
 });
 
 test('source table shows the empty message instead of zero rows', async () => {
