@@ -121,6 +121,28 @@ class PromoPageTest extends TestCase
             ->assertSee('Memuat rekap source');
     }
 
+    public function test_promo_code_summary_follows_the_shared_filter_and_opens_a_read_only_usage_detail(): void
+    {
+        $response = $this->actingAs($this->employee)
+            ->get(route('promo.index'))
+            ->assertSeeInOrder([
+                'x-data="promoAnalysis"',
+                'x-data="promoAnalysisSource"',
+                'x-data="promoAnalysisCode"',
+                'x-data="promoAnalysisCodeUsage"',
+                'Promo Code List',
+            ], false)
+            ->assertSee('@promo-code-usage-open.window', false)
+            ->assertSeeInOrder(['Summary by Promo Code', 'Kode Promo', 'Platform', 'Kategori/Funnel', 'Source', 'Jumlah Penggunaan', 'Jumlah Revenue', 'Kontribusi (%)'])
+            ->assertSee('Memuat rekap kode promo')
+            ->assertSee('Promo Code Usage Details')
+            ->assertSeeInOrder(['Tanggal', 'Platform/Aplikasi', 'Jumlah Penggunaan', 'Revenue', 'Total']);
+
+        $summary = str($response->getContent())->between('id="promo-code-summary-title"', 'Promo Code List');
+        $this->assertStringNotContainsString('Tipe', $summary);
+        $this->assertStringNotContainsString('Import', $summary);
+    }
+
     public function test_promo_code_list_shows_mapping_columns_with_search_and_pagination(): void
     {
         $this->actingAs($this->employee)
