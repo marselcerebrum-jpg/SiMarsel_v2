@@ -132,6 +132,30 @@ class PromoPageTest extends TestCase
             ->assertSee('@promo-codes-changed.window="reload()"', false);
     }
 
+    public function test_unregistered_code_alert_shows_raw_code_platform_and_usage(): void
+    {
+        $this->actingAs($this->employee)
+            ->get(route('promo.index'))
+            ->assertSee('x-data="promoUnregisteredCodes"', false)
+            ->assertSeeInOrder(['Unregistered Promo Codes', 'Promo Code List'])
+            ->assertSeeInOrder(['Raw Code', 'Platform', 'Usage', 'Last Used', 'Actions'])
+            ->assertSee('Register Code')
+            ->assertSee('Transaksi dengan kode ini tetap tersimpan dan tetap dihitung dalam analisis.');
+    }
+
+    public function test_registering_from_alert_opens_prefilled_single_entry(): void
+    {
+        $this->actingAs($this->employee)
+            ->get(route('promo.index'))
+            ->assertSee('@promo-code-register.window="openRegister($event.detail)"', false)
+            ->assertSee('@promo-codes-changed.window="refresh()"', false)
+            ->assertSee('Register Promo Code')
+            ->assertSee('Mendaftarkan kode dari alert juga dapat melengkapi')
+            ->assertSee('penggunaan historis yang sebelumnya belum terpetakan akan dihubungkan')
+            ->assertSee('Hanya penggunaan yang belum terhubung ke kode promo yang diproses; penggunaan yang sudah terhubung tidak diproses ulang meskipun funnel/source-nya kosong. Klasifikasi Funnel/Source yang sudah ada tidak akan ditimpa.')
+            ->assertDontSee('Deactivate');
+    }
+
     public function test_master_data_tab_manages_funnel_and_source_separately(): void
     {
         $this->actingAs($this->employee)

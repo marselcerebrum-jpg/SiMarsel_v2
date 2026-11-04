@@ -12,7 +12,9 @@
         </div>
     </section>
 
-    <section x-data="promoCodeManagement" @promo-codes-changed.window="reload()" class="{{ $card }} min-w-0 p-5" aria-labelledby="promo-list-title">
+    @include('pages.promo.components.promo-unregistered-alert')
+
+    <section x-data="promoCodeManagement" @promo-codes-changed.window="reload()" @promo-code-register.window="openRegister($event.detail)" class="{{ $card }} min-w-0 p-5" aria-labelledby="promo-list-title">
         <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
                 <h2 id="promo-list-title" class="text-base font-semibold text-ink">Promo Code List</h2>
