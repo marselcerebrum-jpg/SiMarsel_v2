@@ -626,7 +626,7 @@ File `promo-analisis_{date_from}_{date_to}.xlsx`, misalnya `promo-analisis_2026-
 - Revenue di Detail adalah revenue atribusi kode (Rp0 untuk kode utama di transaksi dua-kode). Jumlah kolom Revenue Detail sama dengan jumlah Revenue di Rekap.
 - Angka disimpan sebagai angka, bukan teks. Nilai kosong (misalnya perubahan tanpa pembanding, atau bucket setelah hari ini) dibiarkan kosong.
 - Jika filter tidak punya data, file tetap diunduh dengan semua sheet: tabel kosong hanya berisi judul kolom.
-- Sheet Rekap dan Detail dibaca bertahap dari database, sehingga export tidak terbatas pagination.
+- Sheet Rekap dan Detail **dibaca dan ditulis bertahap** sampai ke file: Rekap dibaca per 500 baris (penulisan asli Markaz diambil per kelompok itu juga), Detail per 1.000 baris. Tidak pernah seluruh baris dimuat ke memori sekaligus, dan export tidak terbatas pagination.
 
 ### Gagal
 
