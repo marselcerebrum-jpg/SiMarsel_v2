@@ -2,6 +2,7 @@ import Alpine from 'alpinejs';
 import promoCodeBulkEntry from './bulk-entry';
 import promoCodeManagement from './promo-code';
 import { promoMasterTable, promoPlatformTable } from './table';
+import promoUnregisteredCodes from './unregistered';
 
 const TABS = ['promo-codes', 'master-data'];
 
@@ -37,5 +38,6 @@ Alpine.data('promoManagement', () => ({
 
 Alpine.data('promoCodeManagement', promoCodeManagement);
 Alpine.data('promoCodeBulkEntry', promoCodeBulkEntry);
+Alpine.data('promoUnregisteredCodes', promoUnregisteredCodes);
 Alpine.data('promoMasterTable', promoMasterTable);
 Alpine.data('promoPlatformTable', promoPlatformTable);

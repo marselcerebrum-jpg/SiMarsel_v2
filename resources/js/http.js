@@ -24,6 +24,8 @@ export async function http(url, { method = 'GET', body } = {}) {
 export function errorMessage(error, fallback = 'Terjadi kesalahan. Silakan coba lagi.') {
     if (error?.status === 419) return 'Sesi kedaluwarsa. Muat ulang halaman lalu coba lagi.';
     if (error?.status === 429) return 'Terlalu banyak percobaan. Tunggu sebentar lalu coba lagi.';
+    // Server errors may carry technical details (SQL, stack) when APP_DEBUG is on; never show them.
+    if (error?.status >= 500) return fallback;
 
     return error?.data?.message || fallback;
 }
