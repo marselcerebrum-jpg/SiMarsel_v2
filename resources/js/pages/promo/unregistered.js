@@ -19,6 +19,8 @@ export default function promoUnregisteredCodes() {
         loading: true,
         loadError: '',
         requestId: 0,
+        // Whether the loaded result is a search result, so the badge does not change before the response arrives.
+        searched: false,
 
         init() {
             this.fetchItems();
@@ -33,10 +35,24 @@ export default function promoUnregisteredCodes() {
             return this.filter.search.trim() !== '';
         },
 
+        /**
+         * "All Registered" only when no search is applied and nothing is unregistered.
+         */
+        get status() {
+            if (this.searched) {
+                return { text: `${this.total} ${this.total === 1 ? 'Result' : 'Results'}`, tone: 'bg-soft text-label' };
+            }
+
+            return this.total > 0
+                ? { text: `${this.total} Unregistered`, tone: 'bg-amber-100 text-amber-800' }
+                : { text: 'All Registered', tone: 'bg-emerald-100 text-emerald-700' };
+        },
+
         formatUsedOn,
 
         async fetchItems() {
             const requestId = ++this.requestId;
+            const searched = this.hasFilter;
             this.loading = true;
             this.loadError = '';
 
@@ -52,6 +68,7 @@ export default function promoUnregisteredCodes() {
 
                 this.items = data;
                 this.meta = meta ?? null;
+                this.searched = searched;
             } catch (error) {
                 if (requestId !== this.requestId) return;
                 this.loadError = errorMessage(error, 'Gagal memuat kode promo yang belum terdaftar.');

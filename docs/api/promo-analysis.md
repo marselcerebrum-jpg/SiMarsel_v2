@@ -1,6 +1,6 @@
 # API Analisis Promo
 
-Filter analisis, kartu KPI ringkasan, serta rekap per funnel dan per source untuk halaman Analisis Promo. Semua komponen analisis promo memakai **filter yang sama**, jadi kirim query parameter yang sama ke setiap endpoint.
+Filter analisis, kartu KPI ringkasan, rekap per funnel, per source, dan per kode promo, serta detail penggunaan kode untuk halaman Analisis Promo. Semua komponen analisis promo memakai **filter yang sama**, jadi kirim query parameter yang sama ke setiap endpoint.
 
 Wajib login. **Semua user yang login** boleh mengakses. Aturan header dan kode error umum ada di [authentication.md](authentication.md). Cara penggunaan kode promo disimpan ada di [promo-codes.md](../promo-codes.md).
 
@@ -8,8 +8,11 @@ Wajib login. **Semua user yang login** boleh mengakses. Aturan header dan kode e
 |---|---|
 | `GET /api/promo-analysis/filters` | Pilihan dropdown filter |
 | `GET /api/promo-analysis/summary` | Kartu KPI |
+| `GET /api/promo-analysis/product-types` | Transaksi dan revenue promo per tipe produk (Perdana / Perpanjangan) |
 | `GET /api/promo-analysis/funnels` | Tabel transaksi dan revenue per funnel |
 | `GET /api/promo-analysis/sources` | Tabel penggunaan dan revenue per source |
+| `GET /api/promo-analysis/codes` | Tabel rekap per kode promo |
+| `GET /api/promo-analysis/codes/usages` | Detail penggunaan satu kode (saat baris rekap diklik) |
 
 ## Sumber data
 
@@ -135,6 +138,62 @@ Setiap KPI berisi nilai periode sekarang dan periode pembanding:
 ```
 
 Jika tidak ada transaksi untuk filter itu, respons tetap **200** dengan `is_empty: true` dan `message: "Data tidak tersedia untuk filter yang dipilih."`.
+
+## `GET /api/promo-analysis/product-types`
+
+Transaksi dan revenue **promo** menurut tipe produk (`transactions.product_type`), untuk membandingkan segmen Perdana dan Perpanjangan. Endpoint ini menerima semua filter di atas.
+
+- Hanya **transaksi unik yang punya minimal satu kode promo**. Transaksi dua-kode dihitung **satu kali**, dan nominalnya dijumlahkan satu kali.
+- Yang ditampilkan adalah jumlah **transaksi** dan **revenue**, bukan jumlah penggunaan kode.
+- Dasar transaksinya sama dengan KPI: hanya `Success`, dan transaksi anomali dikecualikan. `totals` selalu sama dengan **Transaksi dengan Promo** dan **Revenue dengan Promo** di `/summary`.
+- Pencarian kode (`search`) mempersempit transaksi ke yang memakai kode yang cocok, sama seperti KPI.
+
+### Kelompok tipe produk
+
+| `key` | Kondisi | Nama |
+|---|---|---|
+| `first_purchase` | `product_type` = `Perdana` | Perdana |
+| `renewal` | `product_type` = `Perpanjangan` | Perpanjangan |
+| `other` | Nilai lain | Nilai `product_type` apa adanya, satu baris per nilai |
+| `unknown` | Kosong atau `null` | Tidak diketahui |
+
+- Perdana dan Perpanjangan dicocokkan dengan cara yang sama seperti **Pengguna Baru** dan **Repeat Order** di Ringkasan Performa, jadi angkanya konsisten.
+- Nilai lain atau kosong **tidak pernah** dimasukkan diam-diam ke Perdana atau Perpanjangan.
+- Urutan: Perdana dan Perpanjangan (selalu tampil, walaupun 0), lalu tipe lain A-Z, lalu Tidak diketahui (hanya jika ada).
+
+### Rumus
+
+| Field | Rumus |
+|---|---|
+| `transactions` | Transaksi promo unik di kelompok itu |
+| `revenue` | Jumlah `nominal` transaksi promo di kelompok itu, satu kali per transaksi |
+| `transaction_percentage` | `transactions` ÷ total transaksi promo hasil filter × 100, 2 desimal; `0` jika total 0 |
+| `revenue_percentage` | `revenue` ÷ total revenue promo hasil filter × 100, 2 desimal; `0` jika total 0 |
+
+Export tabel ini, jika nanti dibuat, wajib memakai `PromoProductTypeService::breakdown()` yang sama, supaya angkanya tidak berbeda dengan halaman.
+
+### 200 OK
+
+`GET /api/promo-analysis/product-types?year=2026&month=9`:
+
+```json
+{
+    "data": {
+        "filter": { "mode": "month", "date_from": "2026-09-01", "date_to": "2026-09-30", "...": "sama dengan /summary" },
+        "is_empty": false,
+        "message": null,
+        "totals": { "transactions": 6, "revenue": 1950000 },
+        "product_types": [
+            { "key": "first_purchase", "name": "Perdana", "transactions": 2, "revenue": 300000, "transaction_percentage": 33.33, "revenue_percentage": 15.38 },
+            { "key": "renewal", "name": "Perpanjangan", "transactions": 1, "revenue": 300000, "transaction_percentage": 16.67, "revenue_percentage": 15.38 },
+            { "key": "other", "name": "Bundling", "transactions": 1, "revenue": 400000, "transaction_percentage": 16.67, "revenue_percentage": 20.51 },
+            { "key": "unknown", "name": "Tidak diketahui", "transactions": 2, "revenue": 950000, "transaction_percentage": 33.33, "revenue_percentage": 48.72 }
+        ]
+    }
+}
+```
+
+Jika tidak ada transaksi promo, respons tetap **200** dengan `is_empty: true`, `message`, dan Perdana/Perpanjangan bernilai 0.
 
 ## `GET /api/promo-analysis/funnels`
 
@@ -273,6 +332,164 @@ Semua source master **selalu tampil**, termasuk yang 0, urut sesuai master (Apli
 
 Jika tidak ada transaksi, respons tetap **200** dengan `is_empty: true`, `message`, dan semua source bernilai 0.
 
+## `GET /api/promo-analysis/codes`
+
+Rekap jumlah penggunaan dan revenue atribusi **per kode promo**. Endpoint ini menerima semua filter di atas, ditambah:
+
+| Parameter | Format | Keterangan |
+|---|---|---|
+| `sort` | `code`, `platform`, `funnel`, `source`, `usages`, `revenue`, `contribution` | Default `revenue`. `contribution` sama dengan urutan `revenue`. |
+| `direction` | `asc` / `desc` | Default `desc` |
+| `per_page` | 1-100 | Default 15 |
+| `page` | angka | Default 1 |
+
+Pencarian memakai `search` dari filter bersama: hanya kode yang cocok yang ditampilkan, termasuk kode yang belum terdaftar.
+
+### Aturan
+
+- **Satu baris** per platform + kode yang dinormalisasi (` cpns26 ` dan `CPNS26` adalah kode yang sama). Kode yang sama di platform lain adalah baris lain.
+- Funnel dan source diambil dari **snapshot** setiap penggunaan, yaitu master saat penggunaan itu pertama kali diproses (bukan versi pada waktu bayar).
+- **Label historis:** nama funnel/source yang ditampilkan adalah **nama yang tersimpan di penggunaan** (`funnel_name_snapshot`, `source_name_snapshot`), walaupun master-nya sudah di-rename. Nama master sekarang hanya dipakai jika data lama belum punya nama snapshot. Contoh: penggunaan dengan snapshot `Marketing` tetap tampil `Marketing` setelah master diubah menjadi `Digital Marketing`.
+- Satu baris per platform + kode + **grup snapshot** (ID dan label funnel, ID dan label source). Jika klasifikasi kode berubah, misalnya mapping diganti atau master di-rename lalu dipakai transaksi baru, barisnya dipecah, misalnya `CPNS26 · Aplikasi` dan `CPNS26 · Marketing`.
+- Berbeda dengan tabel Funnel dan Source, yang memakai nama master **sekarang** sesuai aturan `docs/promo-codes.md`. Jumlah penggunaan dan revenue tetap sama, tetapi labelnya bisa berbeda setelah master di-rename.
+- Transaksi anomali dikecualikan dari rekap, detail, dan denominator kontribusi, termasuk penggunaan valid lama yang masih disimpan.
+- **Penggunaan** = setiap kemunculan kode per transaksi. Transaksi dua-kode menambah satu penggunaan ke masing-masing kode.
+- **Revenue atribusi**, sama dengan tabel Source: satu kode mendapat seluruh nominal. Pada dua kode, kode posisi 1 mendapat **Rp0** dan kode posisi 2 mendapat **seluruh** nominal. Ini atribusi khusus rekap kode, bukan revenue funnel.
+- **Kode belum terdaftar** tetap muncul dengan `is_registered: false`, tanpa funnel/source, dan semua penulisan aslinya ada di `raw_codes`.
+- Tidak ada kolom tipe kode promo.
+
+| Field | Keterangan |
+|---|---|
+| `code` | Kode yang dinormalisasi |
+| `raw_codes` | Semua penulisan asli dari Markaz di hasil filter |
+| `is_registered`, `promo_code_id` | Apakah kode sudah ada di master, dan id master-nya (`null` jika belum terdaftar) |
+| `funnel`, `source` | `{ id, name }`: `id` snapshot dan nama yang tersimpan di penggunaan (label historis). `id: null` untuk funnel/source yang sudah dihapus dari master; `null` jika tidak ada. |
+| `usages` | Jumlah penggunaan kode |
+| `revenue` | Revenue atribusi kode |
+| `contribution_percentage` | `revenue` ÷ total revenue **seluruh** transaksi hasil filter × 100, 2 desimal; `0` jika total 0 |
+| `detail` | Parameter untuk membuka detail penggunaan baris ini: `platform_id`, `code`, dan `group` (identitas grup snapshot baris ini). Kirim ketiganya apa adanya ke `/codes/usages`. |
+| `totals` | `transactions` dan `revenue` seluruh transaksi hasil filter (sama dengan `/summary`), serta `usages` dan `code_revenue` semua kode (bukan hanya halaman ini) |
+
+Urutan cadangan, jika nilai `sort` sama: kode A-Z, lalu nama platform, funnel, dan source.
+
+### 200 OK
+
+`GET /api/promo-analysis/codes?year=2026&month=9`:
+
+```json
+{
+    "data": [
+        {
+            "code": "RESELLER01",
+            "raw_codes": ["RESELLER01"],
+            "is_registered": true,
+            "promo_code_id": 7,
+            "platform": { "id": 2, "slug": "jadiasn", "name": "JADIASN" },
+            "funnel": { "id": 3, "name": "Sales" },
+            "source": { "id": 8, "name": "Reseller" },
+            "usages": 2,
+            "revenue": 500000,
+            "contribution_percentage": 23.81,
+            "detail": { "platform_id": 2, "code": "RESELLER01", "group": "WzMsIlNhbGVzIiw4LCJSZXNlbGxlciJd" }
+        },
+        {
+            "code": "UNREG26",
+            "raw_codes": [" unreg26 ", "UNREG26"],
+            "is_registered": false,
+            "promo_code_id": null,
+            "platform": { "id": 2, "slug": "jadiasn", "name": "JADIASN" },
+            "funnel": null,
+            "source": null,
+            "usages": 2,
+            "revenue": 400000,
+            "contribution_percentage": 19.05,
+            "detail": { "platform_id": 2, "code": "UNREG26", "group": "W251bGwsbnVsbCxudWxsLG51bGxd" }
+        }
+    ],
+    "links": { "...": "..." },
+    "meta": { "current_page": 1, "last_page": 1, "per_page": 15, "total": 4, "...": "..." },
+    "filter": { "...": "sama dengan /summary" },
+    "totals": { "transactions": 6, "revenue": 2100000, "usages": 7, "code_revenue": 1500000 },
+    "is_empty": false,
+    "message": null
+}
+```
+
+## `GET /api/promo-analysis/codes/usages`
+
+Detail penggunaan satu baris rekap, dibuka saat baris itu diklik. Kirim `platform_id`, `code`, dan `group` dari `detail` di baris rekap, beserta **filter yang sama** dengan rekap. Dengan `group`, detail hanya berisi penggunaan dengan klasifikasi snapshot baris itu, jadi totalnya **selalu sama** dengan penggunaan dan revenue baris yang diklik.
+
+| Parameter | Wajib | Keterangan |
+|---|---|---|
+| `platform_id` | Ya | Platform kode |
+| `code` | Ya | Kode promo; dinormalisasi, jadi ` cpns26 ` = `CPNS26` |
+| `group` | Tidak | Identitas grup snapshot dari `detail.group` baris rekap. Tanpa `group`, detail berisi **semua** penggunaan kode itu dari semua klasifikasi (dipakai Top 5, yang menggabungkan klasifikasi). Nilai yang tidak valid → 422. |
+| `per_page` | Tidak | 1-100 transaksi per halaman, default 15 |
+| `page` | Tidak | Default 1 |
+| filter bersama | Tidak | `platforms[]`, `payment_methods[]`, periode, `search` |
+
+- Satu baris per **transaksi** yang memakai kode itu, **dikelompokkan per tanggal**, terbaru lebih dulu (tanggal, lalu jam bayar).
+- Setiap tanggal membawa total **sehari penuh** (`transactions_count`, `usages`, `revenue`), juga jika transaksi tanggal itu berlanjut ke halaman berikutnya.
+- Pagination menghitung **transaksi** (`meta.total` = jumlah transaksi).
+- Transaksi yang memakai kode yang sama di dua posisi adalah satu baris dengan `usages: 2`.
+- Revenue memakai atribusi yang sama dengan rekap, jadi `totals` detail selalu sama dengan baris rekap yang diklik (dengan `group`), atau dengan jumlah semua baris kode itu (tanpa `group`).
+- `code.funnel` dan `code.source` menampilkan klasifikasi grup yang dibuka (`null` tanpa `group`). Funnel/source tiap transaksi memakai label historis yang sama dengan rekap.
+- Seperti rekap, saat `search` aktif hanya kode yang cocok yang dihitung.
+- Tidak ada fitur import di detail.
+
+### 200 OK
+
+`GET /api/promo-analysis/codes/usages?year=2026&month=9&platform_id=2&code=RESELLER01`:
+
+```json
+{
+    "data": [
+        {
+            "date": "2026-09-10",
+            "transactions_count": 2,
+            "usages": 2,
+            "revenue": 500000,
+            "transactions": [
+                {
+                    "trx_id": "jadiasn-476770",
+                    "paid_date": "2026-09-10",
+                    "paid_time": "11:00:00",
+                    "platform": { "id": 2, "slug": "jadiasn", "name": "JADIASN" },
+                    "code_positions": [2],
+                    "raw_codes": ["RESELLER01"],
+                    "funnel": { "id": 3, "name": "Sales" },
+                    "source": { "id": 8, "name": "Reseller" },
+                    "usages": 1,
+                    "revenue": 300000,
+                    "transaction_nominal": 300000
+                }
+            ]
+        }
+    ],
+    "links": { "...": "..." },
+    "meta": { "current_page": 1, "per_page": 15, "total": 2, "...": "..." },
+    "filter": { "...": "sama dengan /summary" },
+    "code": {
+        "code": "RESELLER01",
+        "is_registered": true,
+        "platform": { "id": 2, "slug": "jadiasn", "name": "JADIASN" },
+        "funnel": { "id": 3, "name": "Sales" },
+        "source": { "id": 8, "name": "Reseller" },
+        "group": "WzMsIlNhbGVzIiw4LCJSZXNlbGxlciJd"
+    },
+    "totals": { "transactions": 2, "usages": 2, "revenue": 500000 },
+    "is_empty": false,
+    "message": null
+}
+```
+
+| Field transaksi | Keterangan |
+|---|---|
+| `code_positions` | Posisi kode ini di transaksi (`1` = kode utama, `2` = kode kedua) |
+| `raw_codes` | Penulisan asli kode ini di transaksi |
+| `revenue` | Revenue atribusi kode ini dari transaksi itu (Rp0 jika kode utama di transaksi dua-kode) |
+| `transaction_nominal` | Nominal transaksi seluruhnya |
+
 ## 422 Validasi gagal
 
 | Kondisi | Key | Pesan |
@@ -282,5 +499,10 @@ Jika tidak ada transaksi, respons tetap **200** dengan `is_empty: true`, `messag
 | `payment_methods` bukan daftar | `payment_methods` | `Metode pembayaran harus berupa daftar.` |
 | Pencarian lebih dari 100 karakter | `search` | `Pencarian kode promo maksimal 100 karakter.` |
 | Slug platform tidak ada | `platform` / `platforms.0` | `Platform tidak ditemukan.` |
+| `sort` / `direction` tidak dikenal (`/codes`) | `sort` / `direction` | `Urutan tidak valid.` / `Arah urutan tidak valid.` |
+| `per_page` di luar 1-100 (`/codes`, `/codes/usages`) | `per_page` | `Jumlah per halaman harus di antara 1 dan 100.` |
+| `platform_id` / `code` kosong (`/codes/usages`) | `platform_id` / `code` | `Platform wajib diisi.` / `Kode promo wajib diisi.` |
+| `platform_id` tidak ada (`/codes/usages`) | `platform_id` | `Platform tidak ditemukan.` |
+| `group` tidak valid (`/codes/usages`) | `group` | `Grup klasifikasi tidak valid. Buka detail dari baris rekap kode promo.` |
 
 Validasi tanggal, bulan, dan tahun lainnya sama dengan [filter Ringkasan Performa](performance-filter.md#422-validasi-gagal).
