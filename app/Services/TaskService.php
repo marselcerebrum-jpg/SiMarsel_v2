@@ -54,7 +54,7 @@ class TaskService
 
     public function detail(Task $task): Task
     {
-        return $task->load(['category', 'division', 'platform', 'pic', 'creator', 'activities.actor']);
+        return $task->load(['category', 'division', 'platform', 'pic', 'creator', 'activities.actor', 'evidences.submitter']);
     }
 
     /**

@@ -37,8 +37,7 @@ class TaskDetailResource extends TaskResource
                 'id' => $this->creator->id,
                 'fullname' => $this->creator->fullname,
             ] : null,
-            // Evidence upload is not available yet, so the list is always empty for now.
-            'evidence' => [],
+            'evidence' => TaskEvidenceResource::collection($this->whenLoaded('evidences', fn () => $this->evidences, [])),
             'history' => TaskActivityResource::collection($this->whenLoaded('activities', fn () => $this->activities, [])),
             'editable_fields' => $editableFields,
             'next_statuses' => in_array('status', $editableFields, true)

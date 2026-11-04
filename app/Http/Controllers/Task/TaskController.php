@@ -9,10 +9,13 @@ use App\Http\Requests\Task\UpdateTaskRequest;
 use App\Http\Resources\TaskDetailResource;
 use App\Http\Resources\TaskResource;
 use App\Models\Task;
+use App\Models\TaskEvidence;
+use App\Services\TaskEvidenceService;
 use App\Services\TaskService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class TaskController extends Controller
 {
@@ -56,6 +59,11 @@ class TaskController extends Controller
     public function show(Task $task): TaskDetailResource
     {
         return TaskDetailResource::make($this->taskService->detail($task));
+    }
+
+    public function downloadEvidence(Task $task, TaskEvidence $evidence, TaskEvidenceService $service): StreamedResponse
+    {
+        return $service->download($task, $evidence);
     }
 
     public function update(UpdateTaskRequest $request, Task $task): TaskDetailResource

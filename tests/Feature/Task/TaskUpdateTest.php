@@ -139,13 +139,11 @@ class TaskUpdateTest extends TestCase
             ->assertJsonValidationErrors(['status' => 'Status tidak dapat diubah dari On Process ke Done. Tugas ini wajib melalui QA sebelum Done.']);
     }
 
-    public function test_staff_leaves_the_qa_decision_and_reopening_to_admin_or_manager(): void
+    public function test_staff_only_moves_their_work_forward(): void
     {
         $cases = [
-            [TaskStatus::ReadyForQa, 'on_qa', 'Status Ready for QA ke On QA hanya dapat diubah oleh Admin atau Manager divisi.'],
-            [TaskStatus::OnQa, 'done', 'Status On QA ke Done hanya dapat diubah oleh Admin atau Manager divisi.'],
-            [TaskStatus::OnQa, 'in_progress', 'Status On QA ke On Process hanya dapat diubah oleh Admin atau Manager divisi.'],
-            [TaskStatus::Done, 'in_progress', 'Status Done ke On Process hanya dapat diubah oleh Admin atau Manager divisi.'],
+            [TaskStatus::Todo, 'backlog', 'Status To Do ke Back Log hanya dapat diubah oleh Admin atau Manager divisi.'],
+            [TaskStatus::InProgress, 'todo', 'Status On Process ke To Do hanya dapat diubah oleh Admin atau Manager divisi.'],
         ];
 
         foreach ($cases as [$current, $next, $message]) {
@@ -158,6 +156,47 @@ class TaskUpdateTest extends TestCase
 
             $this->assertSame($current, $this->task->fresh()->status);
         }
+    }
+
+    public function test_staff_cannot_update_a_task_waiting_for_or_in_qa_or_done(): void
+    {
+        $cases = [
+            [TaskStatus::Backlog, 'todo'],
+            [TaskStatus::ReadyForQa, 'on_qa'],
+            [TaskStatus::ReadyForQa, 'in_progress'],
+            [TaskStatus::OnQa, 'done'],
+            [TaskStatus::OnQa, 'in_progress'],
+            [TaskStatus::Done, 'in_progress'],
+        ];
+
+        foreach ($cases as [$current, $next]) {
+            $this->task->forceFill(['status' => $current])->save();
+
+            $this->actingAs($this->staff)
+                ->patchJson($this->url(), $this->payload(['status' => $next]))
+                ->assertForbidden();
+
+            $this->assertSame($current, $this->task->fresh()->status);
+        }
+
+        $this->assertDatabaseCount('task_activities', 0);
+    }
+
+    public function test_qa_decisions_and_reopening_stay_with_admin_or_manager(): void
+    {
+        $this->task->forceFill(['status' => TaskStatus::ReadyForQa])->save();
+
+        $this->actingAs($this->manager)
+            ->patchJson($this->url(), ['version' => 1, 'status' => 'on_qa'])
+            ->assertOk();
+
+        $this->patchJson($this->url(), ['version' => 2, 'status' => 'done'])
+            ->assertOk();
+
+        $this->actingAs($this->admin)
+            ->patchJson($this->url(), ['version' => 3, 'status' => 'in_progress'])
+            ->assertOk()
+            ->assertJsonPath('data.status', 'in_progress');
     }
 
     public function test_staff_can_finish_a_task_without_qa(): void

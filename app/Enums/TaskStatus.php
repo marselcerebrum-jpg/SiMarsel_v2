@@ -39,6 +39,21 @@ enum TaskStatus: string
         };
     }
 
+    /**
+     * The PIC only moves their work forward: start it, then hand it to QA or finish it when no QA is needed.
+     * QA decisions, reopening a finished task, and moving back are left to Admin or the Manager.
+     *
+     * @return array<int, self>
+     */
+    public function picNextStatuses(bool $requiresReview): array
+    {
+        return match ($this) {
+            self::Todo => [self::InProgress],
+            self::InProgress => [$requiresReview ? self::ReadyForQa : self::Done],
+            default => [],
+        };
+    }
+
     public function canMoveTo(self $status, bool $requiresReview): bool
     {
         return in_array($status, $this->nextStatuses($requiresReview), true);

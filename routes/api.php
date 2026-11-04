@@ -162,5 +162,8 @@ Route::middleware('auth')->group(function () {
             ->whereNumber('task')
             ->can('update', 'task')
             ->name('update');
+        Route::get('/{task}/evidences/{evidence}/download', [TaskController::class, 'downloadEvidence'])
+            ->can('view', 'task')
+            ->name('evidences.download');
     });
 });

@@ -63,6 +63,11 @@ class Task extends Model
         return $this->hasMany(TaskActivity::class)->orderByDesc('created_at')->orderByDesc('id');
     }
 
+    public function evidences(): HasMany
+    {
+        return $this->hasMany(TaskEvidence::class)->latest();
+    }
+
     public function division(): BelongsTo
     {
         return $this->belongsTo(Division::class);
@@ -134,32 +139,27 @@ class Task extends Model
     }
 
     /**
-     * Admin, the division's Manager, and the PIC may change the task; the PIC only its status.
+     * Seeing a task is not editing it: Admin and the division's Manager may edit it, its PIC only while
+     * there is a status step for them to take. Otherwise the task is read-only for the PIC.
      */
     public function updatableBy(Account $account): bool
     {
-        return $this->managedBy($account) || $this->assignedTo($account);
+        return $this->managedBy($account) || $this->nextStatusesFor($account) !== [];
     }
 
     /**
-     * Statuses the account may move the task to. The PIC follows the same workflow but leaves the QA
-     * decision and reopening a finished task to Admin or the Manager.
+     * Statuses the account may move the task to: the whole workflow for Admin and the Manager, only the
+     * PIC's own steps for the PIC.
      *
      * @return array<int, TaskStatus>
      */
     public function nextStatusesFor(Account $account): array
     {
-        $next = $this->status->nextStatuses($this->requires_review);
-
-        if ($this->managedBy($account)) {
-            return $next;
-        }
-
-        if (! $this->assignedTo($account) || in_array($this->status, [TaskStatus::OnQa, TaskStatus::Done], true)) {
-            return [];
-        }
-
-        return array_values(array_filter($next, fn (TaskStatus $status) => $status !== TaskStatus::OnQa));
+        return match (true) {
+            $this->managedBy($account) => $this->status->nextStatuses($this->requires_review),
+            $this->assignedTo($account) => $this->status->picNextStatuses($this->requires_review),
+            default => [],
+        };
     }
 
     /**
