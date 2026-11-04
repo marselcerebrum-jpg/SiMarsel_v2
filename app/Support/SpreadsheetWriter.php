@@ -9,11 +9,12 @@ use OpenSpout\Writer\XLSX\Writer as XlsxWriter;
 /**
  * Writes titled sections of rows to a file: one sheet per section in XLSX,
  * or every section one after another (title row, rows, blank row) in CSV.
+ * Rows may be any iterable, so a large section can be streamed instead of held in memory.
  */
 class SpreadsheetWriter
 {
     /**
-     * @param  array<string, list<list<string|int|float|null>>>  $sections  Section title => rows.
+     * @param  array<string, iterable<list<string|int|float|null>>>  $sections  Section title => rows.
      */
     public function xlsx(array $sections, string $path): void
     {
@@ -23,14 +24,17 @@ class SpreadsheetWriter
         foreach (array_keys($sections) as $index => $title) {
             $sheet = $index === 0 ? $writer->getCurrentSheet() : $writer->addNewSheetAndMakeItCurrent();
             $sheet->setName($title);
-            $writer->addRows(array_map(fn (array $row) => Row::fromValues($row), $sections[$title]));
+
+            foreach ($sections[$title] as $row) {
+                $writer->addRow(Row::fromValues($row));
+            }
         }
 
         $writer->close();
     }
 
     /**
-     * @param  array<string, list<list<string|int|float|null>>>  $sections  Section title => rows.
+     * @param  array<string, iterable<list<string|int|float|null>>>  $sections  Section title => rows.
      */
     public function csv(array $sections, string $path): void
     {
@@ -38,11 +42,13 @@ class SpreadsheetWriter
         $writer->openToFile($path);
 
         foreach ($sections as $title => $rows) {
-            $writer->addRows([
-                Row::fromValues([$title]),
-                ...array_map(fn (array $row) => Row::fromValues($row), $rows),
-                Row::fromValues([]),
-            ]);
+            $writer->addRow(Row::fromValues([$title]));
+
+            foreach ($rows as $row) {
+                $writer->addRow(Row::fromValues($row));
+            }
+
+            $writer->addRow(Row::fromValues([]));
         }
 
         $writer->close();

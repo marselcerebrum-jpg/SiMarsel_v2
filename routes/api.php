@@ -13,6 +13,7 @@ use App\Http\Controllers\Platform\PlatformController;
 use App\Http\Controllers\Product\ProductOverviewController;
 use App\Http\Controllers\Promo\FunnelController;
 use App\Http\Controllers\Promo\PromoAnalysisController;
+use App\Http\Controllers\Promo\PromoAnalysisExportController;
 use App\Http\Controllers\Promo\PromoCodeController;
 use App\Http\Controllers\Promo\PromoCodeSummaryController;
 use App\Http\Controllers\Promo\PromoSourceController;
@@ -142,6 +143,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/codes/usages', [PromoCodeSummaryController::class, 'usages'])->name('codes.usages');
         Route::get('/trend', PromoTrendController::class)->name('trend');
         Route::get('/top-codes', [PromoCodeSummaryController::class, 'top'])->name('top-codes');
+        Route::get('/export', PromoAnalysisExportController::class)->name('export');
     });
 
     Route::get('/performance/summary', PerformanceSummaryController::class)

@@ -32,12 +32,21 @@ class PromoCodeSummaryRepository
     public function __construct(private PromoAnalysisRepository $promoAnalysisRepository) {}
 
     /**
-     * One row per platform + normalized code + funnel and source snapshot group, so a code whose usages carry
-     * different classifications is split by them. Unregistered codes stay in.
+     * One page of the rekap per kode promo.
      *
      * @return LengthAwarePaginator<int, object>
      */
     public function paginate(PromoAnalysisFilter $filter, string $sort, string $direction, int $perPage): LengthAwarePaginator
+    {
+        return $this->codes($filter, $sort, $direction)->paginate($perPage)->withQueryString();
+    }
+
+    /**
+     * One row per platform + normalized code + funnel and source snapshot group, so a code whose usages carry
+     * different classifications is split by them. Unregistered codes stay in. Used for the page and, read in
+     * chunks, the export; the trailing ids make the order unique, so chunks never skip or repeat a row.
+     */
+    public function codes(PromoAnalysisFilter $filter, string $sort, string $direction): Builder
     {
         $codes = DB::query()
             ->fromSub($this->labelledUsages($filter), 'usages')
@@ -59,8 +68,9 @@ class PromoCodeSummaryRepository
             ->orderBy('platforms.name')
             ->orderBy('codes.funnel_name')
             ->orderBy('codes.source_name')
-            ->paginate($perPage)
-            ->withQueryString();
+            ->orderBy('codes.platform_id')
+            ->orderBy('codes.funnel_id')
+            ->orderBy('codes.source_id');
     }
 
     /**
@@ -132,6 +142,25 @@ class PromoCodeSummaryRepository
             ->get()
             ->groupBy(fn (object $row) => $row->platform_id.'|'.$row->code)
             ->map(fn (Collection $rows) => $rows->pluck('raw_code')->sort(fn (string $a, string $b) => strcmp($a, $b))->values()->all());
+    }
+
+    /**
+     * Every code usage of the filter, newest transaction first, with its platform, registration, and funnel and
+     * source labels: the rows of the code detail, for every code at once.
+     */
+    public function usages(PromoAnalysisFilter $filter): Builder
+    {
+        return DB::query()
+            ->fromSub($this->labelledUsages($filter), 'usages')
+            ->join('platforms', 'platforms.id', '=', 'usages.platform_id')
+            ->leftJoin('promo_codes', fn (JoinClause $join) => $join
+                ->on('promo_codes.platform_id', '=', 'usages.platform_id')
+                ->on('promo_codes.code', '=', 'usages.code'))
+            ->selectRaw('usages.*, platforms.name as platform_name, promo_codes.id as promo_code_id')
+            ->orderByDesc('usages.paid_date')
+            ->orderByDesc('usages.paid_time')
+            ->orderByDesc('usages.transaction_id')
+            ->orderBy('usages.code_position');
     }
 
     /**

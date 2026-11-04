@@ -15,6 +15,7 @@ Wajib login. **Semua user yang login** boleh mengakses. Aturan header dan kode e
 | `GET /api/promo-analysis/codes/usages` | Detail penggunaan satu kode (saat baris rekap diklik) |
 | `GET /api/promo-analysis/trend` | Grafik tren transaksi dan revenue promo, dengan overlay total penjualan |
 | `GET /api/promo-analysis/top-codes` | Top 5 kode berdasarkan jumlah penggunaan |
+| `GET /api/promo-analysis/export` | Export Excel seluruh analisis sesuai filter |
 
 ## Sumber data
 
@@ -591,6 +592,55 @@ Lima kode promo dengan **jumlah penggunaan** terbanyak. Endpoint ini menerima se
 ```
 
 `detail` bisa dipakai untuk membuka detail penggunaan kode (`/codes/usages`). Karena Top 5 menggabungkan klasifikasi, `detail` di sini **tanpa** `group`, sehingga detail berisi semua penggunaan kode itu dan totalnya sama dengan baris Top 5.
+
+## `GET /api/promo-analysis/export`
+
+Mengunduh **seluruh** hasil Analisis Promo sesuai filter yang sedang aktif, dalam satu file Excel. Setiap sheet dibuat oleh service yang sama dengan endpoint komponennya, jadi angkanya selalu sama dengan halaman. Export hanya membaca data: tidak ada import dan tidak mengubah data master.
+
+| Parameter | Keterangan |
+|---|---|
+| Filter bersama | `platforms[]`, `payment_methods[]`, periode, `search`, sama dengan endpoint lain |
+| `period` | Rincian sheet Tren: `daily` (default), `weekly`, `monthly`, sama dengan `/trend` |
+| `sort`, `direction` | Urutan sheet Rekap Kode Promo, sama dengan `/codes` (default `revenue`, `desc`) |
+
+Contoh: `GET /api/promo-analysis/export?year=2026&month=9&platforms[]=jadiasn&period=weekly`
+
+Di frontend, cukup arahkan browser ke URL tersebut (`window.location.href = url` atau `<a href="...">`), karena cookie session ikut terkirim. Jika memakai `fetch()` untuk menampilkan status proses, baca respons sebagai blob saat sukses, dan sebagai JSON (`message`) saat gagal.
+
+### 200 OK
+
+File `promo-analisis_{date_from}_{date_to}.xlsx`, misalnya `promo-analisis_2026-09-01_2026-09-30.xlsx`, dengan 7 sheet:
+
+| Sheet | Kolom | Sumber |
+|---|---|---|
+| Ringkasan | Periode, Periode Pembanding, Platform, Metode Pembayaran, Pencarian Kode Promo; lalu tabel KPI, Nilai, Nilai Periode Pembanding, Perubahan (%), Tren | `/summary` |
+| Funnel | Funnel, Jumlah Transaksi, Jumlah Revenue, Kontribusi Funnel (%) | `/funnels` |
+| Source | Source, Jumlah Penggunaan, Jumlah Revenue, Kontribusi Source (%) | `/sources` |
+| Rekap Kode Promo | Kode Promo, Kode Asli Markaz, Status, Platform, Funnel, Source, Jumlah Penggunaan, Jumlah Revenue, Kontribusi (%) | `/codes`, **semua baris** tanpa pagination |
+| Detail Penggunaan | Tanggal, Jam, ID Transaksi, Platform, Kode Promo, Kode Asli Markaz, Posisi Kode, Status, Funnel, Source, Jumlah Penggunaan, Revenue, Nominal Transaksi | `/codes/usages` untuk **semua kode**: satu baris per penggunaan kode, transaksi terbaru lebih dulu |
+| Tren | Periode, Tanggal Mulai, Tanggal Akhir, Transaksi dengan Promo, Revenue dengan Promo, Total Transaksi, Total Penjualan | `/trend` |
+| Perdana vs Perpanjangan | Tipe Produk, Jumlah Transaksi Promo, Revenue Promo, Persentase Transaksi (%), Persentase Revenue (%) | `/product-types` |
+
+- Kode yang **belum terdaftar** tetap ikut di Rekap dan Detail, dengan Status `Belum terdaftar` dan penulisan asli dari Markaz.
+- Transaksi anomali dikecualikan dari semua sheet, sama seperti halaman.
+- Revenue di Detail adalah revenue atribusi kode (Rp0 untuk kode utama di transaksi dua-kode). Jumlah kolom Revenue Detail sama dengan jumlah Revenue di Rekap.
+- Angka disimpan sebagai angka, bukan teks. Nilai kosong (misalnya perubahan tanpa pembanding, atau bucket setelah hari ini) dibiarkan kosong.
+- Jika filter tidak punya data, file tetap diunduh dengan semua sheet: tabel kosong hanya berisi judul kolom.
+- Sheet Rekap dan Detail **dibaca dan ditulis bertahap** sampai ke file: Rekap dibaca per 500 baris (penulisan asli Markaz diambil per kelompok itu juga), Detail per 1.000 baris. Tidak pernah seluruh baris dimuat ke memori sekaligus, dan export tidak terbatas pagination.
+
+### Gagal
+
+Respons JSON dengan `message` yang bisa langsung ditampilkan:
+
+| Status | Kondisi | Pesan |
+|---|---|---|
+| 422 | Filter, `period`, atau `sort` tidak valid | Sama dengan endpoint lain (lihat di bawah) |
+| 422 | Penggunaan kode lebih dari batas satu sheet Excel (1.048.575 baris) | `Data terlalu besar untuk diekspor: sheet Detail Penggunaan berisi N baris, maksimal 1048575 baris. Persempit periode atau filter, lalu coba lagi.` |
+| 500 | Kesalahan tak terduga | Pesan umum Laravel, tanpa detail teknis. Tampilkan pesan gagal umum di FE. |
+
+### Tombol Salin
+
+Tombol **Salin** menyalin data komponen yang sedang dipilih dari respons endpoint komponen itu, dengan filter yang sama. Prosesnya sepenuhnya di frontend, tanpa endpoint khusus, dan status berhasil/gagal ditampilkan di frontend.
 
 ## 422 Validasi gagal
 
