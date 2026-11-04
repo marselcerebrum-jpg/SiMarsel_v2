@@ -8,6 +8,8 @@ use App\Models\Platform;
 use App\Models\PromoCode;
 use App\Models\PromoSource;
 use App\Models\Transaction;
+use App\Repositories\PromoAnalysisRepository;
+use App\Repositories\PromoCodeSummaryRepository;
 use App\Services\PromoAnalysisExportService;
 use App\Services\PromoAnalysisService;
 use App\Services\PromoCodeService;
@@ -17,7 +19,9 @@ use App\Services\PromoTrendService;
 use App\Support\SpreadsheetWriter;
 use Carbon\CarbonImmutable;
 use Database\Seeders\DatabaseSeeder;
+use Generator;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Testing\TestResponse;
 use OpenSpout\Reader\XLSX\Reader;
 use Tests\TestCase;
@@ -269,6 +273,53 @@ class PromoAnalysisExportTest extends TestCase
         $this->getJson(self::URL.'?sort=type')->assertUnprocessable()->assertJsonValidationErrors(['sort' => 'Urutan tidak valid.']);
         $this->getJson(self::URL.'?date_from=2025-01-01&date_to=2026-06-30')
             ->assertUnprocessable()->assertJsonValidationErrors(['date_to' => 'Rentang tanggal untuk periode daily maksimal 366 hari.']);
+    }
+
+    public function test_rekap_is_read_and_written_in_chunks_without_loading_every_row(): void
+    {
+        $this->seedExportData();
+        foreach (range(1, 20) as $number) {
+            $this->transaction(['EXTRA'.$number], 1000, '2026-09-25');
+        }
+        // A second spelling of a code, whose raw codes must still be found from its own chunk.
+        $this->transaction(['extra7'], 1000, '2026-09-26');
+
+        // Chunks of 2 rows stand in for the real chunk size, so 23 rekap rows need 12 reads.
+        $this->instance(PromoCodeSummaryService::class, new class(app(PromoCodeSummaryRepository::class), app(PromoAnalysisRepository::class)) extends PromoCodeSummaryService
+        {
+            public const EXPORT_CHUNK = 2;
+        });
+        // Records what the writer receives, so a rekap built as one array would be caught.
+        $writer = new class extends SpreadsheetWriter
+        {
+            public ?string $rekapType = null;
+
+            public function xlsx(array $sections, string $path): void
+            {
+                $this->rekapType = get_debug_type($sections['Rekap Kode Promo']);
+                parent::xlsx($sections, $path);
+            }
+        };
+        $this->instance(SpreadsheetWriter::class, $writer);
+
+        DB::enableQueryLog();
+        $sheets = $this->sheets($this->export(self::SEPTEMBER.'&sort=code&direction=asc')->assertOk());
+        $queries = array_column(DB::getQueryLog(), 'query');
+
+        $this->assertSame(Generator::class, $writer->rekapType);
+        $rekapReads = array_values(array_filter($queries, fn (string $sql) => str_contains($sql, 'platform_slug')));
+        $this->assertCount(12, $rekapReads);
+        foreach ($rekapReads as $sql) {
+            $this->assertMatchesRegularExpression('/limit 2 offset \d+/', $sql);
+        }
+        $this->assertCount(12, array_filter($queries, fn (string $sql) => str_contains($sql, 'HEX(raw_code)')));
+
+        // The chunked rekap is the same as the page: every row once, in order, with its raw codes.
+        $this->actingAs($this->manager);
+        $rekap = $this->getJson('/api/promo-analysis/codes'.self::SEPTEMBER.'&sort=code&direction=asc&per_page=100')->json('data');
+        $this->assertCount(23, $rekap);
+        $this->assertSame(array_column($rekap, 'code'), array_column(array_slice($sheets['Rekap Kode Promo'], 1), 0));
+        $this->assertSame('EXTRA7, extra7', collect($sheets['Rekap Kode Promo'])->firstWhere(0, 'EXTRA7')[1]);
     }
 
     public function test_an_export_too_large_for_excel_is_refused_with_a_readable_message(): void
