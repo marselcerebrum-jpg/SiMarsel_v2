@@ -106,6 +106,21 @@ class PromoPageTest extends TestCase
             ->assertSee('Memuat rekap funnel');
     }
 
+    public function test_promo_source_table_follows_the_shared_filter_after_the_funnel_table(): void
+    {
+        $this->actingAs($this->employee)
+            ->get(route('promo.index'))
+            ->assertSeeInOrder([
+                'x-data="promoAnalysis"',
+                'x-data="promoAnalysisFunnel"',
+                'x-data="promoAnalysisSource"',
+                'Promo Code List',
+            ], false)
+            ->assertSeeInOrder(['Promo Analysis by Source', 'Source', 'Jumlah Penggunaan', 'Jumlah Revenue', 'Kontribusi Source (%)'])
+            ->assertSee('Jumlah penggunaan dapat melebihi jumlah transaksi unik karena satu transaksi dapat memakai dua kode promo.')
+            ->assertSee('Memuat rekap source');
+    }
+
     public function test_promo_code_list_shows_mapping_columns_with_search_and_pagination(): void
     {
         $this->actingAs($this->employee)
