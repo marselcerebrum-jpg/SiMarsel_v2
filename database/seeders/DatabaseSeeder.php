@@ -29,6 +29,7 @@ class DatabaseSeeder extends Seeder
             $this->call([
                 PlatformSeeder::class,
                 DownloaderSeeder::class,
+                PromoCodeSeeder::class,
                 TransactionSeeder::class,
             ]);
         }
