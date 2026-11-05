@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\PromoCode;
 use App\Models\Transaction;
 use App\Models\TransactionPromoCode;
+use App\Support\PromoCodePayload;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
@@ -21,85 +22,56 @@ class PromoCodeUsageService
     /**
      * Upsert one usage per code position, so processing a transaction again never creates duplicates.
      *
-     * @return bool False when the value needs review (anomaly) and no usages were stored.
+     * @return bool False when attribution is suspended because the latest payload is anomalous.
      */
     public function normalize(Transaction $transaction): bool
     {
-        $codes = $this->codesByPosition($transaction->promo_code);
+        return DB::transaction(function () use ($transaction) {
+            // Serialize normalization of the same transaction and use its latest persisted payload.
+            $locked = Transaction::query()->whereKey($transaction->id)->lockForUpdate()->firstOrFail();
+            $result = $this->normalizeLocked($locked);
+            $transaction->promo_code_anomaly = $locked->promo_code_anomaly;
+            $transaction->syncOriginalAttribute('promo_code_anomaly');
 
-        $anomaly = match (true) {
-            $codes === null => 'Format promo_code tidak dikenali.',
-            $codes !== [] && array_key_last($codes) > TransactionPromoCode::MAX_CODES => 'Transaksi memiliki lebih dari dua kode promo.',
-            default => null,
-        };
+            return $result;
+        });
+    }
+
+    private function normalizeLocked(Transaction $transaction): bool
+    {
+        if ($transaction->status_message !== Transaction::STATUS_SUCCESS) {
+            return true;
+        }
+
+        $codes = PromoCodePayload::codesByPosition($transaction->promo_code);
+        $anomaly = PromoCodePayload::anomalyReason($codes);
+
+        // Internal processing state must not change Markaz/source timestamps or trigger the observer.
+        DB::table('transactions')->where('id', $transaction->id)->update(['promo_code_anomaly' => $anomaly !== null]);
+        $transaction->promo_code_anomaly = $anomaly !== null;
 
         if ($anomaly !== null) {
-            // No usages at all, so the two-code attribution is never applied to this transaction by accident.
-            $transaction->promoCodeUsages()->delete();
+            // Preserve the last valid usages for history, but exclude this transaction from promo queries.
             $this->recordAnomaly($transaction, $anomaly);
 
             return false;
         }
 
-        // Most transactions have no code: one just inserted (and not updated since) has nothing to clean up either.
         if ($codes === []) {
-            if (! ($transaction->wasRecentlyCreated && $transaction->getChanges() === [])) {
-                $transaction->promoCodeUsages()->delete();
-            }
+            $transaction->promoCodeUsages()->delete();
 
             return true;
         }
 
-        DB::transaction(function () use ($transaction, $codes) {
-            $existing = $transaction->promoCodeUsages()->get()->keyBy('code_position');
+        $existing = $transaction->promoCodeUsages()->get()->keyBy('code_position');
 
-            $transaction->promoCodeUsages()->whereNotIn('code_position', array_keys($codes))->delete();
+        $transaction->promoCodeUsages()->whereNotIn('code_position', array_keys($codes))->delete();
 
-            foreach ($codes as $position => $rawCode) {
-                $this->upsertUsage($transaction, $position, $rawCode, $existing->get($position));
-            }
-        });
+        foreach ($codes as $position => $rawCode) {
+            $this->upsertUsage($transaction, $position, $rawCode, $existing->get($position));
+        }
 
         return true;
-    }
-
-    /**
-     * The codes keyed by their position in the Markaz array (1 = primary, 2 = second/reseller).
-     * Empty entries keep their place but create no usage. A single string counts as position 1.
-     *
-     * @return array<int, string>|null Null when the value is not a code or a list of codes.
-     */
-    private function codesByPosition(mixed $value): ?array
-    {
-        if ($value === null || $value === '' || $value === []) {
-            return [];
-        }
-
-        if (is_string($value) || is_int($value)) {
-            $value = [$value];
-        }
-
-        if (! is_array($value) || ! array_is_list($value)) {
-            return null;
-        }
-
-        $codes = [];
-
-        foreach ($value as $index => $code) {
-            if ($code === null) {
-                continue;
-            }
-
-            if (! is_string($code) && ! is_int($code)) {
-                return null;
-            }
-
-            if (trim((string) $code) !== '') {
-                $codes[$index + 1] = (string) $code;
-            }
-        }
-
-        return $codes;
     }
 
     private function upsertUsage(Transaction $transaction, int $position, string $rawCode, ?TransactionPromoCode $usage): void
@@ -117,8 +89,8 @@ class PromoCodeUsageService
             && $usage->code_snapshot === $code
             && (int) $usage->platform_id_snapshot === (int) $transaction->platform_id;
 
-        // A classified usage keeps its snapshot, even after its master metadata was edited.
-        if ($sameUsage && $usage->isClassified()) {
+        // A mapped usage is already processed, even when its snapshot was intentionally empty.
+        if ($sameUsage && ($usage->promo_code_id !== null || $usage->isClassified())) {
             $usage->update([
                 'raw_code' => $rawCode,
                 'promo_code_id' => $usage->promo_code_id ?? $promoCode?->id,
@@ -136,7 +108,7 @@ class PromoCodeUsageService
                 'code_snapshot' => $code,
                 ...($promoCode === null
                     ? PromoCodeService::EMPTY_SNAPSHOT
-                    : $this->promoCodeService->snapshotAt($promoCode, $transaction->paidAt())),
+                    : $this->promoCodeService->snapshotCurrent($promoCode)),
             ],
         );
     }

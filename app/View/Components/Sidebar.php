@@ -3,7 +3,6 @@
 namespace App\View\Components;
 
 use App\Models\Account;
-use App\Models\Division;
 use App\Models\PromoCode;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\View\Component;
@@ -36,8 +35,7 @@ class Sidebar extends Component
                 $this->link('Promo Management', 'ticket', 'promo.index', ['viewAny', PromoCode::class]),
             ],
             'System' => [
-                $this->link('Account Management', 'gear', 'settings.index', ['viewAny', Account::class]),
-                $this->link('Division Management', 'building', 'divisions.index', ['viewAny', Division::class]),
+                $this->link('Organization Management', 'users', 'settings.index', ['viewAny', Account::class]),
             ],
         ];
     }

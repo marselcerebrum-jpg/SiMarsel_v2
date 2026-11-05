@@ -18,8 +18,8 @@ class AccountSeeder extends Seeder
             [
                 'role_id' => Role::where('code_role', 'MGR')->value('id'),
                 'division_id' => null,
-                'fullname' => 'Default Manager',
-                'password' => 'Manager123!',
+                'fullname' => 'Yanto Kurniawan',
+                'password' => 'manager123',
             ],
         );
     }

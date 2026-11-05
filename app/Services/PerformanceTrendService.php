@@ -7,8 +7,8 @@ use App\Enums\TrendPeriod;
 use App\Repositories\PerformanceRepository;
 use App\Services\Concerns\ComparesWithPreviousValue;
 use App\Support\PerformanceFilter;
+use App\Support\TrendBuckets;
 use Carbon\CarbonImmutable;
-use Carbon\CarbonInterface;
 
 class PerformanceTrendService
 {
@@ -27,10 +27,7 @@ class PerformanceTrendService
      */
     public function trend(PerformanceFilter $filter, TrendMetric $metric, TrendPeriod $period): array
     {
-        $buckets = array_merge(...array_map(
-            fn (array $range) => $this->buckets($range[0], $range[1], $period),
-            $filter->ranges,
-        ));
+        $buckets = TrendBuckets::forFilter($filter, $period);
         [$values, $hasData] = $this->values($metric, $buckets, $filter);
 
         $today = CarbonImmutable::today();
@@ -112,50 +109,6 @@ class PerformanceTrendService
     }
 
     /**
-     * Split the range into buckets; the first and last bucket are cut to the selected range.
-     *
-     * @return list<array{start: CarbonImmutable, end: CarbonImmutable, label: string}>
-     */
-    private function buckets(CarbonImmutable $from, CarbonImmutable $to, TrendPeriod $period): array
-    {
-        $buckets = [];
-        $start = $from;
-
-        while ($start->lte($to)) {
-            $end = match ($period) {
-                TrendPeriod::Daily => $start,
-                TrendPeriod::Weekly => $start->endOfWeek(CarbonInterface::SUNDAY)->startOfDay(),
-                TrendPeriod::Monthly => $start->endOfMonth()->startOfDay(),
-            };
-            $end = $end->min($to);
-
-            $buckets[] = ['start' => $start, 'end' => $end, 'label' => $this->label($start, $end, $period)];
-            $start = $end->addDay();
-        }
-
-        return $buckets;
-    }
-
-    private function label(CarbonImmutable $start, CarbonImmutable $end, TrendPeriod $period): string
-    {
-        if ($period === TrendPeriod::Monthly) {
-            return $start->format('M Y');
-        }
-
-        if ($start->isSameDay($end)) {
-            return $start->format('d M Y');
-        }
-
-        $startFormat = match (true) {
-            $start->isSameMonth($end) => 'd',
-            $start->isSameYear($end) => 'd M',
-            default => 'd M Y',
-        };
-
-        return $start->format($startFormat).' - '.$end->format('d M Y');
-    }
-
-    /**
      * @param  list<array{start: CarbonImmutable, end: CarbonImmutable, label: string}>  $buckets
      * @return array{0: list<int|float|null>, 1: bool} The values per bucket and whether any source data exists.
      */
@@ -164,7 +117,7 @@ class PerformanceTrendService
         array $buckets,
         PerformanceFilter $filter,
     ): array {
-        $bucketOfDay = $this->bucketOfDay($buckets);
+        $bucketOfDay = TrendBuckets::bucketOfDay($buckets);
         $empty = array_fill(0, count($buckets), 0);
 
         return match ($metric) {
@@ -237,24 +190,5 @@ class PerformanceTrendService
         );
 
         return [$conversion, $hasDownloaders || $hasTransactions];
-    }
-
-    /**
-     * Map every date (Y-m-d) in the range to the index of its bucket.
-     *
-     * @param  list<array{start: CarbonImmutable, end: CarbonImmutable, label: string}>  $buckets
-     * @return array<string, int>
-     */
-    private function bucketOfDay(array $buckets): array
-    {
-        $map = [];
-
-        foreach ($buckets as $index => $bucket) {
-            for ($day = $bucket['start']; $day->lte($bucket['end']); $day = $day->addDay()) {
-                $map[$day->toDateString()] = $index;
-            }
-        }
-
-        return $map;
     }
 }

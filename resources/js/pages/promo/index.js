@@ -1,6 +1,14 @@
 import Alpine from 'alpinejs';
+import promoAnalysis from './analysis';
+import promoAnalysisCode from './analysis-code';
+import promoAnalysisCodeUsage from './analysis-code-usage';
+import promoAnalysisFunnel from './analysis-funnel';
+import promoAnalysisSource from './analysis-source';
+import promoAnalysisSummary from './analysis-summary';
+import promoCodeBulkEntry from './bulk-entry';
 import promoCodeManagement from './promo-code';
 import { promoMasterTable, promoPlatformTable } from './table';
+import promoUnregisteredCodes from './unregistered';
 
 const TABS = ['promo-codes', 'master-data'];
 
@@ -34,6 +42,14 @@ Alpine.data('promoManagement', () => ({
     },
 }));
 
+Alpine.data('promoAnalysis', promoAnalysis);
+Alpine.data('promoAnalysisSummary', promoAnalysisSummary);
+Alpine.data('promoAnalysisFunnel', promoAnalysisFunnel);
+Alpine.data('promoAnalysisSource', promoAnalysisSource);
+Alpine.data('promoAnalysisCode', promoAnalysisCode);
+Alpine.data('promoAnalysisCodeUsage', promoAnalysisCodeUsage);
 Alpine.data('promoCodeManagement', promoCodeManagement);
+Alpine.data('promoCodeBulkEntry', promoCodeBulkEntry);
+Alpine.data('promoUnregisteredCodes', promoUnregisteredCodes);
 Alpine.data('promoMasterTable', promoMasterTable);
 Alpine.data('promoPlatformTable', promoPlatformTable);

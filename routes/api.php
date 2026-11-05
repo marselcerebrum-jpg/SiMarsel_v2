@@ -12,8 +12,13 @@ use App\Http\Controllers\Performance\PurchaseTimeDistributionController;
 use App\Http\Controllers\Platform\PlatformController;
 use App\Http\Controllers\Product\ProductOverviewController;
 use App\Http\Controllers\Promo\FunnelController;
+use App\Http\Controllers\Promo\PromoAnalysisController;
+use App\Http\Controllers\Promo\PromoAnalysisExportController;
 use App\Http\Controllers\Promo\PromoCodeController;
+use App\Http\Controllers\Promo\PromoCodeSummaryController;
 use App\Http\Controllers\Promo\PromoSourceController;
+use App\Http\Controllers\Promo\PromoTrendController;
+use App\Http\Controllers\Promo\UnregisteredPromoCodeController;
 use App\Http\Controllers\Task\TaskController;
 use App\Models\Account;
 use App\Models\Division;
@@ -107,6 +112,10 @@ Route::middleware('auth')->group(function () {
         Route::get('/', [PromoCodeController::class, 'index'])
             ->can('viewAny', PromoCode::class)
             ->name('index');
+        // Before /{promoCode}, so "unregistered" is not read as a promo code id.
+        Route::get('/unregistered', [UnregisteredPromoCodeController::class, 'index'])
+            ->can('viewAny', PromoCode::class)
+            ->name('unregistered');
         Route::post('/', [PromoCodeController::class, 'store'])
             ->can('create', PromoCode::class)
             ->name('store');
@@ -122,6 +131,19 @@ Route::middleware('auth')->group(function () {
         Route::delete('/{promoCode}', [PromoCodeController::class, 'destroy'])
             ->can('delete', 'promoCode')
             ->name('destroy');
+    });
+
+    Route::prefix('promo-analysis')->name('api.promo-analysis.')->group(function () {
+        Route::get('/filters', [PromoAnalysisController::class, 'filters'])->name('filters');
+        Route::get('/product-types', [PromoAnalysisController::class, 'productTypes'])->name('product-types');
+        Route::get('/summary', [PromoAnalysisController::class, 'summary'])->name('summary');
+        Route::get('/funnels', [PromoAnalysisController::class, 'funnels'])->name('funnels');
+        Route::get('/sources', [PromoAnalysisController::class, 'sources'])->name('sources');
+        Route::get('/codes', [PromoCodeSummaryController::class, 'index'])->name('codes');
+        Route::get('/codes/usages', [PromoCodeSummaryController::class, 'usages'])->name('codes.usages');
+        Route::get('/trend', PromoTrendController::class)->name('trend');
+        Route::get('/top-codes', [PromoCodeSummaryController::class, 'top'])->name('top-codes');
+        Route::get('/export', PromoAnalysisExportController::class)->name('export');
     });
 
     Route::get('/performance/summary', PerformanceSummaryController::class)

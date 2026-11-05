@@ -21,7 +21,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/settings', AccountPageController::class)
         ->can('viewAny', Account::class)
         ->name('settings.index');
-    Route::view('/divisions', 'pages.settings.divisions')
+    Route::redirect('/divisions', '/settings?tab=divisions')
         ->can('viewAny', Division::class)
         ->name('divisions.index');
 });

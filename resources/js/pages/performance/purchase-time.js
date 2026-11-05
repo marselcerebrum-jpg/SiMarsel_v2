@@ -1,7 +1,7 @@
 import { errorMessage } from '../../http';
 import { fetchPurchaseTimes } from './api';
 import { distributionChartConfig, highlightSlice, renderChart } from './chart';
-import { formatValue } from './format';
+import { formatValue } from '../../format';
 import { purchaseTimeRows } from './table';
 
 const EMPTY_MESSAGE = 'Tidak ada data waktu pembelian untuk filter yang dipilih.';

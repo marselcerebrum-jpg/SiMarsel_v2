@@ -6,7 +6,7 @@ const ENDPOINT = '/api/accounts';
 
 const emptyForm = () => ({ fullname: '', username: '', password: '', role_id: '', division_id: '' });
 
-Alpine.data('accountSettings', (roles = [], divisions = [], canManage = false) => ({
+Alpine.data('accountSettings', (roles = [], divisions = [], canManage = false, initiallyActive = false) => ({
     roles,
     divisions,
     canManage,
@@ -18,7 +18,8 @@ Alpine.data('accountSettings', (roles = [], divisions = [], canManage = false) =
     creating: false,
     showDraftPassword: false,
 
-    loading: true,
+    loaded: false,
+    loading: false,
     loadError: '',
     saving: false,
 
@@ -35,7 +36,11 @@ Alpine.data('accountSettings', (roles = [], divisions = [], canManage = false) =
 
     init() {
         this.resetDraft();
-        this.fetchUsers();
+        if (initiallyActive) this.activate('accounts');
+    },
+
+    activate(tab) {
+        if (tab === 'accounts' && !this.loaded && !this.loading) this.fetchUsers();
     },
 
     get currentUserId() {
@@ -53,6 +58,17 @@ Alpine.data('accountSettings', (roles = [], divisions = [], canManage = false) =
         });
     },
 
+    get accountSummary() {
+        const roleCounts = Object.fromEntries(this.roles.map((role) => [role.code_role, 0]));
+
+        this.users.forEach((user) => {
+            const role = user.role?.code_role;
+            if (role) roleCounts[role] = (roleCounts[role] ?? 0) + 1;
+        });
+
+        return { total: this.users.length, roleCounts };
+    },
+
     async fetchUsers() {
         this.loading = true;
         this.loadError = '';
@@ -60,19 +76,12 @@ Alpine.data('accountSettings', (roles = [], divisions = [], canManage = false) =
         try {
             const { data } = await http(ENDPOINT);
             this.users = data;
+            this.loaded = true;
         } catch (error) {
             this.loadError = errorMessage(error, 'Gagal memuat daftar akun.');
         } finally {
             this.loading = false;
         }
-    },
-
-    countByRole(code) {
-        return this.users.filter((user) => user.role.code_role === code).length;
-    },
-
-    countWithoutDivision() {
-        return this.users.filter((user) => !user.division).length;
     },
 
     roleIdByCode(code) {
@@ -223,4 +232,3 @@ Alpine.data('accountSettings', (roles = [], divisions = [], canManage = false) =
         showToast({ title: 'Account Deleted', text: `${user.fullname} sudah dihapus.` });
     },
 }));
-

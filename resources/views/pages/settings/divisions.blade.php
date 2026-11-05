@@ -1,26 +1,15 @@
-@extends('layouts.dashboard')
-
-@section('title', 'Division Management')
-@push('scripts')
-    @vite('resources/js/pages/settings/divisions.js')
-@endpush
-
 @php
     $card = 'rounded-panel border border-line bg-surface shadow-sm';
     $tileLabel = 'text-xs font-semibold text-label';
     $tileValue = 'mt-1 text-2xl font-bold text-ink';
-    $canManage = auth()->user()->can('create', App\Models\Division::class);
+    $canManageDivisions = auth()->user()->can('create', App\Models\Division::class);
 @endphp
 
-@section('page')
-    <div x-data="divisionManagement(@js($canManage))" class="min-w-0">
-        <header>
-            <h1 class="text-2xl font-bold tracking-tight text-ink">Division Management</h1>
-            <p class="mt-1 text-sm text-muted">
-                {{ $canManage ? 'Kelola divisi dan lihat jumlah anggota di tiap divisi.' : 'Lihat daftar divisi dan jumlah anggotanya.' }}
-            </p>
-        </header>
-
+<div
+    x-data="divisionManagement(@js($canManageDivisions), tab === 'divisions')"
+    @organization-tab-changed.window="activate($event.detail)"
+    class="min-w-0"
+>
         {{-- Ringkasan --}}
         <section class="mt-6 grid gap-4 sm:grid-cols-3" aria-label="Division Summary">
             <article class="{{ $card }} p-4">
@@ -47,11 +36,11 @@
                 <div>
                     <h2 id="division-list-title" class="text-base font-semibold text-ink">Division List</h2>
                     <p class="mt-1 text-sm text-muted">
-                        {{ $canManage ? 'Tambah, ubah, atau hapus divisi yang tidak lagi digunakan.' : 'Hanya manager yang dapat menambah, mengubah, atau menghapus divisi.' }}
+                        {{ $canManageDivisions ? 'Tambah, ubah, atau hapus divisi yang tidak lagi digunakan.' : 'Hanya manager yang dapat menambah, mengubah, atau menghapus divisi.' }}
                     </p>
                 </div>
 
-                @if ($canManage)
+                @if ($canManageDivisions)
                     <button
                         type="button"
                         class="inline-flex h-9 shrink-0 items-center justify-center gap-2 self-start rounded-lg bg-primary px-4 text-sm font-semibold text-white hover:bg-primary-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-50"
@@ -63,13 +52,12 @@
             </div>
 
             @include('pages.settings.components.division-filter')
-            @include('pages.settings.components.division-table')
+            @include('pages.settings.components.division-table', ['canManage' => $canManageDivisions])
         </section>
 
-        @if ($canManage)
+        @if ($canManageDivisions)
             @include('pages.settings.components.division-create-modal')
             @include('pages.settings.components.division-edit-modal')
             @include('pages.settings.components.division-delete-modal')
         @endif
-    </div>
-@endsection
+</div>

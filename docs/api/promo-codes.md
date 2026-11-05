@@ -47,7 +47,8 @@ Urutan: kode yang terakhir dibuat lebih dulu. Respons memakai pagination Laravel
 
 - `code` dan `platform_id` wajib. `funnel_id` dan `source_id` boleh `null` atau tidak dikirim.
 - Membuat versi metadata pertama dengan `effective_from` = saat disimpan.
-- Transaksi lama dengan platform + kode yang sama yang **belum terpetakan** langsung dihubungkan ke kode ini dan diklasifikasi dengan funnel/source yang didaftarkan. Transaksi yang sudah terklasifikasi tidak disentuh.
+- Transaksi lama dengan platform + kode yang sama yang **belum terpetakan** langsung dihubungkan ke kode ini dan diklasifikasi dengan funnel/source yang didaftarkan. Penggunaan yang sudah terklasifikasi hanya dihubungkan; snapshot funnel/source-nya tidak ditimpa.
+- Endpoint ini juga dipakai untuk mendaftarkan kode dari alert kode belum terdaftar (lihat di bawah).
 
 **201 Created**, dengan `message: "Kode promo berhasil dibuat."`.
 
@@ -67,7 +68,7 @@ Menyimpan banyak kode sekaligus dari form bergaya spreadsheet. Setiap baris diva
 
 | Aturan | Perilaku |
 |---|---|
-| Kolom | `code`, `platform_id`, `funnel_id`, `source_id` (ID dari dropdown). Field lain diabaikan; tidak ada tipe/status. |
+| Kolom | `code`, `platform_id`, `funnel_id`, `source_id` (ID dari dropdown). `client_row_id` opsional untuk korelasi respons; tidak disimpan. Field lain diabaikan; tidak ada tipe/status. |
 | Baris invalid | Tidak membatalkan baris lain. Baris yang valid tetap disimpan. |
 | Kode sudah terdaftar | Baris **gagal** dengan alasan `Kode promo CPNS26 sudah terdaftar di platform JADIASN.` Data yang ada tidak diubah dan tidak diduplikasi. |
 | Kode sama dua kali dalam satu kiriman | Baris pertama disimpan; baris berikutnya gagal dengan `Duplikat dengan baris 1.` |
@@ -90,8 +91,11 @@ Menyimpan banyak kode sekaligus dari form bergaya spreadsheet. Setiap baris diva
 ```
 
 - `row` = nomor baris di form (mulai dari 1), sehingga baris yang diabaikan tidak menggeser nomor baris lain.
+- `client_row_id` = string ID sementara dari client (maksimal 100 karakter dan unik dalam kiriman), dikembalikan pada setiap hasil termasuk yang gagal; `null` untuk client lama yang tidak mengirimnya. FE memasangkan hasil berdasarkan ID ini. Ini bukan kunci idempotensi dan tidak memerlukan kolom database.
+- Hasil paste Platform/Funnel/Source yang tidak ditemukan ditandai invalid di FE dan tidak dikirim sebagai `null`; baris valid lain tetap disimpan. Backend tetap menolak ID yang invalid atau tidak ditemukan. Pengguna boleh memilih kosong secara sengaja untuk Funnel/Source.
+- Selama request berlangsung, aksi yang mengubah baris dan submit ulang dinonaktifkan. Ringkasan FE juga mencakup baris paste invalid yang ditahan di layar.
 - `status` = `created` atau `failed`. `errors` memakai key yang sama dengan field (`code`, `platform_id`, `funnel_id`, `source_id`), jadi bisa ditampilkan langsung di sel yang salah.
-- **422** hanya untuk bentuk kiriman yang salah: `rows` kosong (`Isi minimal satu baris kode promo.`), lebih dari 500 baris (`Maksimal 500 baris kode promo dalam sekali simpan.`), atau baris yang bukan objek.
+- **422** untuk bentuk kiriman yang salah: `rows` kosong (`Isi minimal satu baris kode promo.`), lebih dari 500 baris (`Maksimal 500 baris kode promo dalam sekali simpan.`), baris yang bukan objek, atau `client_row_id` invalid/duplikat.
 
 ## `GET /api/promo-codes/{id}`
 
@@ -105,6 +109,8 @@ Detail beserta `versions`:
 ```
 
 Nama funnel/source di `versions` adalah nama **saat versi itu dibuat**, bukan nama master sekarang. `effective_until: null` adalah versi yang sedang berlaku.
+
+Waktu efektif dapat menyertakan enam digit pecahan detik, misalnya `2026-09-15T09:30:00.123456+07:00`. Setiap perubahan metadata memiliki versi tersendiri, termasuk perubahan dalam detik yang sama; versi sebelumnya tidak ditimpa. Waktu tanpa pecahan tetap memakai format lama. Snapshot transaksi yang sudah terhubung, termasuk nilai kosong, tidak diubah.
 
 ## `PUT` / `PATCH /api/promo-codes/{id}`
 
@@ -126,6 +132,44 @@ Kirim hanya field yang diubah: `code`, `platform_id`, `funnel_id`, `source_id`. 
 - Kode yang belum pernah dipakai dihapus bersama riwayat versinya sendiri. Penggunaan transaksi tidak pernah ikut terhapus.
 
 **200 OK**: `{ "message": "Kode promo berhasil dihapus." }`
+
+## `GET /api/promo-codes/unregistered` (Alert kode belum terdaftar)
+
+Kode promo yang muncul di transaksi Markaz tetapi **belum punya master** untuk platformnya, satu baris per platform + kode yang dinormalisasi. Parameter `search` (kode, raw code, nama/slug platform), `platform_id`, `per_page` (1-100, default 15), dan `page` sama dengan daftar kode promo. `meta.total` = jumlah kode belum terdaftar (bisa dipakai untuk badge alert).
+
+```json
+{
+    "data": [
+        {
+            "code": "CPNS26",
+            "raw_codes": [" cpns26 ", "CPNS26"],
+            "platform": { "id": 2, "slug": "jadiasn", "name": "JADIASN" },
+            "usages_count": 15,
+            "transactions_count": 14,
+            "first_used_on": "2026-09-01",
+            "last_used_on": "2026-10-20",
+            "register": { "code": "CPNS26", "platform_id": 2 }
+        }
+    ],
+    "links": { "...": "..." },
+    "meta": { "total": 1, "...": "..." }
+}
+```
+
+| Field | Keterangan |
+|---|---|
+| `code` | Kode yang dinormalisasi (trim + huruf besar), sama dengan yang akan disimpan di master |
+| `raw_codes` | Semua penulisan asli dari Markaz untuk kode ini |
+| `usages_count` | Jumlah baris penggunaan kode (satu transaksi bisa memakai kode yang sama di dua posisi) |
+| `transactions_count` | Jumlah transaksi berbeda yang memakai kode ini |
+| `first_used_on`, `last_used_on` | Tanggal bayar transaksi pertama dan terakhir yang memakai kode ini |
+| `register` | Isi awal form pendaftaran: kirim ke `POST /api/promo-codes` bersama `funnel_id`/`source_id` pilihan user |
+
+Urutan: penggunaan terbanyak lebih dulu.
+
+**Alur daftar dari alert:** user memilih "Daftarkan" → FE membuka form Single Entry dengan Kode Promo dan Platform dari `register` → `POST /api/promo-codes`. Validasi unik platform + kode tetap berlaku. Setelah berhasil, penggunaan lama dengan platform + kode yang sama dihubungkan ke kode baru (`usages_count` di respons) dan kode itu tidak lagi muncul di alert. Penggunaan yang sudah terklasifikasi hanya dihubungkan, snapshot funnel/source-nya tidak ditimpa.
+
+Kode yang **sudah terdaftar tapi belum pernah dipakai tidak muncul** di alert; kode itu ada di `GET /api/promo-codes` dengan `usages_count: 0`.
 
 ## Error
 
