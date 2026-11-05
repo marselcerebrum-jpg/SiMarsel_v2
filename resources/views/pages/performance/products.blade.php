@@ -12,7 +12,7 @@
 @section('page')
     <div x-data="productOverview" class="min-w-0">
         <header>
-            <h1 class="text-2xl font-bold tracking-tight text-ink">Ikhtisar Produk</h1>
+            <h1 class="text-2xl font-bold tracking-tight text-ink">Performa Produk</h1>
             <p class="mt-1 text-sm text-muted">Pantau performa paket produk berdasarkan platform dan periode.</p>
         </header>
 
