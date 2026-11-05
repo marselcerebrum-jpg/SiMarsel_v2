@@ -14,7 +14,7 @@ Role Tasklist berasal dari `GET /api/tasks/meta`. Sebelum endpoint itu ada, fron
 |---|---|---|---|---|
 | `admin` | Semua tugas, default Semua Divisi | Semua divisi | Semua tugas | Semua divisi |
 | `manager` | Tugas divisi yang dikelolanya | Divisinya | Tugas divisinya | Divisinya |
-| `staff` | Hanya tugas yang PIC-nya dia | Tidak | Tidak (hanya workflow & evidence) | Tidak |
+| `staff` | Hanya tugas yang PIC-nya dia, termasuk yang sudah Done | Tidak | Hanya status tugasnya: To Do → On Process → Ready for QA (atau → Done bila tanpa QA). Back Log, Ready for QA, On QA, dan Done hanya-baca (`can_edit: false`) | Tidak |
 
 Backend **wajib** menerapkan cakupan ini di setiap endpoint. Staff yang mengubah parameter atau ID tugas harus mendapat `403` atau `404`. Aturan di frontend hanya untuk tampilan.
 
@@ -60,6 +60,7 @@ Backend **wajib** menerapkan cakupan ini di setiap endpoint. Staff yang mengubah
 | `PATCH /api/tasks/{id}/assignee` | `pic_id`*, `note`, `updated_at`* | `{ data: TaskDetail, message }` |
 | `GET /api/tasks/assignees` | `division` | `{ data: [{ id, fullname, division }] }`, hanya user yang memenuhi aturan penugasan |
 | `GET /api/tasks/{id}/evidences` | – | `{ data: [Evidence] }` |
+| `GET /api/tasks/{id}/evidences/{evidence}/download` | – | File evidence (hanya untuk yang dapat melihat tugas; `404` bila bukan evidence tugas itu atau berupa tautan) |
 | `POST /api/tasks/{id}/evidences` | multipart: `file` **atau** `url`, `note` | `201 { data: Evidence, message }` |
 | `POST /api/tasks/{id}/reviews` | `decision`* (`approve`\|`revision`), `note` (wajib untuk `revision`), `updated_at`* | `{ data: TaskDetail, message }` |
 | `GET /api/tasks/{id}/activities` | – | `{ data: [Activity] }` |
@@ -68,7 +69,7 @@ Backend **wajib** menerapkan cakupan ini di setiap endpoint. Staff yang mengubah
 
 `*` = wajib.
 
-- **Evidence**: `{ id, file_name, file_url, url, note, submitter: { id, fullname }, created_at }`. Isi `file_name`/`file_url` untuk file, atau `url` untuk tautan.
+- **Evidence**: `{ id, task_id, type, file_name, file_url, url, note, submitter: { id, fullname }, created_at }`. `type` = `file` (isi `file_name`/`file_url`) atau `link` (isi `url`). Detail tugas mengirimnya di `evidence`, terbaru lebih dulu; `[]` bila tugas belum punya evidence.
 - **Activity**: `{ id, type, label, description, before, after, causer: { id, fullname }, created_at }`. `type` mencakup `created`, `updated`, `assigned`, `status_changed`, `evidence_submitted`, `approved`, `revision_requested`, `resubmitted`. Isi `before`/`after` untuk perubahan penting. Histori hanya ditambahkan oleh sistem, tidak bisa diedit.
 - **ScheduleItem**: `{ id, type: "task"|"event", title, division, start_date, end_date, status, priority, can_view_detail }`. `status` dan `priority` dipakai agar filter Tasklist ikut berlaku di Timeline (agenda bersama tidak disaring). Agenda bersama (`event`) dan tugas lintas divisi boleh tampil untuk semua role, tetapi `can_view_detail` hanya `true` bila user berhak membuka detailnya.
 - **Event** (Calendar): `{ id, title, division, start_date, end_date, description, task_id, can_view_detail }`. `task_id` diisi bila agenda terkait sebuah tugas (tombol "Lihat Detail Tugas Terkait"); `null` untuk agenda murni yang tidak dibuka di Board. `deadlines` hanya berisi tugas dalam cakupan user dan yang memiliki deadline; sertakan `description` (boleh `null`) agar ringkasan Calendar dapat menampilkan deskripsi singkat.
