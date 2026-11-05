@@ -32,10 +32,10 @@ class TaskPolicy
     }
 
     /**
-     * Seeing a task does not grant editing it: only Admin, or the Manager of its division, may edit.
+     * Admin and the Manager of its division may edit the task; its PIC may only update its status.
      */
     public function update(Account $user, Task $task): bool
     {
-        return $task->managedBy($user);
+        return $task->updatableBy($user);
     }
 }

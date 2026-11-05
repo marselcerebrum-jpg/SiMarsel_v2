@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 #[Fillable([
     'title', 'description', 'category_id', 'division_id', 'platform_id', 'pic_id', 'creator_id', 'priority', 'status',
@@ -19,6 +20,21 @@ class Task extends Model
 {
     /** @use HasFactory<TaskFactory> */
     use HasFactory;
+
+    /**
+     * Fields an Admin or the division's Manager may change through the edit form.
+     */
+    public const EDITABLE_FIELDS = [
+        'title', 'description', 'category_id', 'division_id', 'platform_id', 'pic_id', 'priority', 'status',
+        'start_date', 'deadline', 'requires_review',
+    ];
+
+    /**
+     * @var array<string, mixed>
+     */
+    protected $attributes = [
+        'version' => 1,
+    ];
 
     /**
      * Get the attributes that should be cast.
@@ -35,7 +51,21 @@ class Task extends Model
             'requires_review' => 'boolean',
             'evidence_required' => 'boolean',
             'completed_at' => 'datetime',
+            'version' => 'integer',
         ];
+    }
+
+    /**
+     * History, newest first.
+     */
+    public function activities(): HasMany
+    {
+        return $this->hasMany(TaskActivity::class)->orderByDesc('created_at')->orderByDesc('id');
+    }
+
+    public function evidences(): HasMany
+    {
+        return $this->hasMany(TaskEvidence::class)->latest();
     }
 
     public function division(): BelongsTo
@@ -101,5 +131,86 @@ class Task extends Model
     {
         return $account->isAdmin()
             || ($account->isManager() && $account->division_id !== null && $this->division_id === $account->division_id);
+    }
+
+    public function assignedTo(Account $account): bool
+    {
+        return $this->pic_id !== null && $this->pic_id === $account->id;
+    }
+
+    /**
+     * Seeing a task is not editing it: Admin and the division's Manager may edit it, its PIC only while
+     * there is a status step for them to take. Otherwise the task is read-only for the PIC.
+     */
+    public function updatableBy(Account $account): bool
+    {
+        return $this->managedBy($account) || $this->nextStatusesFor($account) !== [];
+    }
+
+    /**
+     * Statuses the account may move the task to: the whole workflow for Admin and the Manager, only the
+     * PIC's own steps for the PIC.
+     *
+     * @return array<int, TaskStatus>
+     */
+    public function nextStatusesFor(Account $account): array
+    {
+        return match (true) {
+            $this->managedBy($account) => $this->status->nextStatuses($this->requires_review),
+            $this->assignedTo($account) => $this->status->picNextStatuses($this->requires_review),
+            default => [],
+        };
+    }
+
+    /**
+     * Editable fields the account may not change in the task's current condition, with the reason.
+     *
+     * @return array<string, string>
+     */
+    public function lockedFieldsFor(Account $account): array
+    {
+        if (! $this->managedBy($account)) {
+            return collect(self::EDITABLE_FIELDS)
+                ->reject(fn (string $field) => $field === 'status')
+                ->mapWithKeys(fn (string $field) => [$field => 'PIC hanya dapat mengubah status tugas.'])
+                ->all();
+        }
+
+        if ($this->status === TaskStatus::Done) {
+            return collect(self::EDITABLE_FIELDS)
+                ->reject(fn (string $field) => $field === 'status')
+                ->mapWithKeys(fn (string $field) => [$field => 'Tugas yang sudah selesai tidak dapat diubah. Buka kembali tugas terlebih dahulu.'])
+                ->all();
+        }
+
+        $locked = [];
+
+        if (! $account->isAdmin()) {
+            $locked['division_id'] = 'Hanya Admin yang dapat memindahkan tugas ke divisi lain.';
+        }
+
+        if ($this->status->inQa()) {
+            $locked['requires_review'] = 'Kewajiban QA tidak dapat diubah setelah tugas masuk tahap QA.';
+        }
+
+        return $locked;
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    public function editableFieldsFor(Account $account): array
+    {
+        if (! $this->updatableBy($account)) {
+            return [];
+        }
+
+        $fields = array_diff(self::EDITABLE_FIELDS, array_keys($this->lockedFieldsFor($account)));
+
+        if ($this->nextStatusesFor($account) === []) {
+            $fields = array_diff($fields, ['status']);
+        }
+
+        return array_values($fields);
     }
 }

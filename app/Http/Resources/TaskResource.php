@@ -33,6 +33,7 @@ class TaskResource extends JsonResource
             'evidence_required' => $this->evidence_required,
             'can_view_detail' => $request->user()->can('view', $this->resource),
             'can_edit' => $request->user()->can('update', $this->resource),
+            'version' => $this->version,
             'updated_at' => $this->updated_at?->toIso8601ZuluString(),
         ];
     }
