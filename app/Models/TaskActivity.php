@@ -16,6 +16,10 @@ class TaskActivity extends Model
 
     public const UPDATED = 'updated';
 
+    public const ASSIGNED = 'assigned';
+
+    public const REASSIGNED = 'reassigned';
+
     public const UPDATED_AT = null;
 
     /**
