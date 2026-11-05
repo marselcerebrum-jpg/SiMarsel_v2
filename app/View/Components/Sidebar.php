@@ -29,7 +29,7 @@ class Sidebar extends Component
                 ]),
             ],
             'Pekerjaan' => [
-                $this->link('Daftar Tugas', 'checklist', 'tasks.index'),
+                $this->link('Tasklist', 'checklist', 'tasks.index'),
             ],
             'Penjualan & Pemasaran' => [
                 $this->link('Manajemen Promo', 'ticket', 'promo.index', ['viewAny', PromoCode::class]),

@@ -43,7 +43,7 @@ class TaskPageTest extends TestCase
             $this->actingAs($account)
                 ->get('/tasks')
                 ->assertOk()
-                ->assertSee('Daftar Tugas')
+                ->assertSee('Tasklist')
                 ->assertSee('x-data="tasklist"', false)
                 ->assertSeeInOrder(['Total Tugas', 'Sedang Berjalan', 'Terlambat', 'Jatuh Tempo Hari Ini'])
                 ->assertSeeInOrder(['Completed', 'Belum Selesai', 'Urgent', 'Tingkat penyelesaian'])

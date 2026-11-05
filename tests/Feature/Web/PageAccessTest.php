@@ -104,7 +104,7 @@ class PageAccessTest extends TestCase
             ->assertSee('href="'.route('settings.index').'"', false)
             ->assertDontSee('Account Management')
             ->assertDontSee('Division Management')
-            ->assertDontSee("soon('Daftar Tugas')", false);
+            ->assertDontSee("soon('Tasklist')", false);
     }
 
     public function test_sidebar_marks_settings_active_on_settings_page(): void
