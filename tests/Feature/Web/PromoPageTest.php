@@ -143,6 +143,23 @@ class PromoPageTest extends TestCase
             ->assertSee('Memuat rekap source');
     }
 
+    public function test_promo_product_type_table_follows_the_shared_filter_after_the_source_table(): void
+    {
+        $this->actingAs($this->employee)
+            ->get(route('promo.index'))
+            ->assertSeeInOrder([
+                'x-data="promoAnalysis"',
+                'x-data="promoAnalysisSource"',
+                'x-data="promoAnalysisProductType"',
+                'x-data="promoAnalysisCode"',
+                'Promo Code List',
+            ], false)
+            ->assertSeeInOrder(['First-Time vs Renewal Promo Analysis', 'Tipe Produk', 'Jumlah Transaksi', 'Revenue'])
+            ->assertDontSee('Persentase Transaksi (%)')
+            ->assertSee('Dihitung per transaksi unik yang memakai promo, bukan per penggunaan kode; transaksi dengan dua kode promo dihitung satu kali.')
+            ->assertSee('Memuat rekap tipe produk');
+    }
+
     public function test_promo_code_summary_follows_the_shared_filter_and_opens_a_read_only_usage_detail(): void
     {
         $response = $this->actingAs($this->employee)
