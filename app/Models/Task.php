@@ -139,27 +139,56 @@ class Task extends Model
     }
 
     /**
-     * Seeing a task is not editing it: Admin and the division's Manager may edit it, its PIC only while
-     * there is a status step for them to take. Otherwise the task is read-only for the PIC.
+     * Seeing a task is not editing it: Admin and the division's Manager may edit it until it is Done, its PIC
+     * only while there is a status step for them to take. Otherwise the task is read-only.
      */
     public function updatableBy(Account $account): bool
     {
-        return $this->managedBy($account) || $this->nextStatusesFor($account) !== [];
+        return ($this->managedBy($account) && $this->status !== TaskStatus::Done) || $this->nextStatusesFor($account) !== [];
     }
 
     /**
-     * Statuses the account may move the task to: the whole workflow for Admin and the Manager, only the
-     * PIC's own steps for the PIC.
+     * Statuses the account may move the task to from its current one: the PIC starts the work and hands it
+     * to QA or finishes it; Admin or the division's Manager makes every other move.
      *
      * @return array<int, TaskStatus>
      */
     public function nextStatusesFor(Account $account): array
     {
-        return match (true) {
-            $this->managedBy($account) => $this->status->nextStatuses($this->requires_review),
-            $this->assignedTo($account) => $this->status->picNextStatuses($this->requires_review),
-            default => [],
-        };
+        return $this->movesStatusFor($account) ? $this->status->nextStatuses($this->requires_review) : [];
+    }
+
+    /**
+     * Why the account may not move the task from its current status to the given one, or null when it may.
+     */
+    public function statusChangeDenialFor(Account $account, TaskStatus $status): ?string
+    {
+        $from = $this->status;
+
+        if (! $from->canMoveTo($status, $this->requires_review)) {
+            $reason = "Status tidak dapat diubah dari {$from->label()} ke {$status->label()}.";
+
+            return $status === TaskStatus::Done && $this->requires_review
+                ? $reason.' Tugas ini wajib melalui QA sebelum Done.'
+                : $reason;
+        }
+
+        if (! $this->movesStatusFor($account)) {
+            return $from->movedByPic()
+                ? "Hanya PIC tugas yang dapat mengubah status dari {$from->label()} ke {$status->label()}."
+                : "Hanya Admin atau Manajer divisi yang dapat mengubah status dari {$from->label()} ke {$status->label()}.";
+        }
+
+        if ($from === TaskStatus::InProgress && $this->evidence_required && ! $this->evidences()->exists()) {
+            return "Unggah evidence terlebih dahulu sebelum mengubah status ke {$status->label()}.";
+        }
+
+        return null;
+    }
+
+    private function movesStatusFor(Account $account): bool
+    {
+        return $this->status->movedByPic() ? $this->assignedTo($account) : $this->managedBy($account);
     }
 
     /**
@@ -178,8 +207,7 @@ class Task extends Model
 
         if ($this->status === TaskStatus::Done) {
             return collect(self::EDITABLE_FIELDS)
-                ->reject(fn (string $field) => $field === 'status')
-                ->mapWithKeys(fn (string $field) => [$field => 'Tugas yang sudah selesai tidak dapat diubah. Buka kembali tugas terlebih dahulu.'])
+                ->mapWithKeys(fn (string $field) => [$field => 'Tugas yang sudah selesai tidak dapat diubah.'])
                 ->all();
         }
 

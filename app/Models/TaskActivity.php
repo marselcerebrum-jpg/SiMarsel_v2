@@ -20,6 +20,8 @@ class TaskActivity extends Model
 
     public const REASSIGNED = 'reassigned';
 
+    public const STATUS_CHANGED = 'status_changed';
+
     public const UPDATED_AT = null;
 
     /**
