@@ -5,6 +5,8 @@ import promoAnalysisCodeUsage from './analysis-code-usage';
 import promoAnalysisFunnel from './analysis-funnel';
 import promoAnalysisSource from './analysis-source';
 import promoAnalysisSummary from './analysis-summary';
+import promoAnalysisTopCodes from './analysis-top-codes';
+import promoAnalysisTrend from './analysis-trend';
 import promoCodeBulkEntry from './bulk-entry';
 import promoCodeManagement from './promo-code';
 import { promoMasterTable, promoPlatformTable } from './table';
@@ -44,6 +46,8 @@ Alpine.data('promoManagement', () => ({
 
 Alpine.data('promoAnalysis', promoAnalysis);
 Alpine.data('promoAnalysisSummary', promoAnalysisSummary);
+Alpine.data('promoAnalysisTrend', promoAnalysisTrend);
+Alpine.data('promoAnalysisTopCodes', promoAnalysisTopCodes);
 Alpine.data('promoAnalysisFunnel', promoAnalysisFunnel);
 Alpine.data('promoAnalysisSource', promoAnalysisSource);
 Alpine.data('promoAnalysisCode', promoAnalysisCode);

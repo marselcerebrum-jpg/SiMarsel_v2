@@ -107,3 +107,14 @@ export function fetchAnalysisCodes(query) {
 export function fetchAnalysisCodeUsages(query) {
     return http(`${PROMO_ANALYSIS}/codes/usages${query ? `?${query}` : ''}`);
 }
+
+/**
+ * Takes the shared filter query plus period (daily, weekly, or monthly).
+ */
+export function fetchAnalysisTrend(query) {
+    return http(`${PROMO_ANALYSIS}/trend${query ? `?${query}` : ''}`);
+}
+
+export function fetchAnalysisTopCodes(query) {
+    return http(`${PROMO_ANALYSIS}/top-codes${query ? `?${query}` : ''}`);
+}
