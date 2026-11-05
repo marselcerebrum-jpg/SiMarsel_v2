@@ -91,6 +91,28 @@ class PromoPageTest extends TestCase
             ->assertDontSee('Kode Aktif');
     }
 
+    public function test_promo_trend_chart_and_top_codes_follow_the_shared_filter_after_the_kpi_cards(): void
+    {
+        $response = $this->actingAs($this->employee)
+            ->get(route('promo.index'))
+            ->assertSeeInOrder([
+                'x-data="promoAnalysis"',
+                'x-data="promoAnalysisSummary"',
+                'x-data="promoAnalysisTrend"',
+                'x-data="promoAnalysisTopCodes"',
+                'x-data="promoAnalysisFunnel"',
+                'Promo Code List',
+            ], false)
+            ->assertSeeInOrder(['Promo Usage Trend', 'aria-label="Chart Period"', 'Daily', 'Weekly', 'Monthly', 'x-ref="canvas"'], false)
+            ->assertSee('@click="setPeriod(\'weekly\')"', false)
+            ->assertSeeInOrder(['Top 5 Promo Codes', 'Peringkat', 'Kode Promo', 'Jumlah Penggunaan', 'Revenue'])
+            ->assertSee('Jumlah penggunaan dapat melebihi jumlah transaksi unik karena satu transaksi dapat memakai dua kode promo.')
+            ->assertSee('Memuat Top 5 kode promo');
+
+        $trend = str($response->getContent())->between('id="promo-trend-title"', 'id="promo-top-codes-title"');
+        $this->assertStringNotContainsString('Jumlah Penggunaan', $trend);
+    }
+
     public function test_promo_funnel_table_follows_the_shared_filter_inside_the_analysis_section(): void
     {
         $this->actingAs($this->employee)
