@@ -19,13 +19,13 @@
     <div x-show="open" x-transition class="relative flex max-h-[90vh] w-full max-w-3xl flex-col rounded-panel border border-line bg-surface shadow-lg">
         <div class="flex items-start justify-between gap-3 border-b border-line p-5">
             <div class="min-w-0">
-                <h2 id="promo-code-usage-title" class="text-base font-semibold text-ink">Promo Code Usage Details</h2>
+                <h2 id="promo-code-usage-title" class="text-base font-semibold text-ink">Detail Penggunaan Kode Promo</h2>
                 <p class="mt-1 flex flex-wrap items-center gap-2 text-sm text-muted">
                     <span class="font-mono font-semibold break-all text-ink" x-text="row?.code"></span>
                     <span class="inline-flex items-center rounded-md bg-primary-soft px-2 py-0.5 text-xs font-semibold text-primary-hover" x-text="row?.platform.name"></span>
                 </p>
             </div>
-            <button type="button" x-ref="codeUsageClose" class="rounded-lg p-1.5 text-muted hover:bg-soft hover:text-ink focus-visible:outline-2 focus-visible:outline-primary" aria-label="Close" @click="close()">
+            <button type="button" x-ref="codeUsageClose" class="rounded-lg p-1.5 text-muted hover:bg-soft hover:text-ink focus-visible:outline-2 focus-visible:outline-primary" aria-label="Tutup" @click="close()">
                 <x-icon name="close" />
             </button>
         </div>
@@ -60,7 +60,7 @@
                             <tr x-show="!loading && loadError" x-cloak>
                                 <td colspan="4" class="px-4 py-10 text-center" role="alert">
                                     <p class="text-sm font-medium text-red-600" x-text="loadError"></p>
-                                    <button type="button" class="mt-2 text-xs font-semibold text-primary hover:text-primary-hover" @click="retry()">Try Again</button>
+                                    <button type="button" class="mt-2 text-xs font-semibold text-primary hover:text-primary-hover" @click="retry()">Coba Lagi</button>
                                 </td>
                             </tr>
 
@@ -80,7 +80,7 @@
                 </div>
             </div>
 
-            <nav x-show="meta && meta.last_page > 1" x-cloak class="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between" aria-label="Promo Code Usage Pagination">
+            <nav x-show="meta && meta.last_page > 1" x-cloak class="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between" aria-label="Navigasi halaman penggunaan kode promo">
                 <p class="text-xs text-muted">
                     Menampilkan <span class="font-semibold text-ink" x-text="meta?.from ?? 0"></span>–<span class="font-semibold text-ink" x-text="meta?.to ?? 0"></span>
                     dari <span x-text="meta?.total ?? 0"></span> transaksi

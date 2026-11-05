@@ -41,18 +41,18 @@ class PerformancePageTest extends TestCase
         $this->actingAs($this->employee)
             ->get('/dashboard')
             ->assertOk()
-            ->assertSee('Performance Summary')
+            ->assertSee('Ringkasan Performa')
             ->assertSee('performanceSummary', false)
             ->assertSeeInOrder([
                 'Filter',
                 'Total Revenue',
-                'Total Transactions',
+                'Total Transaksi',
                 'Total Downloader',
-                'New Users',
-                'Unique Users',
+                'Pengguna Baru',
+                'Pengguna Unik',
                 'AOV',
                 'Repeat Order',
-                'Conversion',
+                'Konversi',
             ])
             ->assertDontSee('Period Comparison');
     }
@@ -65,7 +65,7 @@ class PerformancePageTest extends TestCase
             ->assertSee('id="filter-platforms-label"', false)
             ->assertSee('aria-multiselectable="true"', false)
             ->assertSee('togglePlatform(platform.value)', false)
-            ->assertSee('All Platforms')
+            ->assertSee('Semua Platform')
             ->assertSee('id="filter-mode"', false)
             ->assertSee('toggleYear(year)', false)
             ->assertSee('id="filter-month"', false)
@@ -74,7 +74,7 @@ class PerformancePageTest extends TestCase
             ->assertSee('id="filter-year-to"', false)
             ->assertSee('id="filter-start"', false)
             ->assertSee('id="filter-end"', false)
-            ->assertSeeInOrder(['Platforms', 'Period', 'Years', 'Month', 'From Year', 'To Year', 'Start Date', 'End Date'])
+            ->assertSeeInOrder(['Platform', 'Periode', 'Tahun', 'Bulan', 'Dari Tahun', 'Sampai Tahun', 'Tanggal Mulai', 'Tanggal Akhir'])
             ->assertDontSee('id="filter-preset"', false);
     }
 
@@ -139,7 +139,7 @@ class PerformancePageTest extends TestCase
             ->assertSee(":href=\"exportLink('csv')\"", false)
             ->assertSee('href="'.route('api.performance.export', ['format' => 'xlsx']).'"', false)
             ->assertSee('href="'.route('api.performance.export', ['format' => 'csv']).'"', false)
-            ->assertSeeInOrder(['Export Excel', 'Export CSV']);
+            ->assertSeeInOrder(['Ekspor Excel', 'Ekspor CSV']);
     }
 
     public function test_platform_filter_lists_platforms_from_database(): void
@@ -158,17 +158,17 @@ class PerformancePageTest extends TestCase
         $this->actingAs($this->employee)
             ->get('/dashboard')
             ->assertOk()
-            ->assertSee('Trend &amp; Performance Analysis', false)
+            ->assertSee('Analisis Tren &amp; Performa', false)
             ->assertSee('performanceTrend', false)
             ->assertSee('performance-filter.window', false)
-            ->assertSee('aria-label="Metric"', false)
-            ->assertSee('aria-label="Data Period"', false)
+            ->assertSee('aria-label="Metrik"', false)
+            ->assertSee('aria-label="Periode Data"', false)
             ->assertSee('id="trend-chart"', false)
-            ->assertSeeInOrder(['Revenue', 'Transactions', 'Downloader', 'Conversion', 'New Users', 'Repeat Order'])
+            ->assertSeeInOrder(['Revenue', 'Transaksi', 'Downloader', 'Konversi', 'Pengguna Baru', 'Repeat Order'])
             ->assertSeeInOrder(["setMetric('revenue')", "setMetric('transactions')", "setMetric('downloaders')", "setMetric('conversion')", "setMetric('new_users')", "setMetric('repeat_orders')"], false)
             ->assertSeeInOrder(["setPeriod('daily')", "setPeriod('weekly')", "setPeriod('monthly')"], false)
-            ->assertSeeInOrder(['>Bar<', '>Line<', '>Area<', '>Pie<', '>Table<'], false)
-            ->assertSeeInOrder(['>Daily<', '>Weekly<', '>Monthly<'], false);
+            ->assertSeeInOrder(['>Batang<', '>Garis<', '>Area<', '>Lingkaran<', '>Tabel<'], false)
+            ->assertSeeInOrder(['>Harian<', '>Mingguan<', '>Bulanan<'], false);
     }
 
     public function test_performance_page_has_platform_contribution_section(): void
@@ -176,12 +176,12 @@ class PerformancePageTest extends TestCase
         $this->actingAs($this->employee)
             ->get('/dashboard')
             ->assertOk()
-            ->assertSee('Platform Contribution')
+            ->assertSee('Kontribusi Platform')
             ->assertSee('x-data="performanceContribution"', false)
             ->assertSee('@performance-filter.window="loadContribution($event.detail)"', false)
             ->assertDontSee('contributionCanvas', false)
-            ->assertSeeInOrder(['>Platform</th>', '>Revenue</th>', '>Transactions</th>', '>Users</th>', '>Contribution (%)</th>'], false)
-            ->assertSeeInOrder(['Trend &amp; Performance Analysis', 'Platform Contribution'], false);
+            ->assertSeeInOrder(['>Platform</th>', '>Revenue</th>', '>Transaksi</th>', '>Pengguna</th>', '>Contribution (%)</th>'], false)
+            ->assertSeeInOrder(['Analisis Tren &amp; Performa', 'Kontribusi Platform'], false);
     }
 
     public function test_platform_contribution_shows_summary_progress_bar_tooltip_and_states(): void
@@ -189,7 +189,7 @@ class PerformancePageTest extends TestCase
         $this->actingAs($this->employee)
             ->get('/dashboard')
             ->assertOk()
-            ->assertSeeInOrder(['Total Revenue', 'Platforms', 'Jumlah platform yang tercakup dalam hasil filter'])
+            ->assertSeeInOrder(['Total Revenue', 'Platform', 'Jumlah platform yang tercakup dalam hasil filter'])
             ->assertSee('x-text="contributionRevenue"', false)
             ->assertSee('x-text="contributionPlatformCount"', false)
             ->assertSee(':style="{ width: row.width }"', false)
@@ -206,12 +206,12 @@ class PerformancePageTest extends TestCase
         $this->actingAs($this->employee)
             ->get('/dashboard')
             ->assertOk()
-            ->assertSee('Payment Methods')
+            ->assertSee('Metode Pembayaran')
             ->assertSee('x-data="performancePaymentMethod(', false)
             ->assertSee('@performance-filter.window="loadPayment($event.detail)"', false)
-            ->assertSee('aria-label="Payment Method Parameter"', false)
+            ->assertSee('aria-label="Parameter Metode Pembayaran"', false)
             ->assertSeeInOrder(["setPaymentParameter('revenue')", "setPaymentParameter('transactions')"], false)
-            ->assertSeeInOrder(['Platform Contribution', 'Payment Methods'], false);
+            ->assertSeeInOrder(['Kontribusi Platform', 'Metode Pembayaran'], false);
     }
 
     public function test_payment_method_section_shows_pie_chart_legend_and_states(): void
@@ -221,7 +221,7 @@ class PerformancePageTest extends TestCase
             ->assertOk()
             ->assertSee('x-ref="paymentCanvas"', false)
             ->assertSee(':aria-label="paymentChartLabel"', false)
-            ->assertSeeInOrder(['>Payment Method</th>', '>Transactions</th>', '>Revenue</th>', '>Contribution (%)</th>'], false)
+            ->assertSeeInOrder(['>Metode Pembayaran</th>', '>Transaksi</th>', '>Revenue</th>', '>Contribution (%)</th>'], false)
             ->assertSee('@mouseenter="highlightPayment(index)"', false)
             ->assertSee('x-text="paymentTotals.revenue"', false)
             ->assertSee("paymentState === 'loading'", false)
@@ -236,11 +236,11 @@ class PerformancePageTest extends TestCase
         $this->actingAs($this->employee)
             ->get('/dashboard')
             ->assertOk()
-            ->assertSee('Purchase Time')
+            ->assertSee('Waktu Pembelian')
             ->assertSee('x-data="performancePurchaseTime(', false)
             ->assertSee('@performance-filter.window="loadPurchaseTime($event.detail)"', false)
-            ->assertSeeInOrder(['Early Morning', 'Morning', 'Midday', 'Afternoon', 'Night', 'Unknown'])
-            ->assertSeeInOrder(['Payment Methods', 'Purchase Time'], false);
+            ->assertSeeInOrder(['Dini Hari', 'Pagi', 'Siang', 'Sore', 'Malam', 'Tidak Diketahui'])
+            ->assertSeeInOrder(['Metode Pembayaran', 'Waktu Pembelian'], false);
     }
 
     public function test_purchase_time_section_shows_pie_chart_legend_and_states(): void
@@ -250,7 +250,7 @@ class PerformancePageTest extends TestCase
             ->assertOk()
             ->assertSee('x-ref="purchaseTimeCanvas"', false)
             ->assertSee(':aria-label="purchaseTimeChartLabel"', false)
-            ->assertSeeInOrder(['>Time Range</th>', '>Hours</th>', '>Transactions</th>', '>Share (%)</th>'], false)
+            ->assertSeeInOrder(['>Rentang Waktu</th>', '>Jam</th>', '>Transaksi</th>', '>Share (%)</th>'], false)
             ->assertSee('@mouseenter="highlightPurchaseTime(index)"', false)
             ->assertSee('x-text="purchaseTimeTotal"', false)
             ->assertSee("purchaseTimeState === 'loading'", false)
@@ -264,7 +264,7 @@ class PerformancePageTest extends TestCase
         $this->actingAs($this->employee)
             ->get('/dashboard')
             ->assertOk()
-            ->assertSeeInOrder(['Analytics', 'Performance Analysis', 'Summary', 'Products', 'System'])
+            ->assertSeeInOrder(['Analitik', 'Analisis Performa', 'Ringkasan', 'Produk', 'Sistem'])
             ->assertSee('href="'.route('dashboard').'"', false)
             ->assertSee('aria-current="page"', false);
     }

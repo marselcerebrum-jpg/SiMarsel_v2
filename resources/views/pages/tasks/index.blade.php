@@ -1,6 +1,6 @@
 @extends('layouts.dashboard')
 
-@section('title', 'Tasklist')
+@section('title', 'Daftar Tugas')
 @push('scripts')
     @vite('resources/js/pages/tasks/index.js')
 @endpush
@@ -16,13 +16,13 @@
     <div x-data="tasklist" class="min-w-0">
         <header class="flex flex-wrap items-center justify-between gap-3">
             <div class="min-w-0">
-                <h1 class="text-2xl font-bold tracking-tight text-ink">Tasklist</h1>
+                <h1 class="text-2xl font-bold tracking-tight text-ink">Daftar Tugas</h1>
                 <p class="mt-0.5 hidden text-sm text-muted sm:block">Pantau dan kelola tugas berdasarkan status, prioritas, dan deadline.</p>
             </div>
 
             <button x-show="canCreate" x-cloak type="button" class="{{ $primaryButton }}" @click="createOpen = true">
                 <x-icon name="plus" class="size-4" />
-                Create Task
+                Buat Tugas
             </button>
         </header>
 

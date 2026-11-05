@@ -6,10 +6,10 @@
 
 <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-[repeat(3,minmax(0,1fr))_auto] lg:items-end">
     <div>
-        <label for="filter-platform" class="{{ $labelClass }}">Source App / Platform</label>
+        <label for="filter-platform" class="{{ $labelClass }}">Aplikasi Sumber / Platform</label>
         <div class="relative">
             <select id="filter-platform" x-model="filters.platform" class="{{ $selectClass }}">
-                <option value="">All Platforms</option>
+                <option value="">Semua Platform</option>
                 <template x-for="platform in platforms" :key="platform.slug">
                     <option :value="platform.slug" x-text="platform.name"></option>
                 </template>
@@ -19,7 +19,7 @@
     </div>
 
     <div>
-        <label for="filter-year" class="{{ $labelClass }}">Year</label>
+        <label for="filter-year" class="{{ $labelClass }}">Tahun</label>
         <div class="relative">
             <select id="filter-year" x-model="filters.year" class="{{ $selectClass }}">
                 <template x-for="year in years" :key="year">
@@ -31,10 +31,10 @@
     </div>
 
     <div>
-        <label for="filter-month" class="{{ $labelClass }}">Month</label>
+        <label for="filter-month" class="{{ $labelClass }}">Bulan</label>
         <div class="relative">
             <select id="filter-month" x-model="filters.month" class="{{ $selectClass }}">
-                <option value="">All Months</option>
+                <option value="">Semua Bulan</option>
                 <template x-for="(month, index) in months" :key="index">
                     <option :value="index + 1" x-text="month"></option>
                 </template>
@@ -49,7 +49,7 @@
         :disabled="!hasActiveFilter"
         @click="resetFilters()"
     >
-        Reset Filter
+        Atur Ulang Filter
     </button>
 </div>
 

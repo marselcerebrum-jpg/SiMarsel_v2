@@ -36,16 +36,16 @@ export default function promoUnregisteredCodes() {
         },
 
         /**
-         * "All Registered" only when no search is applied and nothing is unregistered.
+         * "Semua Terdaftar" only when no search is applied and nothing is unregistered.
          */
         get status() {
             if (this.searched) {
-                return { text: `${this.total} ${this.total === 1 ? 'Result' : 'Results'}`, tone: 'bg-soft text-label' };
+                return { text: `${this.total} ${this.total === 1 ? 'Hasil' : 'Hasil'}`, tone: 'bg-soft text-label' };
             }
 
             return this.total > 0
                 ? { text: `${this.total} Unregistered`, tone: 'bg-amber-100 text-amber-800' }
-                : { text: 'All Registered', tone: 'bg-emerald-100 text-emerald-700' };
+                : { text: 'Semua Terdaftar', tone: 'bg-emerald-100 text-emerald-700' };
         },
 
         formatUsedOn,

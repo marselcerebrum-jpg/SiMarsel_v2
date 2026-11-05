@@ -1,6 +1,6 @@
 <div class="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center">
     <label class="relative block w-full sm:max-w-xs">
-        <span class="sr-only">Search Divisions</span>
+        <span class="sr-only">Cari Divisi</span>
         <svg class="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-label" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true">
             <circle cx="11" cy="11" r="7" />
             <path d="M20 20l-3.5-3.5" />

@@ -116,10 +116,10 @@ export function promoMasterTable(type, label) {
 
             if (editing) {
                 this.items = this.items.map((item) => (item.id === editing.id ? result.data : item));
-                showToast({ title: 'Changes Saved', text: `${label} ${result.data.name} sudah diperbarui.` });
+                showToast({ title: 'Perubahan Tersimpan', text: `${label} ${result.data.name} sudah diperbarui.` });
             } else {
                 this.items.push(result.data);
-                showToast({ title: `${label} Created`, text: `${result.data.name} sudah ditambahkan.` });
+                showToast({ title: `${label} Ditambahkan`, text: `${result.data.name} sudah ditambahkan.` });
             }
 
             this.closeModal();
@@ -134,7 +134,7 @@ export function promoMasterTable(type, label) {
 
             this.items = this.items.filter((item) => item.id !== deleting.id);
             this.closeModal();
-            showToast({ title: `${label} Deleted`, text: `${deleting.name} sudah dihapus.` });
+            showToast({ title: `${label} Dihapus`, text: `${deleting.name} sudah dihapus.` });
         },
     };
 }

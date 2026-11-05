@@ -1,18 +1,18 @@
 @extends('layouts.dashboard')
 
-@section('title', 'Organization Management')
+@section('title', 'Manajemen Organisasi')
 @push('scripts')
     @vite('resources/js/pages/settings/index.js')
 @endpush
 
 @php
-    $tabs = ['accounts' => 'Accounts', 'divisions' => 'Divisions'];
+    $tabs = ['accounts' => 'Akun', 'divisions' => 'Divisi'];
 @endphp
 
 @section('page')
     <div x-data="organizationManagement(@js($initialTab))" class="min-w-0">
         <header>
-            <h1 class="text-2xl font-bold tracking-tight text-ink">Organization Management</h1>
+            <h1 class="text-2xl font-bold tracking-tight text-ink">Manajemen Organisasi</h1>
             <p class="mt-1 text-sm text-muted">Kelola akun pengguna dan divisi organisasi.</p>
         </header>
 

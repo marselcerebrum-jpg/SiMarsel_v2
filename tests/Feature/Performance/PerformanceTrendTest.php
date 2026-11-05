@@ -235,7 +235,7 @@ class PerformanceTrendTest extends TestCase
         }
 
         $this->weeklyTrend('conversion')->assertJsonPath('data.metric.unit', 'percent');
-        $this->weeklyTrend('new_users')->assertJsonPath('data.metric.label', 'User Baru');
+        $this->weeklyTrend('new_users')->assertJsonPath('data.metric.label', 'Pengguna Baru');
         $this->weeklyTrend('repeat_orders')->assertJsonPath('data.metric.label', 'Repeat Order');
     }
 
