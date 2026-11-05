@@ -17,6 +17,8 @@
 
         @include('pages.promo.components.promo-analysis-filter')
         @include('pages.promo.components.promo-analysis-summary')
+        @include('pages.promo.components.promo-analysis-trend')
+        @include('pages.promo.components.promo-analysis-top-codes')
         @include('pages.promo.components.promo-analysis-funnel')
         @include('pages.promo.components.promo-analysis-source')
         @include('pages.promo.components.promo-analysis-code')
