@@ -130,13 +130,13 @@
         <div class="flex items-center gap-2">
             <button type="button" class="{{ $pageButton }}" :disabled="loading || filter.page <= 1" @click="goToPage(filter.page - 1)">
                 <x-icon name="chevron-left" class="size-3.5" />
-                Previous
+                Sebelumnya
             </button>
             <span class="text-xs text-muted">
                 Halaman <span class="font-semibold text-ink" x-text="meta?.current_page"></span> dari <span x-text="meta?.last_page"></span>
             </span>
             <button type="button" class="{{ $pageButton }}" :disabled="loading || filter.page >= (meta?.last_page ?? 1)" @click="goToPage(filter.page + 1)">
-                Next
+                Berikutnya
                 <x-icon name="chevron-right" class="size-3.5" />
             </button>
         </div>

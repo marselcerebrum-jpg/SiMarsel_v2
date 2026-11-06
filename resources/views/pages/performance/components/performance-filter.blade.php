@@ -11,7 +11,7 @@
 <div class="flex items-center justify-between gap-3">
     <h2 id="filter-title" class="text-base font-semibold text-ink">Filter</h2>
     <button type="button" class="inline-flex h-9 items-center rounded-lg px-3 text-sm font-semibold text-muted hover:bg-soft hover:text-ink" @click="resetFilter()">
-        Reset
+        Atur Ulang
     </button>
 </div>
 

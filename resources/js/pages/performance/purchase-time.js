@@ -56,7 +56,7 @@ export default (labels = {}) => {
         },
 
         get purchaseTimeChartLabel() {
-            const slices = this.purchaseTimeRows.map((row) => `${row.title} ${row.transactions} transactions`).join(', ');
+            const slices = this.purchaseTimeRows.map((row) => `${row.title} ${row.transactions} transaksi`).join(', ');
 
             return `Diagram lingkaran distribusi waktu pembelian: ${slices}`;
         },

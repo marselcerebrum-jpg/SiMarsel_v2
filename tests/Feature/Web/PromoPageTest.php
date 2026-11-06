@@ -174,7 +174,7 @@ class PromoPageTest extends TestCase
             ->assertSee('Cari kode, platform, funnel, atau source')
             ->assertSee('Semua Platform')
             ->assertSee('aria-label="Navigasi halaman kode promo"', false)
-            ->assertSeeInOrder(['Previous', 'Next']);
+            ->assertSeeInOrder(['Sebelumnya', 'Berikutnya']);
     }
 
     public function test_single_entry_form_has_required_code_and_platform_and_optional_funnel_source(): void

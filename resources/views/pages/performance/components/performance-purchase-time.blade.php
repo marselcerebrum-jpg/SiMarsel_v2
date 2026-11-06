@@ -3,7 +3,7 @@
         ['label' => 'Rentang Waktu', 'class' => ''],
         ['label' => 'Jam', 'class' => ''],
         ['label' => 'Transaksi', 'class' => 'text-right'],
-        ['label' => 'Share (%)', 'class' => 'text-right'],
+        ['label' => 'Porsi (%)', 'class' => 'text-right'],
     ];
 
     $dot = 'size-3 shrink-0 rounded-full';

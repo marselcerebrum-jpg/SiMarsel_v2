@@ -39,7 +39,7 @@
                 class="inline-flex h-9 items-center justify-center gap-2 rounded-lg bg-red-600 px-4 text-sm font-semibold text-white hover:bg-red-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-600 disabled:cursor-not-allowed disabled:opacity-50"
                 :disabled="saving || Boolean(deleting?.usages_count)"
                 @click="confirmDelete()"
-                x-text="saving ? 'Deleting…' : 'Ya, Hapus'"
+                x-text="saving ? 'Menghapus…' : 'Ya, Hapus'"
             >Ya, Hapus</button>
         </div>
     </div>

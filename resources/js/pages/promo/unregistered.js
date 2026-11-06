@@ -2,7 +2,7 @@ import { errorMessage } from '../../http';
 import { fetchUnregisteredCodes } from './api';
 import { defaultFilter, toQueryString } from './filter';
 
-const usedOn = new Intl.DateTimeFormat('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+const usedOn = new Intl.DateTimeFormat('id-ID', { day: '2-digit', month: 'short', year: 'numeric' });
 
 function formatUsedOn(date) {
     return date ? usedOn.format(new Date(`${date}T00:00:00`)) : '—';
@@ -40,11 +40,11 @@ export default function promoUnregisteredCodes() {
          */
         get status() {
             if (this.searched) {
-                return { text: `${this.total} ${this.total === 1 ? 'Hasil' : 'Hasil'}`, tone: 'bg-soft text-label' };
+                return { text: `${this.total} Hasil`, tone: 'bg-soft text-label' };
             }
 
             return this.total > 0
-                ? { text: `${this.total} Unregistered`, tone: 'bg-amber-100 text-amber-800' }
+                ? { text: `${this.total} Belum Terdaftar`, tone: 'bg-amber-100 text-amber-800' }
                 : { text: 'Semua Terdaftar', tone: 'bg-emerald-100 text-emerald-700' };
         },
 

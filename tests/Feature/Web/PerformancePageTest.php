@@ -250,7 +250,7 @@ class PerformancePageTest extends TestCase
             ->assertOk()
             ->assertSee('x-ref="purchaseTimeCanvas"', false)
             ->assertSee(':aria-label="purchaseTimeChartLabel"', false)
-            ->assertSeeInOrder(['>Rentang Waktu</th>', '>Jam</th>', '>Transaksi</th>', '>Share (%)</th>'], false)
+            ->assertSeeInOrder(['>Rentang Waktu</th>', '>Jam</th>', '>Transaksi</th>', '>Porsi (%)</th>'], false)
             ->assertSee('@mouseenter="highlightPurchaseTime(index)"', false)
             ->assertSee('x-text="purchaseTimeTotal"', false)
             ->assertSee("purchaseTimeState === 'loading'", false)

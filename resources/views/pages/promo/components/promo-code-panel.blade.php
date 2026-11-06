@@ -11,7 +11,7 @@
                 <p class="mt-1 text-sm text-muted">Bandingkan transaksi dan revenue dengan promo dan tanpa promo berdasarkan tanggal bayar Markaz.</p>
             </div>
             <button type="button" class="inline-flex h-9 shrink-0 items-center rounded-lg px-3 text-sm font-semibold text-muted hover:bg-soft hover:text-ink" @click="resetFilter()">
-                Reset
+                Atur Ulang
             </button>
         </div>
 

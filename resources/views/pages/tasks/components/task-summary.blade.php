@@ -1,5 +1,5 @@
 {{-- Ringkasan TASK-09: empat metrik utama dalam satu baris ringkas + informasi tambahan satu baris.
-     Dihitung dari daftar tugas yang sama dengan Board/Table dan mengikuti filter aktif.
+     Dihitung dari daftar tugas yang sama dengan Papan/Tabel dan mengikuti filter aktif.
      Jumlah per status hanya tampil di kolom Board agar tidak berulang. --}}
 @php
     $primary = [

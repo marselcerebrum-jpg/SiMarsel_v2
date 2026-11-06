@@ -113,7 +113,7 @@ class PerformanceTrendTest extends TestCase
             ->assertJsonValidationErrors(['date_to', 'metric']);
 
         $this->getJson(self::URL.'?date_from=2026-09-01&date_to=2026-09-30&metric=profit&period=yearly')
-            ->assertJsonValidationErrors(['metric' => 'Metric tidak valid.', 'period' => 'Periode tidak valid.']);
+            ->assertJsonValidationErrors(['metric' => 'Metrik tidak valid.', 'period' => 'Periode tidak valid.']);
     }
 
     public function test_daily_and_weekly_range_is_limited_to_366_days(): void
@@ -285,7 +285,7 @@ class PerformanceTrendTest extends TestCase
         $this->actingAs($this->manager)
             ->getJson(self::URL.'?date_from=2026-08-15&date_to=2026-10-10&metric=transactions&period=monthly')
             ->assertOk()
-            ->assertJsonPath('data.labels', ['Aug 2026', 'Sep 2026', 'Oct 2026'])
+            ->assertJsonPath('data.labels', ['Agu 2026', 'Sep 2026', 'Okt 2026'])
             ->assertJsonPath('data.datasets.0.data', [0, 6, 0])
             ->assertJsonPath('data.rows.0.period_start', '2026-08-15')
             ->assertJsonPath('data.rows.0.period_end', '2026-08-31')
@@ -298,7 +298,7 @@ class PerformanceTrendTest extends TestCase
         $this->actingAs($this->manager)
             ->getJson(self::URL.'?date_from=2026-08-28&date_to=2026-09-03&metric=revenue&period=weekly')
             ->assertOk()
-            ->assertJsonPath('data.labels', ['28 - 30 Aug 2026', '31 Aug - 03 Sep 2026']);
+            ->assertJsonPath('data.labels', ['28 - 30 Agu 2026', '31 Agu - 03 Sep 2026']);
     }
 
     public function test_empty_range_returns_zero_points_and_informative_message(): void
