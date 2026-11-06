@@ -8,7 +8,9 @@ use App\Models\Account;
 use App\Models\Division;
 use App\Models\Task;
 use BackedEnum;
+use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection;
 
 class TaskRepository
 {
@@ -28,6 +30,26 @@ class TaskRepository
             ->when($filters['search'], fn (Builder $query, string $search) => $query->where('title', 'like', "%{$search}%"))
             ->when($filters['priority'], fn (Builder $query, string $priority) => $query->where('priority', $priority))
             ->when($filters['status'], fn (Builder $query, string $status) => $query->where('status', $status));
+    }
+
+    /**
+     * Tasks of every division whose dates fall in the period, for the shared schedule. Not scoped to the
+     * account: the schedule shows other divisions' tasks, and what an item reveals is decided per item.
+     * A task with only a start date or only a deadline counts as that one day; one without either is left out.
+     *
+     * @return Collection<int, Task>
+     */
+    public function scheduled(CarbonInterface $from, CarbonInterface $to, ?string $division): Collection
+    {
+        return Task::query()
+            ->with('division')
+            ->whereRaw('coalesce(start_date, deadline) <= ?', [$to->copy()->endOfDay()->toDateTimeString()])
+            ->whereRaw('coalesce(deadline, start_date) >= ?', [$from->copy()->startOfDay()->toDateTimeString()])
+            ->when($division, fn (Builder $query, string $division) => $query
+                ->whereHas('division', fn (Builder $query) => $query->where('code_division', $division)))
+            ->orderByRaw('coalesce(start_date, deadline)')
+            ->orderBy('id')
+            ->get();
     }
 
     /**
