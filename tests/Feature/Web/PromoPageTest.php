@@ -43,9 +43,9 @@ class PromoPageTest extends TestCase
             $this->actingAs($account)
                 ->get(route('promo.index'))
                 ->assertOk()
-                ->assertSee('Promo Management')
+                ->assertSee('Manajemen Promo')
                 ->assertSee('x-data="promoManagement"', false)
-                ->assertSeeInOrder(['role="tablist"', 'Promo Codes', 'Master Data'], false)
+                ->assertSeeInOrder(['role="tablist"', 'Kode Promo', 'Data Master'], false)
                 ->assertSee('id="panel-promo-codes"', false)
                 ->assertSee('id="panel-master-data"', false);
         }
@@ -55,7 +55,7 @@ class PromoPageTest extends TestCase
     {
         $this->actingAs($this->employee)
             ->get(route('promo.index'))
-            ->assertSeeInOrder(['Promo Code Analysis', 'Promo Code List']);
+            ->assertSeeInOrder(['Analisis Kode Promo', 'Daftar Kode Promo']);
     }
 
     public function test_promo_analysis_filter_offers_platform_payment_method_search_and_two_period_modes(): void
@@ -64,7 +64,7 @@ class PromoPageTest extends TestCase
             ->get(route('promo.index'))
             ->assertSee('x-data="promoAnalysis"', false)
             ->assertSee('@promo-analysis-errors="showServerErrors($event.detail)"', false)
-            ->assertSeeInOrder(['Platform / Source App', 'Payment Method', 'Promo Code', 'Period'])
+            ->assertSeeInOrder(['Platform / Source App', 'Metode Pembayaran', 'Kode Promo', 'Periode'])
             ->assertSee('id="promo-analysis-month"', false)
             ->assertSee('id="promo-analysis-year"', false)
             ->assertSee('id="promo-analysis-start"', false)
@@ -80,12 +80,12 @@ class PromoPageTest extends TestCase
             ->assertSee('x-data="promoAnalysisSummary"', false)
             ->assertSee('@promo-analysis-filter.window="load($event.detail)"', false)
             ->assertSeeInOrder([
-                'Total Transactions with Promo',
-                'Total Transactions without Promo',
-                'Revenue with Promo',
-                'Revenue without Promo',
-                'Promo Transaction Percentage',
-                'Promo Codes Used',
+                'Total Transaksi dengan Promo',
+                'Total Transaksi tanpa Promo',
+                'Revenue dengan Promo',
+                'Revenue tanpa Promo',
+                'Persentase Transaksi Promo',
+                'Kode Promo Terpakai',
             ])
             ->assertDontSee('Active Codes')
             ->assertDontSee('Kode Aktif');
@@ -101,13 +101,13 @@ class PromoPageTest extends TestCase
                 'x-data="promoAnalysisTrend"',
                 'x-data="promoAnalysisTopCodes"',
                 'x-data="promoAnalysisFunnel"',
-                'Promo Code List',
+                'Daftar Kode Promo',
             ], false)
-            ->assertSeeInOrder(['Promo Usage Trend', 'aria-label="Chart Period"', 'Daily', 'Weekly', 'Monthly', 'x-ref="canvas"'], false)
+            ->assertSeeInOrder(['Tren Penggunaan Promo', 'aria-label="Periode Grafik"', 'Harian', 'Mingguan', 'Bulanan', 'x-ref="canvas"'], false)
             ->assertSee('@click="setPeriod(\'weekly\')"', false)
-            ->assertSeeInOrder(['Top 5 Promo Codes', 'Peringkat', 'Kode Promo', 'Jumlah Penggunaan', 'Revenue'])
+            ->assertSeeInOrder(['5 Kode Promo Teratas', 'Peringkat', 'Kode Promo', 'Jumlah Penggunaan', 'Revenue'])
             ->assertSee('Jumlah penggunaan dapat melebihi jumlah transaksi unik karena satu transaksi dapat memakai dua kode promo.')
-            ->assertSee('Memuat Top 5 kode promo');
+            ->assertSee('Memuat 5 kode promo teratas');
 
         $trend = str($response->getContent())->between('id="promo-trend-title"', 'id="promo-top-codes-title"');
         $this->assertStringNotContainsString('Jumlah Penggunaan', $trend);
@@ -121,10 +121,10 @@ class PromoPageTest extends TestCase
                 'x-data="promoAnalysis"',
                 'x-data="promoAnalysisSummary"',
                 'x-data="promoAnalysisFunnel"',
-                'Promo Code List',
+                'Daftar Kode Promo',
             ], false)
             ->assertSee('@promo-analysis-filter.window="load($event.detail)"', false)
-            ->assertSeeInOrder(['Promo Analysis by Funnel', 'Funnel', 'Jumlah Transaksi', 'Jumlah Revenue', 'Kontribusi Funnel (%)'])
+            ->assertSeeInOrder(['Analisis Promo per Funnel', 'Funnel', 'Jumlah Transaksi', 'Jumlah Revenue', 'Kontribusi Funnel (%)'])
             ->assertSee('Memuat rekap funnel');
     }
 
@@ -136,9 +136,9 @@ class PromoPageTest extends TestCase
                 'x-data="promoAnalysis"',
                 'x-data="promoAnalysisFunnel"',
                 'x-data="promoAnalysisSource"',
-                'Promo Code List',
+                'Daftar Kode Promo',
             ], false)
-            ->assertSeeInOrder(['Promo Analysis by Source', 'Source', 'Jumlah Penggunaan', 'Jumlah Revenue', 'Kontribusi Source (%)'])
+            ->assertSeeInOrder(['Analisis Promo per Source', 'Source', 'Jumlah Penggunaan', 'Jumlah Revenue', 'Kontribusi Source (%)'])
             ->assertSee('Jumlah penggunaan dapat melebihi jumlah transaksi unik karena satu transaksi dapat memakai dua kode promo.')
             ->assertSee('Memuat rekap source');
     }
@@ -169,15 +169,15 @@ class PromoPageTest extends TestCase
                 'x-data="promoAnalysisSource"',
                 'x-data="promoAnalysisCode"',
                 'x-data="promoAnalysisCodeUsage"',
-                'Promo Code List',
+                'Daftar Kode Promo',
             ], false)
             ->assertSee('@promo-code-usage-open.window', false)
-            ->assertSeeInOrder(['Summary by Promo Code', 'Kode Promo', 'Platform', 'Kategori/Funnel', 'Source', 'Jumlah Penggunaan', 'Jumlah Revenue', 'Kontribusi (%)'])
+            ->assertSeeInOrder(['Rekap per Kode Promo', 'Kode Promo', 'Platform', 'Kategori/Funnel', 'Source', 'Jumlah Penggunaan', 'Jumlah Revenue', 'Kontribusi (%)'])
             ->assertSee('Memuat rekap kode promo')
-            ->assertSee('Promo Code Usage Details')
+            ->assertSee('Detail Penggunaan Kode Promo')
             ->assertSeeInOrder(['Tanggal', 'Platform/Aplikasi', 'Jumlah Penggunaan', 'Revenue', 'Total']);
 
-        $summary = str($response->getContent())->between('id="promo-code-summary-title"', 'Promo Code List');
+        $summary = str($response->getContent())->between('id="promo-code-summary-title"', 'Daftar Kode Promo');
         $this->assertStringNotContainsString('Tipe', $summary);
         $this->assertStringNotContainsString('Import', $summary);
     }
@@ -187,18 +187,18 @@ class PromoPageTest extends TestCase
         $this->actingAs($this->employee)
             ->get(route('promo.index'))
             ->assertSee('x-data="promoCodeManagement"', false)
-            ->assertSeeInOrder(['Promo Code', 'Platform', 'Funnel', 'Source', 'Usage', 'Actions'])
+            ->assertSeeInOrder(['Kode Promo', 'Platform', 'Funnel', 'Source', 'Penggunaan', 'Aksi'])
             ->assertSee('Cari kode, platform, funnel, atau source')
-            ->assertSee('All Platforms')
-            ->assertSee('aria-label="Promo Code Pagination"', false)
-            ->assertSeeInOrder(['Previous', 'Next']);
+            ->assertSee('Semua Platform')
+            ->assertSee('aria-label="Navigasi halaman kode promo"', false)
+            ->assertSeeInOrder(['Sebelumnya', 'Berikutnya']);
     }
 
     public function test_single_entry_form_has_required_code_and_platform_and_optional_funnel_source(): void
     {
         $this->actingAs($this->employee)
             ->get(route('promo.index'))
-            ->assertSee('Add Promo Code')
+            ->assertSee('Tambah Kode Promo')
             ->assertSee('id="promo-code-form-title"', false)
             ->assertSeeInOrder(['for="promo-code-code"', 'for="promo-code-platform"', 'for="promo-code-funnel"', 'for="promo-code-source"'], false)
             ->assertSee('Opsional, boleh dikosongkan jika belum diketahui.')
@@ -221,17 +221,17 @@ class PromoPageTest extends TestCase
     {
         $this->actingAs($this->employee)
             ->get(route('promo.index'))
-            ->assertSee('Confirm Funnel/Source Change')
+            ->assertSee('Konfirmasi Perubahan Funnel/Source')
             ->assertSee('Perubahan Funnel/Sumber berlaku untuk penggunaan setelah perubahan disimpan.')
             ->assertSee('Transaksi historis yang sudah terklasifikasi tidak akan berubah. Lanjutkan?')
-            ->assertSeeInOrder(['@click="cancelConfirm()"', 'Cancel', '@click="save()"', 'Continue'], false);
+            ->assertSeeInOrder(['@click="cancelConfirm()"', 'Batal', '@click="save()"', 'Lanjutkan'], false);
     }
 
     public function test_promo_code_delete_explains_used_codes_cannot_be_deleted(): void
     {
         $this->actingAs($this->employee)
             ->get(route('promo.index'))
-            ->assertSee('Delete Promo Code?')
+            ->assertSee('Hapus Kode Promo?')
             ->assertSee('sehingga tidak dapat dihapus.');
     }
 
@@ -242,8 +242,8 @@ class PromoPageTest extends TestCase
             ->assertSee('@click="$dispatch(\'promo-bulk-open\')"', false)
             ->assertSee('x-data="promoCodeBulkEntry"', false)
             ->assertSee('id="promo-bulk-title"', false)
-            ->assertSeeInOrder(['Promo Code', 'Platform', 'Funnel', 'Source', 'Status'])
-            ->assertSeeInOrder(['Add Row', 'Add 5 Rows', 'Close', 'Save All']);
+            ->assertSeeInOrder(['Kode Promo', 'Platform', 'Funnel', 'Source', 'Status'])
+            ->assertSeeInOrder(['Tambah Baris', 'Tambah 5 Baris', 'Tutup', 'Simpan Semua']);
 
         foreach (['Code Type', 'Tipe Kode', 'Inactive', 'Nonaktif', 'is_active'] as $text) {
             $response->assertDontSee($text, false);
@@ -254,7 +254,7 @@ class PromoPageTest extends TestCase
     {
         $this->actingAs($this->employee)
             ->get(route('promo.index'))
-            ->assertSeeInOrder(['Processed', 'Succeeded', 'Failed'])
+            ->assertSeeInOrder(['Diproses', 'Berhasil', 'Gagal'])
             ->assertSee('Baris yang sudah tersimpan tidak dikirim ulang.')
             ->assertSee('@promo-codes-changed.window="reload()"', false);
     }
@@ -264,9 +264,9 @@ class PromoPageTest extends TestCase
         $this->actingAs($this->employee)
             ->get(route('promo.index'))
             ->assertSee('x-data="promoUnregisteredCodes"', false)
-            ->assertSeeInOrder(['Unregistered Promo Codes', 'Promo Code List'])
-            ->assertSeeInOrder(['Raw Code', 'Platform', 'Usage', 'Last Used', 'Actions'])
-            ->assertSee('Register Code')
+            ->assertSeeInOrder(['Kode Promo Belum Terdaftar', 'Daftar Kode Promo'])
+            ->assertSeeInOrder(['Kode Asli', 'Platform', 'Penggunaan', 'Terakhir Dipakai', 'Aksi'])
+            ->assertSee('Daftarkan Kode')
             ->assertSee('Transaksi dengan kode ini tetap tersimpan dan tetap dihitung dalam analisis.');
     }
 
@@ -276,7 +276,7 @@ class PromoPageTest extends TestCase
             ->get(route('promo.index'))
             ->assertSee('@promo-code-register.window="openRegister($event.detail)"', false)
             ->assertSee('@promo-codes-changed.window="refresh()"', false)
-            ->assertSee('Register Promo Code')
+            ->assertSee('Daftarkan Kode Promo')
             ->assertSee('Mendaftarkan kode dari alert juga dapat melengkapi')
             ->assertSee('penggunaan historis yang sebelumnya belum terpetakan akan dihubungkan')
             ->assertSee('Hanya penggunaan yang belum terhubung ke kode promo yang diproses; penggunaan yang sudah terhubung tidak diproses ulang meskipun funnel/source-nya kosong. Klasifikasi Funnel/Source yang sudah ada tidak akan ditimpa.')
@@ -289,10 +289,10 @@ class PromoPageTest extends TestCase
             ->get(route('promo.index'))
             ->assertSee("promoMasterTable('funnel', 'Funnel')", false)
             ->assertSee("promoMasterTable('source', 'Source')", false)
-            ->assertSeeInOrder(['Funnel List', 'Create Funnel', 'Source List', 'Create Source'])
+            ->assertSeeInOrder(['Daftar Funnel', 'Tambah Funnel', 'Daftar Source', 'Tambah Source'])
             ->assertSee('id="funnel-form-title"', false)
             ->assertSee('id="source-form-title"', false)
-            ->assertSeeInOrder(['Delete Funnel?', 'Delete Source?']);
+            ->assertSeeInOrder(['Hapus Funnel?', 'Hapus Source?']);
     }
 
     public function test_platform_list_is_read_only(): void
@@ -300,7 +300,7 @@ class PromoPageTest extends TestCase
         $this->actingAs($this->employee)
             ->get(route('promo.index'))
             ->assertSee('x-data="promoPlatformTable"', false)
-            ->assertSeeInOrder(['Platform List', 'Read Only'])
+            ->assertSeeInOrder(['Daftar Platform', 'Read Only'])
             ->assertDontSee('Create Platform')
             ->assertDontSee('Edit Platform')
             ->assertDontSee('Delete Platform');
@@ -311,7 +311,7 @@ class PromoPageTest extends TestCase
         foreach ([$this->manager, $this->employee] as $account) {
             $this->actingAs($account)
                 ->get(route('promo.index'))
-                ->assertSeeInOrder(['Sales &amp; Marketing', 'Promo Management'], false)
+                ->assertSeeInOrder(['Penjualan &amp; Pemasaran', 'Manajemen Promo'], false)
                 ->assertSee('href="'.route('promo.index').'"', false)
                 ->assertSee('aria-current="page"', false);
         }

@@ -1,7 +1,7 @@
 @php
     $columns = [
-        ['label' => 'Payment Method', 'class' => ''],
-        ['label' => 'Transactions', 'class' => 'text-right'],
+        ['label' => 'Metode Pembayaran', 'class' => ''],
+        ['label' => 'Transaksi', 'class' => 'text-right'],
         ['label' => 'Revenue', 'class' => 'text-right'],
         ['label' => 'Contribution (%)', 'class' => 'text-right'],
     ];
@@ -20,12 +20,12 @@
 >
     <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
-            <h2 id="performance-payment-method-title" class="text-base font-semibold text-ink">Payment Methods</h2>
+            <h2 id="performance-payment-method-title" class="text-base font-semibold text-ink">Metode Pembayaran</h2>
             <p class="mt-1 text-sm text-muted">Distribusi metode pembayaran beserta jumlah transaksi, revenue, dan kontribusinya sesuai filter aktif.</p>
         </div>
 
         <div class="flex flex-wrap items-center gap-3">
-            <div class="{{ $group }}" role="radiogroup" aria-label="Payment Method Parameter">
+            <div class="{{ $group }}" role="radiogroup" aria-label="Parameter Metode Pembayaran">
                 @foreach ($paymentMethod['parameters'] as $option)
                     <button
                         type="button"
@@ -66,7 +66,7 @@
                 class="inline-flex h-9 items-center justify-center rounded-lg border border-line bg-white px-3 text-sm font-semibold text-ink hover:bg-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
                 @click="retryPayment()"
             >
-                Reload
+                Muat Ulang
             </button>
         </div>
     </div>
@@ -139,7 +139,7 @@
                         </div>
                         <dl class="grid grid-cols-2 gap-x-4 pl-6 text-sm">
                             <div>
-                                <dt class="text-xs font-semibold text-label">Transactions</dt>
+                                <dt class="text-xs font-semibold text-label">Transaksi</dt>
                                 <dd class="performance-value text-muted" x-text="row.transactions"></dd>
                             </div>
                             <div>
@@ -152,7 +152,7 @@
                 <li class="bg-soft/60 px-4 py-3">
                     <dl class="grid grid-cols-2 gap-x-4 text-sm font-bold text-ink">
                         <div>
-                            <dt class="text-xs text-label">Total Transactions</dt>
+                            <dt class="text-xs text-label">Total Transaksi</dt>
                             <dd class="performance-value" x-text="paymentTotals.transactions"></dd>
                         </div>
                         <div>

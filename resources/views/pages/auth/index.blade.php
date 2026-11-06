@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('title', 'Login')
+@section('title', 'Masuk')
 @section('body_class', 'auth-body')
 
 @push('scripts')
@@ -13,7 +13,7 @@
             <header class="auth-header">
                 <div class="auth-logo" aria-hidden="true">SM</div>
                 <h1 id="auth-title" class="auth-title">SiMarsel<span class="auth-title-dot">.</span></h1>
-                <p class="auth-subtitle">Masuk untuk mengakses dashboard.</p>
+                <p class="auth-subtitle">Masuk untuk mengakses dasbor SiMarsel.</p>
             </header>
 
             <div id="login-alert" class="auth-alert" role="alert" hidden></div>
@@ -50,7 +50,7 @@
                             autocomplete="current-password"
                             required
                         >
-                        <button type="button" id="toggle-password" class="auth-toggle" aria-label="Show Password" aria-pressed="false">
+                        <button type="button" id="toggle-password" class="auth-toggle" aria-label="Tampilkan password" aria-pressed="false">
                             <svg class="auth-icon-eye" viewBox="0 0 24 24" aria-hidden="true">
                                 <path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z" />
                                 <circle cx="12" cy="12" r="3" />
@@ -66,7 +66,7 @@
 
                 <button type="submit" id="login-button" class="auth-button" disabled>
                     <span class="auth-spinner" aria-hidden="true"></span>
-                    <span class="auth-button-text">Login</span>
+                    <span class="auth-button-text">Masuk</span>
                 </button>
             </form>
         </section>

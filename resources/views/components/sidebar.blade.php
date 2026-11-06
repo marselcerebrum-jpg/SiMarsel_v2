@@ -14,7 +14,7 @@
     id="sidebar"
     class="fixed inset-y-0 left-0 z-50 flex w-64 -translate-x-full flex-col overflow-hidden bg-navy transition-transform duration-300 ease-in-out lg:translate-x-0"
     :class="{ '-translate-x-full': !open }"
-    aria-label="Main Menu"
+    aria-label="Menu Utama"
 >
     {{-- 1. Logo & tombol tutup (mobile) --}}
     <div class="relative flex shrink-0 items-center justify-between px-4 pt-6 pb-5">
@@ -25,7 +25,7 @@
                 <span class="block text-[9px] leading-tight font-bold tracking-wider text-slate-400 uppercase">PT. Cerebrum<br>Edukanesia Nusantara</span>
             </span>
         </a>
-        <button type="button" class="p-2 text-slate-400 hover:text-white lg:hidden" aria-label="Close Menu" @click="open = false">
+        <button type="button" class="p-2 text-slate-400 hover:text-white lg:hidden" aria-label="Tutup Menu" @click="open = false">
             <x-icon name="close" class="size-5" />
         </button>
     </div>
@@ -66,7 +66,7 @@
                                         <button type="button" class="{{ $subBase }} {{ $soon }}" title="Fitur belum dibuat" @click="soon(@js($child['label']))">
                                             <x-icon :name="$child['icon']" />
                                             {{ $child['label'] }}
-                                            <span class="ml-auto rounded-md bg-white/5 px-1.5 py-0.5 text-[8.5px] font-bold tracking-wider text-slate-500 uppercase">Soon</span>
+                                            <span class="ml-auto rounded-md bg-white/5 px-1.5 py-0.5 text-[8.5px] font-bold tracking-wider text-slate-500 uppercase">Segera</span>
                                         </button>
                                     @endif
                                 @endforeach
@@ -85,7 +85,7 @@
                         <button type="button" class="{{ $base }} {{ $soon }}" title="Fitur belum dibuat" @click="soon(@js($item['label']))">
                             <x-icon :name="$item['icon']" />
                             {{ $item['label'] }}
-                            <span class="ml-auto rounded-md bg-white/5 px-1.5 py-0.5 text-[8.5px] font-bold tracking-wider text-slate-500 uppercase">Soon</span>
+                            <span class="ml-auto rounded-md bg-white/5 px-1.5 py-0.5 text-[8.5px] font-bold tracking-wider text-slate-500 uppercase">Segera</span>
                         </button>
                     @endif
                 @endforeach
@@ -93,7 +93,7 @@
                 @if ($loop->last)
                     <a href="{{ route('login') }}" data-logout class="{{ $base }} {{ $idle }}">
                         <x-icon name="logout" />
-                        Logout
+                        Keluar
                     </a>
                 @endif
             </nav>
@@ -104,7 +104,7 @@
     <div class="relative shrink-0 border-t border-navy-line px-4 pt-4 pb-5">
         <div class="rounded-lg border border-navy-line p-3">
             <div class="mb-2 flex items-center justify-between gap-2">
-                <p class="text-[11px] font-semibold text-slate-400">Active Account</p>
+                <p class="text-[11px] font-semibold text-slate-400">Akun Aktif</p>
                 <span class="shrink-0 rounded-md bg-white/10 px-2 py-0.5 text-[11px] font-semibold text-white">{{ $account->role->name }}</span>
             </div>
 
@@ -112,7 +112,7 @@
             <p class="mt-0.5 text-[10px] leading-snug font-semibold break-all text-slate-400">{{ '@'.$account->username }}</p>
 
             <p class="mt-2 text-[11px] font-semibold text-emerald-300">
-                {{ $account->division?->name ?? 'No Division' }}
+                {{ $account->division?->name ?? 'Tanpa Divisi' }}
             </p>
         </div>
     </div>

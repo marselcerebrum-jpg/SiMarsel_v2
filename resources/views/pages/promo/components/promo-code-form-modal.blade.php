@@ -24,7 +24,7 @@
         x-transition
         class="relative max-h-[calc(100vh-2rem)] w-full max-w-md overflow-y-auto rounded-panel border border-line bg-surface p-5 shadow-lg"
     >
-        <h2 id="promo-code-form-title" class="text-base font-semibold text-ink" x-text="editing ? 'Edit Promo Code' : (registering ? 'Register Promo Code' : 'Add Promo Code')">Add Promo Code</h2>
+        <h2 id="promo-code-form-title" class="text-base font-semibold text-ink" x-text="editing ? 'Ubah Kode Promo' : (registering ? 'Daftarkan Kode Promo' : 'Tambah Kode Promo')">Tambah Kode Promo</h2>
         <p x-show="!editing" class="mt-1 text-sm text-muted">Daftarkan satu kode promo beserta platform, funnel, dan source-nya.</p>
         <p x-show="registering" class="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
             Kode ini ditemukan di <span class="font-semibold" x-text="registering?.usages_count + ' penggunaan'"></span> transaksi Markaz.
@@ -35,12 +35,12 @@
 
         <p x-show="optionsError" class="mt-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700" role="alert">
             <span x-text="optionsError"></span>
-            <button type="button" class="ml-1 font-semibold underline" @click="fetchOptions()">Retry</button>
+            <button type="button" class="ml-1 font-semibold underline" @click="fetchOptions()">Coba Lagi</button>
         </p>
 
         <form class="mt-5 flex flex-col gap-4" novalidate @submit.prevent="submit()">
             <div>
-                <label for="promo-code-code" class="{{ $labelClass }}">Promo Code {!! $required !!}</label>
+                <label for="promo-code-code" class="{{ $labelClass }}">Kode Promo {!! $required !!}</label>
                 <input
                     id="promo-code-code"
                     x-ref="codeInput"
@@ -128,9 +128,9 @@
             <p x-show="formError" x-text="formError" class="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700" role="alert"></p>
 
             <div class="flex flex-col-reverse gap-2 border-t border-line pt-4 sm:flex-row sm:justify-end">
-                <button type="button" class="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-line bg-white px-3 text-sm font-semibold text-ink hover:bg-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:opacity-50" :disabled="saving" @click="closeModal()">Cancel</button>
+                <button type="button" class="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-line bg-white px-3 text-sm font-semibold text-ink hover:bg-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:opacity-50" :disabled="saving" @click="closeModal()">Batal</button>
                 <button type="submit" :disabled="saving || (optionsLoading && !options.platforms.length)" class="inline-flex h-9 items-center justify-center gap-2 rounded-lg bg-primary px-4 text-sm font-semibold text-white hover:bg-primary-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-50">
-                    <span x-text="saving ? 'Saving…' : (editing ? 'Save Changes' : 'Save Promo Code')">Save Promo Code</span>
+                    <span x-text="saving ? 'Menyimpan…' : (editing ? 'Simpan Perubahan' : 'Simpan Kode Promo')">Simpan Kode Promo</span>
                 </button>
             </div>
         </form>

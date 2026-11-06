@@ -9,13 +9,13 @@
     $error = 'mt-1.5 text-xs text-red-600';
     $multiSelects = [
         ['field' => 'platforms', 'label' => 'Platform / Source App', 'options' => 'platformOptions', 'summary' => 'platformSummary', 'empty' => 'Belum ada platform.'],
-        ['field' => 'payment_methods', 'label' => 'Payment Method', 'options' => 'paymentMethodOptions', 'summary' => 'paymentMethodSummary', 'empty' => 'Belum ada metode pembayaran.'],
+        ['field' => 'payment_methods', 'label' => 'Metode Pembayaran', 'options' => 'paymentMethodOptions', 'summary' => 'paymentMethodSummary', 'empty' => 'Belum ada metode pembayaran.'],
     ];
 @endphp
 
 <p x-show="optionsError" x-cloak class="mt-4 flex flex-wrap items-center gap-3 rounded-lg border border-red-200 bg-red-50 px-4 py-2.5 text-sm text-red-700" role="alert">
     <span x-text="optionsError"></span>
-    <button type="button" class="font-semibold underline hover:no-underline" @click="loadOptions()">Try Again</button>
+    <button type="button" class="font-semibold underline hover:no-underline" @click="loadOptions()">Coba Lagi</button>
 </p>
 
 <div class="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
@@ -49,7 +49,7 @@
     @endforeach
 
     <div>
-        <label for="promo-analysis-search" class="{{ $label }}">Promo Code</label>
+        <label for="promo-analysis-search" class="{{ $label }}">Kode Promo</label>
         <div class="relative">
             <svg class="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-label" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true">
                 <circle cx="11" cy="11" r="7" />
@@ -70,7 +70,7 @@
 
     {{-- Only one period mode may be active; the API answers 422 otherwise --}}
     <div>
-        <label for="promo-analysis-mode" class="{{ $label }}">Period</label>
+        <label for="promo-analysis-mode" class="{{ $label }}">Periode</label>
         <div class="relative">
             <select id="promo-analysis-mode" x-model="filter.mode" @change="changeMode()" class="{{ $control }} appearance-none pr-9">
                 <template x-for="mode in modes" :key="mode.value">
@@ -84,7 +84,7 @@
     {{-- Month & Year --}}
     <template x-if="filter.mode === 'month'">
         <div>
-            <label for="promo-analysis-month" class="{{ $label }}">Month</label>
+            <label for="promo-analysis-month" class="{{ $label }}">Bulan</label>
             <div class="relative">
                 <select id="promo-analysis-month" x-model="filter.month" @change="apply()" class="{{ $control }} appearance-none pr-9" :class="errors.month && 'border-red-500'">
                     <template x-for="(month, index) in months" :key="index">
@@ -99,7 +99,7 @@
 
     <template x-if="filter.mode === 'month'">
         <div>
-            <label for="promo-analysis-year" class="{{ $label }}">Year</label>
+            <label for="promo-analysis-year" class="{{ $label }}">Tahun</label>
             <div class="relative">
                 <select id="promo-analysis-year" x-model="filter.year" @change="changeYear()" class="{{ $control }} appearance-none pr-9" :class="errors.year && 'border-red-500'">
                     <template x-for="year in years" :key="year">
@@ -115,7 +115,7 @@
     {{-- Date Range --}}
     <template x-if="filter.mode === 'date_range'">
         <div>
-            <label for="promo-analysis-start" class="{{ $label }}">Start Date</label>
+            <label for="promo-analysis-start" class="{{ $label }}">Tanggal Mulai</label>
             <input
                 id="promo-analysis-start"
                 type="date"
@@ -132,7 +132,7 @@
 
     <template x-if="filter.mode === 'date_range'">
         <div>
-            <label for="promo-analysis-end" class="{{ $label }}">End Date</label>
+            <label for="promo-analysis-end" class="{{ $label }}">Tanggal Akhir</label>
             <input
                 id="promo-analysis-end"
                 type="date"

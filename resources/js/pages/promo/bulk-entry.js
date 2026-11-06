@@ -231,7 +231,7 @@ export default function promoCodeBulkEntry() {
 
                 showToast({
                     type: this.summary.failed > 0 ? 'info' : 'success',
-                    title: 'Bulk Entry Processed',
+                    title: 'Input Massal Diproses',
                     text: `${this.summary.succeeded} kode berhasil disimpan, ${this.summary.failed} gagal.`,
                 });
             } catch (error) {

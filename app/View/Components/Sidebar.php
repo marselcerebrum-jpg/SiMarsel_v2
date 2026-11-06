@@ -22,20 +22,20 @@ class Sidebar extends Component
     public function __construct()
     {
         $this->sections = [
-            'Analytics' => [
-                $this->group('Performance Analysis', 'chart', [
-                    $this->link('Summary', 'chart', 'dashboard'),
-                    $this->link('Products', 'cube', 'performance.products'),
+            'Analitik' => [
+                $this->group('Analisis Performa', 'chart', [
+                    $this->link('Ringkasan', 'chart', 'dashboard'),
+                    $this->link('Produk', 'cube', 'performance.products'),
                 ]),
             ],
-            'Work' => [
+            'Pekerjaan' => [
                 $this->link('Tasklist', 'checklist', 'tasks.index'),
             ],
-            'Sales & Marketing' => [
-                $this->link('Promo Management', 'ticket', 'promo.index', ['viewAny', PromoCode::class]),
+            'Penjualan & Pemasaran' => [
+                $this->link('Manajemen Promo', 'ticket', 'promo.index', ['viewAny', PromoCode::class]),
             ],
-            'System' => [
-                $this->link('Organization Management', 'users', 'settings.index', ['viewAny', Account::class]),
+            'Sistem' => [
+                $this->link('Manajemen Organisasi', 'users', 'settings.index', ['viewAny', Account::class]),
             ],
         ];
     }
