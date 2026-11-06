@@ -53,7 +53,7 @@ Backend **wajib** menerapkan cakupan ini di setiap endpoint. Staff yang mengubah
 |---|---|---|
 | `GET /api/tasks/meta` | – | `{ data: { role, division, can_create, divisions: [{ code_division, name }], categories: [{ id, name, requires_review }], platforms: [{ slug, name }] } }` |
 | `GET /api/tasks` | `division` (opsional) | `{ data: [Task] }`, semua tugas dalam cakupan user. Pencarian, filter prioritas/status, sort, dan pagination dilakukan di frontend. |
-| `POST /api/tasks` | `title`*, `description`, `category_id`, `division`*, `pic_id`, `platform`, `priority`*, `start_date`, `deadline`, `status`* (`backlog`\|`todo`), `requires_review`, `client_request_id`* | `201 { data: Task, message }` |
+| `POST /api/tasks` | `title`*, `description`, `category_id`, `division`*, `pic_id`, `platform`, `priority`*, `start_date`, `deadline`, `status`* (`backlog`\|`todo`), `requires_review`, `evidence_required`, `client_request_id`* | `201 { data: Task, message }` |
 | `GET /api/tasks/{id}` | – | `{ data: TaskDetail }` |
 | `PATCH /api/tasks/{id}` | `title`, `description`, `category_id`, `platform`, `priority`, `start_date`, `deadline`, `updated_at`* | `{ data: TaskDetail, message }` |
 | `PATCH /api/tasks/{id}/status` | `status`*, `version`* | `{ data: TaskDetail, message }`; `422` dengan alasan di `errors.status` bila transisi ditolak; `409 { message, current_version }` bila `version` sudah usang |
@@ -61,7 +61,7 @@ Backend **wajib** menerapkan cakupan ini di setiap endpoint. Staff yang mengubah
 | `GET /api/tasks/assignees` | `division` | `{ data: [{ id, fullname, division }] }`, hanya user yang memenuhi aturan penugasan |
 | `GET /api/tasks/{id}/evidences` | – | `{ data: [Evidence] }` |
 | `GET /api/tasks/{id}/evidences/{evidence}/download` | – | File evidence (hanya untuk yang dapat melihat tugas; `404` bila bukan evidence tugas itu atau berupa tautan) |
-| `POST /api/tasks/{id}/evidences` | multipart: `file` **atau** `url`, `note` | `201 { data: Evidence, message }` |
+| `POST /api/tasks/{id}/evidences` | multipart: `file` **atau** `url`, `note` | `201 { data: Evidence, message }`; hanya PIC (`403` untuk yang lain); `422` dengan pesan di `errors.file`/`errors.url`, atau di `errors.evidence` bila status tugas tidak menerima evidence |
 | `POST /api/tasks/{id}/reviews` | `decision`* (`approve`\|`revision`), `note` (wajib untuk `revision`), `updated_at`* | `{ data: TaskDetail, message }` |
 | `GET /api/tasks/{id}/activities` | – | `{ data: [Activity] }` |
 | `GET /api/tasks/schedule` | `from`*, `to`*, `division` | `{ data: [ScheduleItem] }` |
@@ -109,10 +109,16 @@ Backend **wajib** menerapkan cakupan ini di setiap endpoint. Staff yang mengubah
 - PIC lama dan baru dicatat di histori.
 
 **Evidence (TASK-06)**
-- Hanya PIC yang boleh mengirim evidence, saat status `todo` atau `in_progress`.
-- File yang diterima frontend: PDF, JPG, JPEG, PNG, WEBP, DOC, DOCX, XLS, XLSX, PPT, PPTX, ZIP, maks. 10 MB. Backend tetap memvalidasi ulang jenis dan ukuran file.
-- Tautan wajib `http://` atau `https://`.
-- Evidence lama tetap tersimpan setelah revisi.
+- Hanya PIC yang boleh mengirim evidence, saat status `todo` atau `in_progress`. Admin dan Manajer divisi dapat melihat dan mengunduhnya.
+- Satu evidence berisi `file` **atau** `url`, tidak keduanya. `note` opsional, maks. 2000 karakter.
+- File yang diterima: PDF, JPG, JPEG, PNG, WEBP, DOC, DOCX, XLS, XLSX, PPT, PPTX, ZIP, maks. 10 MB. Backend memvalidasi ulang jenis dan ukuran file. File disimpan privat dan hanya dapat diunduh lewat endpoint download.
+- Tautan wajib URL valid dengan `http://` atau `https://`, maks. 2048 karakter.
+- Evidence terikat pada tugas di URL; `task_id` di body diabaikan.
+- PIC diperiksa ulang saat evidence disimpan (row tugas dikunci). Bila PIC diganti ketika evidence sedang dikirim, evidence dari PIC lama ditolak `403` dan file yang sudah terunggah dihapus.
+- `evidence_required` mengikuti kategori: kategori dengan `evidence_required = true` selalu mewajibkan evidence. Untuk kategori lain, pembuat tugas boleh mengirim `evidence_required` di `POST /api/tasks`. Memindahkan tugas ke kategori yang mewajibkan evidence membuat evidence wajib.
+- Submission tetap lewat `PATCH /api/tasks/{id}/status` (`ready_for_qa` bila wajib QA, `done` bila tidak); ditolak `422` bila evidence wajib tapi belum ada.
+- Setelah revisi (`on_qa` → `in_progress`), PIC dapat mengirim evidence baru dan submit ulang. Evidence lama tetap tersimpan dan tampil di detail (terbaru lebih dulu).
+- Setiap evidence yang dikirim dicatat di histori dengan action `evidence_submitted`.
 
 **Data lama (409)**: setiap perubahan membawa `updated_at` terakhir yang dilihat user. Jika berbeda dengan data di database, tolak dengan `409 Conflict`. Frontend lalu memuat ulang data dan meminta user memeriksa kembali.
 
