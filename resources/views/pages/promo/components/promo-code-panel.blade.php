@@ -15,6 +15,7 @@
             </button>
         </div>
 
+        @include('pages.promo.components.promo-analysis-actions')
         @include('pages.promo.components.promo-analysis-filter')
         @include('pages.promo.components.promo-analysis-summary')
         @include('pages.promo.components.promo-analysis-trend')

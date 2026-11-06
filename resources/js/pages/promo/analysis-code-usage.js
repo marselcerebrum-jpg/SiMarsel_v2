@@ -1,6 +1,8 @@
 import { errorMessage, validationErrors } from '../../http';
 import { formatDate, formatValue } from '../../format';
 import { fetchAnalysisCodeUsages } from './api';
+import { USAGE_COLUMNS, allPages, copyAllSnapshot, runCopy } from './analysis-copy';
+import { showToast } from '../../components/toast';
 
 /**
  * Usage detail of one promo code recap row, read-only (no import). Uses the analysis filter
@@ -17,6 +19,8 @@ export default function promoAnalysisCodeUsage() {
         loading: false,
         loadError: '',
         requestId: 0,
+        copying: false,
+        copyError: '',
 
         /**
          * The backend groups transactions per date; the table lists one row per transaction.
@@ -54,6 +58,7 @@ export default function promoAnalysisCodeUsage() {
             this.filterQuery = filterQuery ?? '';
             this.page = 1;
             this.result = null;
+            this.copyError = '';
             this.open = true;
 
             return this.fetch();
@@ -64,6 +69,7 @@ export default function promoAnalysisCodeUsage() {
             this.row = null;
             this.result = null;
             this.loadError = '';
+            this.copyError = '';
             // Ignore a response that arrives after the panel is closed.
             this.requestId++;
             this.loading = false;
@@ -79,6 +85,32 @@ export default function promoAnalysisCodeUsage() {
 
         retry() {
             return this.fetch();
+        },
+
+        /**
+         * Copies every transaction of this code for the active filter, not only the page on screen.
+         */
+        async copy() {
+            if (this.copying || !this.row) return;
+
+            const query = this.query();
+            const snapshot = copyAllSnapshot(this, USAGE_COLUMNS, this.meta?.total ?? this.transactions.length, () => allPages(
+                fetchAnalysisCodeUsages,
+                query,
+                (result) => (result.data ?? []).flatMap((day) => day.transactions ?? []),
+            ));
+
+            this.copying = true;
+            this.copyError = '';
+
+            try {
+                const { message, error } = await runCopy(snapshot, `detail penggunaan ${this.row.code}`);
+
+                this.copyError = error ?? '';
+                if (message) showToast({ title: 'Data Copied', text: message });
+            } finally {
+                this.copying = false;
+            }
         },
 
         query() {

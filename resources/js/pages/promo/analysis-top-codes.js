@@ -1,4 +1,5 @@
 import { errorMessage, validationErrors } from '../../http';
+import { TOP_CODE_COLUMNS, copySnapshot } from './analysis-copy';
 import { formatValue } from '../../format';
 import { fetchAnalysisTopCodes } from './api';
 
@@ -73,6 +74,10 @@ export default function promoAnalysisTopCodes() {
 
         retry() {
             return this.load(this.query);
+        },
+
+        provideCopy(detail) {
+            if (detail.target === 'top-codes') detail.snapshot = copySnapshot(this, TOP_CODE_COLUMNS, this.codes.map((row) => ({ ...row, display_code: this.displayCode(row) })));
         },
     };
 }

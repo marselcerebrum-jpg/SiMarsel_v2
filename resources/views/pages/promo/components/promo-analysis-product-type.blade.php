@@ -2,6 +2,7 @@
 <section
     x-data="promoAnalysisProductType"
     @promo-analysis-filter.window="load($event.detail)"
+    @promo-analysis-copy.window="provideCopy($event.detail)"
     class="mt-5 border-t border-line pt-5"
     aria-labelledby="promo-product-type-title"
 >

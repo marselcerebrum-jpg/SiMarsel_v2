@@ -12,8 +12,9 @@
 @endphp
 
 <section
-    x-data="promoAnalysisSummary"
+    x-data="promoAnalysisSummary(@js($metrics))"
     @promo-analysis-filter.window="load($event.detail)"
+    @promo-analysis-copy.window="provideCopy($event.detail)"
     class="mt-5 border-t border-line pt-5"
     aria-label="Promo Summary"
 >
