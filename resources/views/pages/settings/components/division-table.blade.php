@@ -7,11 +7,11 @@
         <table class="w-full min-w-[560px] text-left text-sm">
             <thead class="bg-soft text-xs font-semibold text-label">
                 <tr>
-                    <th scope="col" class="px-4 py-3">Code</th>
-                    <th scope="col" class="px-4 py-3">Division Name</th>
-                    <th scope="col" class="px-4 py-3">Members</th>
+                    <th scope="col" class="px-4 py-3">Kode</th>
+                    <th scope="col" class="px-4 py-3">Nama Divisi</th>
+                    <th scope="col" class="px-4 py-3">Anggota</th>
                     @if ($canManage)
-                        <th scope="col" class="px-4 py-3 text-right">Actions</th>
+                        <th scope="col" class="px-4 py-3 text-right">Aksi</th>
                     @endif
                 </tr>
             </thead>
@@ -33,12 +33,12 @@
                                     type="button"
                                     class="rounded-md px-2 py-1 font-semibold text-primary hover:text-primary-hover focus-visible:outline-2 focus-visible:outline-primary"
                                     @click="openEdit(division)"
-                                >Edit</button>
+                                >Ubah</button>
                                 <button
                                     type="button"
                                     class="ml-2 rounded-md px-2 py-1 font-semibold text-red-600 hover:text-red-700 focus-visible:outline-2 focus-visible:outline-red-600"
                                     @click="openDelete(division)"
-                                >Delete</button>
+                                >Hapus</button>
                             </td>
                         @endif
                     </tr>
@@ -51,7 +51,7 @@
                 <tr x-show="!loading && loadError" x-cloak>
                     <td colspan="{{ $columns }}" class="px-4 py-10 text-center">
                         <p class="text-sm font-medium text-red-600" x-text="loadError"></p>
-                        <button type="button" class="mt-2 text-xs font-semibold text-primary hover:text-primary-hover" @click="fetchDivisions()">Retry</button>
+                        <button type="button" class="mt-2 text-xs font-semibold text-primary hover:text-primary-hover" @click="fetchDivisions()">Coba Lagi</button>
                     </td>
                 </tr>
 
@@ -59,7 +59,7 @@
                     <td colspan="{{ $columns }}" class="px-4 py-10 text-center">
                         <p class="text-sm font-medium text-ink">Belum ada divisi.</p>
                         @if ($canManage)
-                            <button type="button" class="mt-2 text-xs font-semibold text-primary hover:text-primary-hover" @click="openCreate()">Create First Division</button>
+                            <button type="button" class="mt-2 text-xs font-semibold text-primary hover:text-primary-hover" @click="openCreate()">Tambah Divisi Pertama</button>
                         @endif
                     </td>
                 </tr>
@@ -68,7 +68,7 @@
                     <td colspan="{{ $columns }}" class="px-4 py-10 text-center">
                         <p class="text-sm font-medium text-ink">Tidak ada divisi yang cocok.</p>
                         <p class="mt-1 text-xs text-muted">Coba ubah kata kunci pencarian.</p>
-                        <button type="button" class="mt-2 text-xs font-semibold text-primary hover:text-primary-hover" @click="search = ''">Reset Search</button>
+                        <button type="button" class="mt-2 text-xs font-semibold text-primary hover:text-primary-hover" @click="search = ''">Atur Ulang Pencarian</button>
                     </td>
                 </tr>
             </tbody>

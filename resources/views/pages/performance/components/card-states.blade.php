@@ -25,12 +25,12 @@
 {{-- Error --}}
 <div x-show="!loading && status === 'error'" x-cloak class="flex flex-col items-center gap-3 rounded-lg border border-red-200 bg-red-50 px-4 py-10 text-center">
     <p class="text-sm text-red-700" x-text="error"></p>
-    <button type="button" class="{{ $stateButton }}" @click="load()">Try Again</button>
+    <button type="button" class="{{ $stateButton }}" @click="load()">Coba Lagi</button>
 </div>
 
 {{-- Data kosong --}}
 <div x-show="!loading && status === 'empty'" x-cloak class="flex flex-col items-center gap-1 rounded-lg border border-dashed border-line bg-soft px-4 py-10 text-center">
     <p class="text-sm font-semibold text-ink">{{ $emptyText }}</p>
     <p class="text-sm text-muted">Tidak ada data untuk <span x-text="periodLabel"></span>.</p>
-    <button x-show="hasActiveFilter" type="button" class="{{ $stateButton }} mt-3" @click="resetFilters()">Reset Filter</button>
+    <button x-show="hasActiveFilter" type="button" class="{{ $stateButton }} mt-3" @click="resetFilters()">Atur Ulang Filter</button>
 </div>

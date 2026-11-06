@@ -58,6 +58,6 @@
             </select>
         </label>
 
-        <button type="button" class="{{ $button }} shrink-0" :disabled="!hasActiveFilter" @click="resetFilters()">Reset Filter</button>
+        <button type="button" class="{{ $button }} shrink-0" :disabled="!hasActiveFilter" @click="resetFilters()">Atur Ulang Filter</button>
     </div>
 </div>

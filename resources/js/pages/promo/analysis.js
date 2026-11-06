@@ -54,11 +54,11 @@ export default function promoAnalysis() {
         },
 
         get platformSummary() {
-            return selectionSummary(this.platformOptions, this.filter.platforms, 'All Platforms', 'platforms');
+            return selectionSummary(this.platformOptions, this.filter.platforms, 'Semua Platform', 'platforms');
         },
 
         get paymentMethodSummary() {
-            return selectionSummary(this.paymentMethodOptions, this.filter.payment_methods, 'All Payment Methods', 'methods');
+            return selectionSummary(this.paymentMethodOptions, this.filter.payment_methods, 'Semua Metode Pembayaran', 'methods');
         },
 
         get filterInvalid() {

@@ -12,7 +12,7 @@
     <div x-show="createOpen" x-transition.opacity class="absolute inset-0 bg-slate-900/50" @click="!saving && (createOpen = false)"></div>
 
     <div x-show="createOpen" x-transition class="relative max-h-[calc(100vh-2rem)] w-full max-w-2xl overflow-y-auto rounded-panel border border-line bg-surface p-5 shadow-lg">
-        <h2 id="create-task-title" class="text-base font-semibold text-ink">Create Task</h2>
+        <h2 id="create-task-title" class="text-base font-semibold text-ink">Buat Tugas</h2>
         <p class="mt-1 text-sm text-muted">Buat tugas baru dan tentukan penanggung jawabnya. Pembuat tugas dicatat otomatis dari akun Anda.</p>
 
         <form class="mt-5 flex flex-col gap-5" novalidate @submit.prevent="submit()">
@@ -133,9 +133,9 @@
                 :class="formPending ? 'border-amber-200 bg-amber-50 text-amber-900' : 'border-red-200 bg-red-50 text-red-700'"></p>
 
             <div class="flex flex-col-reverse gap-2 border-t border-line pt-4 sm:flex-row sm:justify-end">
-                <button type="button" class="{{ $button }}" :disabled="saving" @click="createOpen = false">Cancel</button>
+                <button type="button" class="{{ $button }}" :disabled="saving" @click="createOpen = false">Batal</button>
                 <button type="submit" class="{{ $primaryButton }}" :disabled="saving">
-                    <span x-text="saving ? 'Saving…' : 'Save Task'">Save Task</span>
+                    <span x-text="saving ? 'Menyimpan…' : 'Simpan Tugas'">Simpan Tugas</span>
                 </button>
             </div>
         </form>

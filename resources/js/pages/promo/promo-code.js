@@ -243,15 +243,15 @@ export default function promoCodeManagement() {
 
                 if (editing) {
                     this.items = this.items.map((item) => (item.id === editing.id ? result.data : item));
-                    showToast({ title: 'Changes Saved', text: `Kode promo ${result.data.code} sudah diperbarui.` });
+                    showToast({ title: 'Perubahan Tersimpan', text: `Kode promo ${result.data.code} sudah diperbarui.` });
                 } else {
                     showToast(
                         registering
                             ? {
-                                  title: 'Promo Code Registered',
+                                  title: 'Kode Promo Didaftarkan',
                                   text: `${result.data.code} terdaftar dan ${result.data.usages_count ?? 0} penggunaan transaksi sudah terhubung.`,
                               }
-                            : { title: 'Promo Code Created', text: `${result.data.code} sudah ditambahkan.` },
+                            : { title: 'Kode Promo Ditambahkan', text: `${result.data.code} sudah ditambahkan.` },
                     );
                 }
             } catch (error) {
@@ -281,7 +281,7 @@ export default function promoCodeManagement() {
                 this.saving = false;
                 this.closeModal();
                 this.fetchItems();
-                showToast({ title: 'Promo Code Deleted', text: `${deleting.code} sudah dihapus.` });
+                showToast({ title: 'Kode Promo Dihapus', text: `${deleting.code} sudah dihapus.` });
             } catch (error) {
                 this.formError = errorMessage(error);
 

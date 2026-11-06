@@ -67,8 +67,8 @@ export const TRANSITIONS = [
     { from: 'in_progress', to: 'ready_for_qa', actor: 'pic', when: 'requires_review', label: 'Kirim ke QA' },
     { from: 'in_progress', to: 'done', actor: 'pic', when: 'no_review', label: 'Selesaikan Tugas' },
     { from: 'ready_for_qa', to: 'on_qa', actor: 'manager', label: 'Mulai Review' },
-    { from: 'on_qa', to: 'done', actor: 'manager', label: 'Approve', review: 'approve' },
-    { from: 'on_qa', to: 'in_progress', actor: 'manager', label: 'Request Revision', review: 'revision' },
+    { from: 'on_qa', to: 'done', actor: 'manager', label: 'Setujui', review: 'approve' },
+    { from: 'on_qa', to: 'in_progress', actor: 'manager', label: 'Minta Revisi', review: 'revision' },
 ];
 
 /**

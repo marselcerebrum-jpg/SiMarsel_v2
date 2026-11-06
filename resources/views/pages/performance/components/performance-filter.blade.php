@@ -11,14 +11,14 @@
 <div class="flex items-center justify-between gap-3">
     <h2 id="filter-title" class="text-base font-semibold text-ink">Filter</h2>
     <button type="button" class="inline-flex h-9 items-center rounded-lg px-3 text-sm font-semibold text-muted hover:bg-soft hover:text-ink" @click="resetFilter()">
-        Reset
+        Atur Ulang
     </button>
 </div>
 
 <div class="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
     {{-- Platforms (multi-select) --}}
     <div x-data="{ open: false }" @click.outside="open = false" @keydown.escape="open = false" class="relative">
-        <span id="filter-platforms-label" class="{{ $label }}">Platforms</span>
+        <span id="filter-platforms-label" class="{{ $label }}">Platform</span>
         <button
             type="button"
             class="{{ $control }} relative truncate pr-9 text-left"
@@ -28,7 +28,7 @@
             :aria-expanded="open.toString()"
             @click="open = !open"
         >
-            <span x-text="platformSummary">All Platforms</span>
+            <span x-text="platformSummary">Semua Platform</span>
             <x-icon name="chevron-down" class="{{ $chevron }}" />
         </button>
         <div x-show="open" x-cloak class="{{ $menu }}" role="listbox" aria-multiselectable="true" aria-labelledby="filter-platforms-label">
@@ -44,7 +44,7 @@
 
     {{-- Period mode: only one may be active, the API answers 422 otherwise --}}
     <div>
-        <label for="filter-mode" class="{{ $label }}">Period</label>
+        <label for="filter-mode" class="{{ $label }}">Periode</label>
         <div class="relative">
             <select id="filter-mode" x-model="filter.mode" @change="changeMode()" class="{{ $control }} appearance-none pr-9">
                 <template x-for="mode in modes" :key="mode.value">
@@ -58,7 +58,7 @@
     {{-- Year & Month --}}
     <template x-if="filter.mode === 'years'">
         <div x-data="{ open: false }" @click.outside="open = false" @keydown.escape="open = false" class="relative">
-            <span id="filter-years-label" class="{{ $label }}">Years <span class="font-normal">(maks. <span x-text="maxYears"></span>)</span></span>
+            <span id="filter-years-label" class="{{ $label }}">Tahun <span class="font-normal">(maks. <span x-text="maxYears"></span>)</span></span>
             <button
                 type="button"
                 class="{{ $control }} relative truncate pr-9 text-left"
@@ -85,10 +85,10 @@
 
     <template x-if="filter.mode === 'years'">
         <div>
-            <label for="filter-month" class="{{ $label }}">Month</label>
+            <label for="filter-month" class="{{ $label }}">Bulan</label>
             <div class="relative">
                 <select id="filter-month" x-model="filter.month" @change="apply()" :disabled="!monthEnabled" class="{{ $control }} appearance-none pr-9" :class="errors.month && 'border-red-500'">
-                    <option value="">All Months</option>
+                    <option value="">Semua Bulan</option>
                     <template x-for="(month, index) in months" :key="index">
                         <option :value="String(index + 1)" x-text="month" :selected="String(index + 1) === String(filter.month)"></option>
                     </template>
@@ -103,7 +103,7 @@
     {{-- Year range --}}
     <template x-if="filter.mode === 'year_range'">
         <div>
-            <label for="filter-year-from" class="{{ $label }}">From Year</label>
+            <label for="filter-year-from" class="{{ $label }}">Dari Tahun</label>
             <div class="relative">
                 <select id="filter-year-from" x-model="filter.year_from" @change="apply()" class="{{ $control }} appearance-none pr-9" :class="errors.year_from && 'border-red-500'">
                     <template x-for="year in years" :key="year">
@@ -118,7 +118,7 @@
 
     <template x-if="filter.mode === 'year_range'">
         <div>
-            <label for="filter-year-to" class="{{ $label }}">To Year</label>
+            <label for="filter-year-to" class="{{ $label }}">Sampai Tahun</label>
             <div class="relative">
                 <select id="filter-year-to" x-model="filter.year_to" @change="apply()" class="{{ $control }} appearance-none pr-9" :class="errors.year_to && 'border-red-500'">
                     <template x-for="year in years" :key="year">
@@ -134,7 +134,7 @@
     {{-- Date range --}}
     <template x-if="filter.mode === 'date_range'">
         <div>
-            <label for="filter-start" class="{{ $label }}">Start Date</label>
+            <label for="filter-start" class="{{ $label }}">Tanggal Mulai</label>
             <input
                 id="filter-start"
                 type="date"
@@ -151,7 +151,7 @@
 
     <template x-if="filter.mode === 'date_range'">
         <div>
-            <label for="filter-end" class="{{ $label }}">End Date</label>
+            <label for="filter-end" class="{{ $label }}">Tanggal Akhir</label>
             <input
                 id="filter-end"
                 type="date"

@@ -81,7 +81,7 @@ export default (parameters = []) => {
         get paymentChartLabel() {
             const slices = this.paymentRows.map((row) => `${row.name} ${row.percentage}`).join(', ');
 
-            return `Pie chart distribusi ${this.paymentMeta.label} per metode pembayaran: ${slices}`;
+            return `Diagram lingkaran distribusi ${this.paymentMeta.label} per metode pembayaran: ${slices}`;
         },
 
         setPaymentParameter(value) {

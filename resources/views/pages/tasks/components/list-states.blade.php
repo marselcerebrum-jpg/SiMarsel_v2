@@ -52,15 +52,15 @@
 
 <div x-show="!loading && status === 'error'" x-cloak class="flex flex-col items-center gap-3 rounded-lg border border-red-200 bg-red-50 px-4 py-10 text-center" role="alert">
     <p class="text-sm text-red-700" x-text="error"></p>
-    <button type="button" class="{{ $button }}" @click="load()">Try Again</button>
+    <button type="button" class="{{ $button }}" @click="load()">Coba Lagi</button>
 </div>
 
 <div x-show="!loading && emptyKind === 'none'" x-cloak class="flex flex-col items-center gap-1 rounded-lg border border-dashed border-line bg-soft px-4 py-12 text-center">
     <p class="text-sm font-semibold text-ink">Belum ada tugas yang tersedia.</p>
-    <p x-show="canCreate" class="text-sm text-muted">Buat tugas pertama melalui tombol Create Task.</p>
+    <p x-show="canCreate" class="text-sm text-muted">Buat tugas pertama melalui tombol Buat Tugas.</p>
 </div>
 
 <div x-show="emptyKind === 'filtered'" x-cloak class="flex flex-col items-center gap-3 rounded-lg border border-dashed border-line bg-soft px-4 py-12 text-center">
     <p class="text-sm font-semibold text-ink">Tidak ada tugas yang sesuai dengan filter.</p>
-    <button type="button" class="{{ $button }}" @click="resetFilters()">Reset Filter</button>
+    <button type="button" class="{{ $button }}" @click="resetFilters()">Atur Ulang Filter</button>
 </div>
