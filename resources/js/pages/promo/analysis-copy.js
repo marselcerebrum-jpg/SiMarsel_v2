@@ -8,13 +8,13 @@ import { errorMessage } from '../../http';
  * Paginated tables use copyAllSnapshot(), which copies every row of the active filter, not one page.
  */
 export const COPY_TARGETS = [
-    { value: 'summary', label: 'KPI Summary' },
-    { value: 'trend', label: 'Promo Usage Trend' },
-    { value: 'top-codes', label: 'Top 5 Promo Codes' },
-    { value: 'funnel', label: 'Promo Analysis by Funnel' },
-    { value: 'source', label: 'Promo Analysis by Source' },
-    { value: 'product-type', label: 'First-Time vs Renewal Promo Analysis' },
-    { value: 'codes', label: 'Summary by Promo Code' },
+    { value: 'summary', label: 'Ringkasan KPI' },
+    { value: 'trend', label: 'Tren Penggunaan Promo' },
+    { value: 'top-codes', label: '5 Kode Promo Teratas' },
+    { value: 'funnel', label: 'Analisis Promo per Funnel' },
+    { value: 'source', label: 'Analisis Promo per Source' },
+    { value: 'product-type', label: 'Perdana vs Perpanjangan' },
+    { value: 'codes', label: 'Rekap per Kode Promo' },
 ];
 
 const registration = (row) => (row.is_registered ? 'Terdaftar' : 'Belum terdaftar');

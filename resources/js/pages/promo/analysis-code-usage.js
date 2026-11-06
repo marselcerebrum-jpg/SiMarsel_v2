@@ -107,7 +107,7 @@ export default function promoAnalysisCodeUsage() {
                 const { message, error } = await runCopy(snapshot, `detail penggunaan ${this.row.code}`);
 
                 this.copyError = error ?? '';
-                if (message) showToast({ title: 'Data Copied', text: message });
+                if (message) showToast({ title: 'Data Disalin', text: message });
             } finally {
                 this.copying = false;
             }

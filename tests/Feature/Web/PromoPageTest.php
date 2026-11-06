@@ -167,9 +167,9 @@ class PromoPageTest extends TestCase
             ->assertSeeInOrder([
                 'x-data="promoAnalysis"',
                 'x-data="promoAnalysisActions"',
-                'Component to Copy',
-                'Copy',
-                'Export Excel',
+                'Komponen yang Disalin',
+                'Salin',
+                'Ekspor Excel',
                 'id="promo-analysis-search"',
             ], false)
             ->assertSee('@promo-analysis-filter.window="clearStatus()"', false)

@@ -7,7 +7,7 @@ import { COPY_TARGETS, runCopy } from './analysis-copy';
 const FALLBACK_FILE_NAME = 'promo-analisis.xlsx';
 
 /**
- * Export Excel and Copy for the promo analysis. Placed inside `promoAnalysis`, so it reads the
+ * Ekspor Excel (Export) and Salin (Copy) for the promo analysis. Placed inside `promoAnalysis`, so it reads the
  * active filter (`query`, `filterInvalid`) from that scope. Both actions only read data.
  *
  * - Export asks the components for their view state with the synchronous `promo-analysis-export-params`
@@ -60,7 +60,7 @@ export default function promoAnalysisActions() {
 
                 download(blob, name);
                 this.status = null;
-                showToast({ title: 'Export Successful', text: `File ${name} berhasil diunduh.` });
+                showToast({ title: 'Ekspor Berhasil', text: `File ${name} berhasil diunduh.` });
             } catch (error) {
                 if (error?.status === 422 && error.data?.errors) {
                     this.$dispatch('promo-analysis-errors', validationErrors(error));
@@ -86,7 +86,7 @@ export default function promoAnalysisActions() {
                 const { message, error } = await runCopy(detail.snapshot, label);
 
                 this.status = error ? { type: 'error', message: error } : null;
-                if (message) showToast({ title: 'Data Copied', text: message });
+                if (message) showToast({ title: 'Data Disalin', text: message });
             } finally {
                 this.copying = false;
             }

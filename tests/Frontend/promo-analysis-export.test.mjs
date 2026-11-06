@@ -331,7 +331,7 @@ test('Export Excel sends the active filter with the trend period and code sort, 
 
     same(calls.exports, ['platforms%5B%5D=jadiasn&payment_methods%5B%5D=BCA&year=2026&month=9&search=cpns&period=weekly&sort=usages&direction=desc']);
     same(calls.downloads, [{ blob, fileName: 'promo-analisis_2026-09-01_2026-09-30.xlsx' }]);
-    same(calls.toasts, [{ title: 'Export Successful', text: 'File promo-analisis_2026-09-01_2026-09-30.xlsx berhasil diunduh.' }]);
+    same(calls.toasts, [{ title: 'Ekspor Berhasil', text: 'File promo-analisis_2026-09-01_2026-09-30.xlsx berhasil diunduh.' }]);
     assert.equal(bar.exporting, false);
     assert.equal(bar.status, null);
 });
@@ -385,7 +385,7 @@ test('Copy asks only the selected component and writes its rows to the clipboard
     await bar.copy();
 
     same(calls.copies, ['Funnel\nSales']);
-    same(calls.toasts, [{ title: 'Data Copied', text: '1 baris Promo Analysis by Funnel berhasil disalin.' }]);
+    same(calls.toasts, [{ title: 'Data Disalin', text: '1 baris Analisis Promo per Funnel berhasil disalin.' }]);
     assert.equal(bar.status, null);
     assert.equal(bar.copying, false);
 });
@@ -404,14 +404,14 @@ test('Copy of a paginated table loads every row while showing its status, then w
     bar.copyTarget = 'codes';
     const pending = bar.copy();
     assert.equal(bar.copying, true);
-    same(bar.status, { type: 'loading', message: 'Menyalin data Summary by Promo Code sesuai filter aktif…' });
+    same(bar.status, { type: 'loading', message: 'Menyalin data Rekap per Kode Promo sesuai filter aktif…' });
     assert.equal(bar.busy, true, 'Export waits until the copy is done');
 
     resolveRows('Kode Promo\nA');
     await pending;
 
     same(calls.copies, ['Kode Promo\nA']);
-    same(calls.toasts, [{ title: 'Data Copied', text: '32 baris Summary by Promo Code berhasil disalin.' }]);
+    same(calls.toasts, [{ title: 'Data Disalin', text: '32 baris Rekap per Kode Promo berhasil disalin.' }]);
     assert.equal(bar.status, null);
 });
 
@@ -430,7 +430,7 @@ test('Copy of a paginated table shows the backend message when loading its rows 
 
     assert.equal(calls.copies.length, 0);
     assert.equal(calls.toasts.length, 0);
-    same(bar.status, { type: 'error', message: 'Gagal mengambil data Summary by Promo Code. Silakan coba lagi.' });
+    same(bar.status, { type: 'error', message: 'Gagal mengambil data Rekap per Kode Promo. Silakan coba lagi.' });
 });
 
 test('Copy shows a clear message and writes nothing when the component has no data or the clipboard fails', async () => {
@@ -444,7 +444,7 @@ test('Copy shows a clear message and writes nothing when the component has no da
     bar.copyTarget = 'product-type';
     await bar.copy();
     assert.equal(calls.copies.length, 0);
-    same(bar.status, { type: 'error', message: 'Tidak ada data First-Time vs Renewal Promo Analysis untuk filter yang dipilih, sehingga tidak ada yang disalin.' });
+    same(bar.status, { type: 'error', message: 'Tidak ada data Perdana vs Perpanjangan untuk filter yang dipilih, sehingga tidak ada yang disalin.' });
 
     answer = { status: 'ready', text: 'x', rows: 1 };
     await bar.copy();
@@ -493,7 +493,7 @@ test('usage detail copies every transaction of the code for the active filter', 
         'year=2026&month=9&platform_id=2&code=RESELLER01&group=g1&page=2&per_page=100',
     ]);
     same(copies, ['Tanggal\tPlatform/Aplikasi\tJumlah Penggunaan\tRevenue\n2026-09-10\tJADIASN\t1\t250000\n2026-09-09\tJADIASN\t1\t250000']);
-    same(toasts, [{ title: 'Data Copied', text: '2 baris detail penggunaan RESELLER01 berhasil disalin.' }]);
+    same(toasts, [{ title: 'Data Disalin', text: '2 baris detail penggunaan RESELLER01 berhasil disalin.' }]);
     assert.equal(detail.copyError, '');
 });
 

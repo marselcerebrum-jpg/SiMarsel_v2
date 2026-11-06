@@ -1,13 +1,13 @@
-{{-- Export Excel and Copy for the active analysis filter. Both only read data: nothing is imported and no master data changes. --}}
+{{-- Ekspor Excel and Salin for the active analysis filter. Both only read data: nothing is imported and no master data changes. --}}
 @php
     $button = 'inline-flex h-9 shrink-0 items-center justify-center gap-2 rounded-lg px-4 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-50';
     $spinner = 'size-3.5 animate-spin rounded-full border-2 border-t-transparent motion-reduce:animate-none';
 @endphp
 
 <div x-data="promoAnalysisActions" @promo-analysis-filter.window="clearStatus()" class="mt-4">
-    <div class="flex flex-wrap items-center justify-end gap-2" role="group" aria-label="Export and Copy">
+    <div class="flex flex-wrap items-center justify-end gap-2" role="group" aria-label="Ekspor dan Salin">
         <div class="relative w-full sm:w-72">
-            <label for="promo-analysis-copy-target" class="sr-only">Component to Copy</label>
+            <label for="promo-analysis-copy-target" class="sr-only">Komponen yang Disalin</label>
             <select
                 id="promo-analysis-copy-target"
                 x-model="copyTarget"
@@ -29,7 +29,7 @@
         >
             <span x-show="copying" x-cloak class="{{ $spinner }} border-primary" aria-hidden="true"></span>
             <x-icon name="clipboard" x-show="!copying" class="size-4" />
-            Copy
+            Salin
         </button>
 
         <button
@@ -41,7 +41,7 @@
         >
             <span x-show="exporting" x-cloak class="{{ $spinner }} border-white" aria-hidden="true"></span>
             <x-icon name="table" x-show="!exporting" class="size-4" />
-            <span x-text="exporting ? 'Exporting…' : 'Export Excel'">Export Excel</span>
+            <span x-text="exporting ? 'Mengekspor…' : 'Ekspor Excel'">Ekspor Excel</span>
         </button>
     </div>
 
