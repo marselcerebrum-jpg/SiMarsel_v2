@@ -142,10 +142,8 @@ class TaskDetailTest extends TestCase
                 ->getJson("/api/tasks/{$this->task->id}")
                 ->assertOk()
                 ->assertJsonPath('data.can_edit', true)
-                ->assertJsonPath('data.next_statuses', [
-                    ['value' => 'backlog', 'label' => 'Back Log'],
-                    ['value' => 'in_progress', 'label' => 'On Process'],
-                ]);
+                // Starting the work is the PIC's step, so neither may move a To Do task.
+                ->assertJsonPath('data.next_statuses', []);
         }
     }
 
@@ -153,11 +151,11 @@ class TaskDetailTest extends TestCase
     {
         $this->actingAs($this->admin)
             ->getJson("/api/tasks/{$this->task->id}")
-            ->assertJsonPath('data.editable_fields', Task::EDITABLE_FIELDS);
+            ->assertJsonPath('data.editable_fields', array_values(array_diff(Task::EDITABLE_FIELDS, ['status'])));
 
         $this->actingAs($this->manager)
             ->getJson("/api/tasks/{$this->task->id}")
-            ->assertJsonPath('data.editable_fields', array_values(array_diff(Task::EDITABLE_FIELDS, ['division_id'])));
+            ->assertJsonPath('data.editable_fields', array_values(array_diff(Task::EDITABLE_FIELDS, ['division_id', 'status'])));
     }
 
     public function test_manager_cannot_open_a_task_of_another_division(): void
@@ -223,7 +221,7 @@ class TaskDetailTest extends TestCase
         }
     }
 
-    public function test_manager_can_still_decide_qa_and_reopen(): void
+    public function test_manager_decides_qa_and_done_task_is_read_only(): void
     {
         $this->task->forceFill(['status' => TaskStatus::OnQa, 'requires_review' => true])->save();
 
@@ -238,9 +236,9 @@ class TaskDetailTest extends TestCase
         $this->task->forceFill(['status' => TaskStatus::Done])->save();
 
         $this->getJson("/api/tasks/{$this->task->id}")
-            ->assertJsonPath('data.can_edit', true)
-            ->assertJsonPath('data.editable_fields', ['status'])
-            ->assertJsonPath('data.next_statuses', [['value' => 'in_progress', 'label' => 'On Process']]);
+            ->assertJsonPath('data.can_edit', false)
+            ->assertJsonPath('data.editable_fields', [])
+            ->assertJsonPath('data.next_statuses', []);
     }
 
     // Evidence
