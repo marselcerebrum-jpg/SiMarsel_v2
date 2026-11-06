@@ -13,6 +13,7 @@ use App\Models\TaskEvidence;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
@@ -148,6 +149,47 @@ class TaskEvidenceTest extends TestCase
         }
 
         $this->assertDatabaseCount('task_evidences', 0);
+    }
+
+    public function test_evidence_is_rejected_when_the_pic_is_replaced_while_it_is_being_sent(): void
+    {
+        $task = $this->task(TaskStatus::InProgress);
+
+        // The route lets the old PIC through, then the Manager reassigns the task before the evidence is saved.
+        Gate::after(function (Account $user, string $ability) use ($task) {
+            if ($ability === 'submitEvidence') {
+                Task::whereKey($task->id)->update(['pic_id' => $this->otherStaff->id]);
+            }
+        });
+
+        $this->actingAs($this->staff)
+            ->postJson($this->url($task), ['file' => UploadedFile::fake()->create('laporan.pdf', 10, 'application/pdf')])
+            ->assertForbidden()
+            ->assertJsonPath('message', 'Anda tidak memiliki akses untuk melakukan aksi ini.');
+
+        $this->assertDatabaseCount('task_evidences', 0);
+        $this->assertSame(0, $task->activities()->where('action', TaskActivity::EVIDENCE_SUBMITTED)->count());
+        $this->assertSame([], Storage::disk('local')->allFiles());
+    }
+
+    public function test_only_the_new_pic_may_send_evidence_after_reassignment(): void
+    {
+        $task = $this->task(TaskStatus::InProgress);
+
+        $this->actingAs($this->manager)
+            ->patchJson("/api/tasks/{$task->id}/assignment", ['version' => $task->version, 'pic_id' => $this->otherStaff->id])
+            ->assertOk();
+
+        $this->actingAs($this->staff)
+            ->postJson($this->url($task), ['url' => 'https://example.com/lama'])
+            ->assertForbidden();
+
+        $this->actingAs($this->otherStaff)
+            ->postJson($this->url($task), ['url' => 'https://example.com/baru'])
+            ->assertCreated()
+            ->assertJsonPath('data.submitter.id', $this->otherStaff->id);
+
+        $this->assertSame(['https://example.com/baru'], $task->evidences()->pluck('url')->all());
     }
 
     public function test_evidence_cannot_be_sent_for_another_task_through_the_pic_task(): void
