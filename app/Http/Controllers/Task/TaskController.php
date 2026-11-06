@@ -7,12 +7,15 @@ use App\Http\Requests\Task\AssignTaskRequest;
 use App\Http\Requests\Task\ChangeTaskStatusRequest;
 use App\Http\Requests\Task\StoreTaskRequest;
 use App\Http\Requests\Task\TaskListRequest;
+use App\Http\Requests\Task\TaskScheduleRequest;
 use App\Http\Requests\Task\UpdateTaskRequest;
+use App\Http\Resources\ScheduleItemResource;
 use App\Http\Resources\TaskDetailResource;
 use App\Http\Resources\TaskResource;
 use App\Models\Task;
 use App\Models\TaskEvidence;
 use App\Services\TaskEvidenceService;
+use App\Services\TaskScheduleService;
 use App\Services\TaskService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -41,6 +44,13 @@ class TaskController extends Controller
         return TaskResource::collection($result['tasks'])->additional([
             'meta' => ['status_counts' => $result['status_counts']],
         ]);
+    }
+
+    public function schedule(TaskScheduleRequest $request, TaskScheduleService $service): AnonymousResourceCollection
+    {
+        return ScheduleItemResource::collection(
+            $service->schedule($request->user(), $request->from(), $request->to(), $request->division()),
+        );
     }
 
     public function createOptions(Request $request): JsonResponse
