@@ -87,10 +87,10 @@ Alpine.data('tasklist', () => ({
     statuses: STATUSES,
     priorities: PRIORITIES,
     views: [
-        { key: 'board', label: 'Board' },
-        { key: 'table', label: 'Table' },
-        { key: 'timeline', label: 'Timeline' },
-        { key: 'calendar', label: 'Calendar' },
+        { key: 'board', label: 'Papan' },
+        { key: 'table', label: 'Tabel' },
+        { key: 'timeline', label: 'Linimasa' },
+        { key: 'calendar', label: 'Kalender' },
     ],
     view: 'board',
 
@@ -588,7 +588,7 @@ Alpine.data('taskCreateForm', () => ({
             });
             this.syncTask(data);
             this.createOpen = false;
-            showToast({ title: 'Task Created', text: message ?? `${data.title} ditambahkan ke ${statusOf(data.status).label}.` });
+            showToast({ title: 'Tugas Dibuat', text: message ?? `${data.title} ditambahkan ke ${statusOf(data.status).label}.` });
         } catch (error) {
             if (error?.status === 422) {
                 this.errors = validationErrors(error);
@@ -771,7 +771,7 @@ Alpine.data('taskDetail', () => ({
             const { data, message } = await updateTask(this.task.id, { ...this.editForm, updated_at: this.task.updated_at });
             this.applyTask(data);
             this.editing = false;
-            showToast({ title: 'Changes Saved', text: message ?? 'Informasi tugas diperbarui.' });
+            showToast({ title: 'Perubahan Tersimpan', text: message ?? 'Informasi tugas diperbarui.' });
         } catch (error) {
             if (error?.status === 422) this.editErrors = validationErrors(error);
             else await this.handleFailure(error, 'Perubahan tugas gagal disimpan.');

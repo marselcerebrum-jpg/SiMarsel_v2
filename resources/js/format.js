@@ -32,9 +32,9 @@ export function formatAxis(value, format) {
 }
 
 const TRENDS = {
-    up: { label: 'Up', word: 'Naik', symbol: '↑', tone: 'bg-emerald-50 text-emerald-700', textTone: 'text-emerald-600' },
-    down: { label: 'Down', word: 'Turun', symbol: '↓', tone: 'bg-red-50 text-red-600', textTone: 'text-red-600' },
-    same: { label: 'Same', word: 'Sama', symbol: '=', tone: 'bg-soft text-muted', textTone: 'text-muted' },
+    up: { label: 'Naik', word: 'Naik', symbol: '↑', tone: 'bg-emerald-50 text-emerald-700', textTone: 'text-emerald-600' },
+    down: { label: 'Turun', word: 'Turun', symbol: '↓', tone: 'bg-red-50 text-red-600', textTone: 'text-red-600' },
+    same: { label: 'Sama', word: 'Sama', symbol: '=', tone: 'bg-soft text-muted', textTone: 'text-muted' },
 };
 
 /**
@@ -51,7 +51,7 @@ export function trendBadge(metric) {
     const trend = TRENDS[metric?.trend];
 
     if (!trend) {
-        return { tone: 'bg-soft text-label', textTone: 'text-label', text: 'No Comparison', short: '', sentence: 'Tidak ada data pembanding' };
+        return { tone: 'bg-soft text-label', textTone: 'text-label', text: 'Tanpa Pembanding', short: '', sentence: 'Tidak ada data pembanding' };
     }
 
     const hasChange = metric.change_percentage !== null && metric.change_percentage !== undefined && metric.trend !== 'same';

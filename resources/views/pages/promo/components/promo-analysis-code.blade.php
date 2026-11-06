@@ -18,7 +18,7 @@
     class="mt-5 border-t border-line pt-5"
     aria-labelledby="promo-code-summary-title"
 >
-    <h3 id="promo-code-summary-title" class="text-sm font-semibold text-ink">Summary by Promo Code</h3>
+    <h3 id="promo-code-summary-title" class="text-sm font-semibold text-ink">Rekap per Kode Promo</h3>
 
     <div class="mt-4 overflow-hidden rounded-lg border border-line">
         <div class="overflow-x-auto">
@@ -52,9 +52,9 @@
                                     x-show="!row.is_registered"
                                     class="ml-1 inline-flex items-center rounded-md bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-700"
                                     title="Kode belum terdaftar di master kode promo"
-                                >Unregistered</span>
+                                >Belum Terdaftar</span>
                                 <p x-show="!row.is_registered" class="mt-1 text-xs text-muted">
-                                    Raw code: <span class="font-mono break-all" x-text="rawCodes(row)"></span>
+                                    Kode asli: <span class="font-mono break-all" x-text="rawCodes(row)"></span>
                                 </p>
                             </th>
                             <td class="px-4 py-3">
@@ -75,7 +75,7 @@
                     <tr x-show="!loading && loadError" x-cloak>
                         <td colspan="7" class="px-4 py-10 text-center" role="alert">
                             <p class="text-sm font-medium text-red-600" x-text="loadError"></p>
-                            <button type="button" class="mt-2 text-xs font-semibold text-primary hover:text-primary-hover" @click="retry()">Try Again</button>
+                            <button type="button" class="mt-2 text-xs font-semibold text-primary hover:text-primary-hover" @click="retry()">Coba Lagi</button>
                         </td>
                     </tr>
 
@@ -87,7 +87,7 @@
         </div>
     </div>
 
-    <nav x-show="meta && meta.last_page > 1" x-cloak class="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between" aria-label="Promo Code Summary Pagination">
+    <nav x-show="meta && meta.last_page > 1" x-cloak class="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between" aria-label="Navigasi halaman rekap kode promo">
         <p class="text-xs text-muted">
             Menampilkan <span class="font-semibold text-ink" x-text="meta?.from ?? 0"></span>–<span class="font-semibold text-ink" x-text="meta?.to ?? 0"></span>
             dari <span x-text="meta?.total ?? 0"></span> kode promo
@@ -96,13 +96,13 @@
         <div class="flex items-center gap-2">
             <button type="button" class="{{ $pageButton }}" :disabled="loading || page <= 1" @click="goToPage(page - 1)">
                 <x-icon name="chevron-left" class="size-3.5" />
-                Previous
+                Sebelumnya
             </button>
             <span class="text-xs text-muted">
                 Halaman <span class="font-semibold text-ink" x-text="meta?.current_page"></span> dari <span x-text="meta?.last_page"></span>
             </span>
             <button type="button" class="{{ $pageButton }}" :disabled="loading || page >= (meta?.last_page ?? 1)" @click="goToPage(page + 1)">
-                Next
+                Berikutnya
                 <x-icon name="chevron-right" class="size-3.5" />
             </button>
         </div>

@@ -12,7 +12,7 @@
             {{-- Header mobile --}}
             <header class="sticky top-0 z-30 flex items-center justify-between border-b border-navy-line bg-navy px-4 py-2.5 text-white lg:hidden">
                 <div class="flex items-center gap-3">
-                    <button type="button" class="inline-grid size-9 place-items-center rounded-lg hover:bg-white/10" aria-label="Open Menu" aria-controls="sidebar" :aria-expanded="open" @click="open = true">
+                    <button type="button" class="inline-grid size-9 place-items-center rounded-lg hover:bg-white/10" aria-label="Buka Menu" aria-controls="sidebar" :aria-expanded="open" @click="open = true">
                         <x-icon name="menu" class="size-5" />
                     </button>
                     <span class="text-base font-bold tracking-tight">SiMarsel</span>
@@ -27,7 +27,7 @@
 
                 <footer class="mx-auto mt-12 max-w-7xl border-t border-line pt-6 text-center">
                     <span class="text-xs font-medium text-label">
-                        @yield('footer_name', 'Dashboard Analytic Marketing & Sales')
+                        @yield('footer_name', 'Dasbor Analitik Pemasaran & Penjualan')
                     </span>
                 </footer>
             </main>

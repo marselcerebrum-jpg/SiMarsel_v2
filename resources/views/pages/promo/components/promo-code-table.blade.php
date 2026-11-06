@@ -8,12 +8,12 @@
         <table class="w-full min-w-[720px] text-left text-sm" :aria-busy="loading">
             <thead class="bg-soft text-xs font-semibold text-label">
                 <tr>
-                    <th scope="col" class="px-4 py-3">Promo Code</th>
+                    <th scope="col" class="px-4 py-3">Kode Promo</th>
                     <th scope="col" class="px-4 py-3">Platform</th>
                     <th scope="col" class="px-4 py-3">Funnel</th>
                     <th scope="col" class="px-4 py-3">Source</th>
-                    <th scope="col" class="px-4 py-3">Usage</th>
-                    <th scope="col" class="px-4 py-3 text-right">Actions</th>
+                    <th scope="col" class="px-4 py-3">Penggunaan</th>
+                    <th scope="col" class="px-4 py-3 text-right">Aksi</th>
                 </tr>
             </thead>
 
@@ -26,29 +26,29 @@
                         </td>
                         <td class="px-4 py-3">
                             <span x-show="item.funnel" class="text-ink" x-text="item.funnel?.name"></span>
-                            <span x-show="!item.funnel" class="{{ $notSet }}" title="Funnel belum diisi">Not Set</span>
+                            <span x-show="!item.funnel" class="{{ $notSet }}" title="Funnel belum diisi">Belum Diisi</span>
                         </td>
                         <td class="px-4 py-3">
                             <span x-show="item.source" class="text-ink" x-text="item.source?.name"></span>
-                            <span x-show="!item.source" class="{{ $notSet }}" title="Source belum diisi">Not Set</span>
+                            <span x-show="!item.source" class="{{ $notSet }}" title="Source belum diisi">Belum Diisi</span>
                         </td>
                         <td class="px-4 py-3">
                             <span x-show="item.usages_count" class="text-muted" x-text="item.usages_count + ' transaksi'"></span>
-                            <span x-show="!item.usages_count" class="{{ $notSet }}">Unused</span>
+                            <span x-show="!item.usages_count" class="{{ $notSet }}">Belum Dipakai</span>
                         </td>
                         <td class="px-4 py-3 text-right whitespace-nowrap">
                             <button
                                 type="button"
                                 class="rounded-md px-2 py-1 font-semibold text-primary hover:text-primary-hover focus-visible:outline-2 focus-visible:outline-primary"
-                                :aria-label="'Edit ' + item.code"
+                                :aria-label="'Ubah ' + item.code"
                                 @click="openEdit(item)"
-                            >Edit</button>
+                            >Ubah</button>
                             <button
                                 type="button"
                                 class="ml-2 rounded-md px-2 py-1 font-semibold text-red-600 hover:text-red-700 focus-visible:outline-2 focus-visible:outline-red-600"
-                                :aria-label="'Delete ' + item.code"
+                                :aria-label="'Hapus ' + item.code"
                                 @click="openDelete(item)"
-                            >Delete</button>
+                            >Hapus</button>
                         </td>
                     </tr>
                 </template>
@@ -60,14 +60,14 @@
                 <tr x-show="!loading && loadError" x-cloak>
                     <td colspan="6" class="px-4 py-10 text-center">
                         <p class="text-sm font-medium text-red-600" x-text="loadError"></p>
-                        <button type="button" class="mt-2 text-xs font-semibold text-primary hover:text-primary-hover" @click="fetchItems()">Retry</button>
+                        <button type="button" class="mt-2 text-xs font-semibold text-primary hover:text-primary-hover" @click="fetchItems()">Coba Lagi</button>
                     </td>
                 </tr>
 
                 <tr x-show="!loading && !loadError && !items.length && !hasFilter" x-cloak>
                     <td colspan="6" class="px-4 py-10 text-center">
                         <p class="text-sm font-medium text-ink">Belum ada kode promo terdaftar.</p>
-                        <button type="button" class="mt-2 text-xs font-semibold text-primary hover:text-primary-hover" @click="openCreate()">Add First Promo Code</button>
+                        <button type="button" class="mt-2 text-xs font-semibold text-primary hover:text-primary-hover" @click="openCreate()">Tambah Kode Promo Pertama</button>
                     </td>
                 </tr>
 
@@ -75,7 +75,7 @@
                     <td colspan="6" class="px-4 py-10 text-center">
                         <p class="text-sm font-medium text-ink">Tidak ada kode promo yang cocok.</p>
                         <p class="mt-1 text-xs text-muted">Coba ubah kata kunci atau filter platform.</p>
-                        <button type="button" class="mt-2 text-xs font-semibold text-primary hover:text-primary-hover" @click="resetFilter()">Reset Filter</button>
+                        <button type="button" class="mt-2 text-xs font-semibold text-primary hover:text-primary-hover" @click="resetFilter()">Atur Ulang Filter</button>
                     </td>
                 </tr>
             </tbody>
@@ -83,7 +83,7 @@
     </div>
 </div>
 
-<nav x-show="meta && meta.last_page > 1" x-cloak class="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between" aria-label="Promo Code Pagination">
+<nav x-show="meta && meta.last_page > 1" x-cloak class="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between" aria-label="Navigasi halaman kode promo">
     <p class="text-xs text-muted">
         Menampilkan <span class="font-semibold text-ink" x-text="meta?.from ?? 0"></span>–<span class="font-semibold text-ink" x-text="meta?.to ?? 0"></span>
         dari <span x-text="meta?.total ?? 0"></span> kode promo
@@ -92,13 +92,13 @@
     <div class="flex items-center gap-2">
         <button type="button" class="{{ $pageButton }}" :disabled="loading || filter.page <= 1" @click="goToPage(filter.page - 1)">
             <x-icon name="chevron-left" class="size-3.5" />
-            Previous
+            Sebelumnya
         </button>
         <span class="text-xs text-muted">
             Halaman <span class="font-semibold text-ink" x-text="meta?.current_page"></span> dari <span x-text="meta?.last_page"></span>
         </span>
         <button type="button" class="{{ $pageButton }}" :disabled="loading || filter.page >= (meta?.last_page ?? 1)" @click="goToPage(filter.page + 1)">
-            Next
+            Berikutnya
             <x-icon name="chevron-right" class="size-3.5" />
         </button>
     </div>

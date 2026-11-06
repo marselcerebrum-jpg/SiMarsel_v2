@@ -2,8 +2,8 @@
     $columns = [
         ['label' => 'Platform', 'class' => ''],
         ['label' => 'Revenue', 'class' => 'text-right'],
-        ['label' => 'Transactions', 'class' => 'text-right'],
-        ['label' => 'Users', 'class' => 'text-right'],
+        ['label' => 'Transaksi', 'class' => 'text-right'],
+        ['label' => 'Pengguna', 'class' => 'text-right'],
         ['label' => 'Contribution (%)', 'class' => 'w-[34%] min-w-56'],
     ];
 
@@ -19,8 +19,8 @@
     :aria-busy="contributionLoading.toString()"
 >
     <div>
-        <h2 id="performance-contribution-title" class="text-base font-semibold text-ink">Platform Contribution</h2>
-        <p class="mt-1 text-sm text-muted">Peringkat kontribusi revenue setiap platform beserta jumlah transaksi dan user sesuai filter aktif.</p>
+        <h2 id="performance-contribution-title" class="text-base font-semibold text-ink">Kontribusi Platform</h2>
+        <p class="mt-1 text-sm text-muted">Peringkat kontribusi revenue setiap platform beserta jumlah transaksi dan pengguna sesuai filter aktif.</p>
     </div>
 
     <div class="mt-5 border-t border-line"></div>
@@ -53,7 +53,7 @@
                 class="inline-flex h-9 items-center justify-center rounded-lg border border-line bg-white px-3 text-sm font-semibold text-ink hover:bg-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
                 @click="retryContribution()"
             >
-                Reload
+                Muat Ulang
             </button>
         </div>
     </div>
@@ -70,7 +70,7 @@
                 <dd class="mt-0.5 text-xs text-muted">Akumulasi revenue seluruh platform pada filter aktif</dd>
             </div>
             <div class="{{ $tile }}">
-                <dt class="text-xs font-semibold text-label">Platforms</dt>
+                <dt class="text-xs font-semibold text-label">Platform</dt>
                 <dd x-show="!contributionLoading" class="performance-value mt-1 text-xl font-bold text-ink" x-text="contributionPlatformCount"></dd>
                 <dd x-show="contributionLoading" x-cloak class="mt-1.5">
                     @include('pages.performance.components.loading-shimmer', ['class' => 'h-6 w-32 rounded-md'])
@@ -85,7 +85,7 @@
             {{-- Table: tablet and larger --}}
             <div class="hidden overflow-x-auto md:block">
                 <table class="w-full min-w-[720px] text-left text-sm">
-                    <caption class="sr-only">Ranking kontribusi revenue per platform</caption>
+                    <caption class="sr-only">Peringkat kontribusi revenue per platform</caption>
                     <thead class="bg-soft text-xs font-semibold text-label">
                         <tr>
                             @foreach ($columns as $column)
@@ -98,7 +98,7 @@
                             <tr class="transition hover:bg-soft/60">
                                 <th scope="row" class="px-4 py-3 font-semibold text-ink">
                                     <span class="inline-flex items-center gap-3">
-                                        <span class="{{ $rank }}" x-text="row.rank" :aria-label="`Rank ${row.rank}`"></span>
+                                        <span class="{{ $rank }}" x-text="row.rank" :aria-label="`Peringkat ${row.rank}`"></span>
                                         <span x-text="row.name"></span>
                                     </span>
                                 </th>
@@ -115,7 +115,7 @@
             </div>
 
             {{-- Ranking list: phones --}}
-            <ol class="divide-y divide-line md:hidden" aria-label="Ranking kontribusi revenue per platform">
+            <ol class="divide-y divide-line md:hidden" aria-label="Peringkat kontribusi revenue per platform">
                 <template x-for="row in contributionTableRows" :key="row.key">
                     <li class="space-y-3 px-4 py-4">
                         <div class="flex items-center gap-3">
@@ -129,11 +129,11 @@
                                 <dd class="performance-value font-semibold text-ink" x-text="row.revenue"></dd>
                             </div>
                             <div>
-                                <dt class="text-xs font-semibold text-label">Transactions</dt>
+                                <dt class="text-xs font-semibold text-label">Transaksi</dt>
                                 <dd class="performance-value text-muted" x-text="row.transactions"></dd>
                             </div>
                             <div>
-                                <dt class="text-xs font-semibold text-label">Users</dt>
+                                <dt class="text-xs font-semibold text-label">Pengguna</dt>
                                 <dd class="performance-value text-muted" x-text="row.users"></dd>
                             </div>
                         </dl>
@@ -141,7 +141,7 @@
                 </template>
             </ol>
 
-            <p class="border-t border-line px-4 py-2.5 text-[11px] text-label">User dihitung per platform; satu email yang bertransaksi di dua platform terhitung di keduanya.</p>
+            <p class="border-t border-line px-4 py-2.5 text-[11px] text-label">Pengguna dihitung per platform; satu email yang bertransaksi di dua platform terhitung di keduanya.</p>
         </div>
     </div>
 
@@ -156,7 +156,7 @@
         >
             <p class="font-semibold text-white" x-text="tip?.name"></p>
             <p class="mt-1">Total Revenue: <span class="performance-value font-semibold text-white" x-text="tip?.revenue"></span></p>
-            <p>Contribution: <span class="performance-value font-semibold text-white" x-text="tip?.contribution"></span></p>
+            <p>Kontribusi: <span class="performance-value font-semibold text-white" x-text="tip?.contribution"></span></p>
         </div>
     </template>
 </div>

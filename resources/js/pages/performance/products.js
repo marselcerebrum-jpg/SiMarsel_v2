@@ -11,7 +11,7 @@ import {
 
 Chart.register(BarController, BarElement, CategoryScale, LinearScale, Tooltip);
 
-const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+const MONTHS = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
 
 const rupiahFormat = new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 });
 const numberFormat = new Intl.NumberFormat('id-ID');
@@ -304,15 +304,15 @@ Alpine.data('topPackagesByVolume', () =>
 // `hint` = definisi metrik (sama dengan docs/api/products.md), tampil saat judul kolom di-hover.
 // `excelFormat` dipakai untuk kolom rata-rata agar nilai desimalnya tidak dibulatkan di Excel.
 const PERFORMANCE_COLUMNS = [
-    { key: 'name', header: 'Package Name', width: 34, hint: 'Nama produk lengkap, termasuk masa aktif' },
+    { key: 'name', header: 'Nama Paket', width: 34, hint: 'Nama produk lengkap, termasuk masa aktif' },
     { key: 'revenue', header: 'Revenue', type: 'number', format: rupiah, hint: 'Total nominal transaksi berhasil' },
     { key: 'trx', header: 'Trx', type: 'number', format: number, hint: 'Jumlah transaksi berhasil' },
-    { key: 'low_price', header: 'Low Price', type: 'number', format: rupiah, hint: 'Nominal terendah dari satu transaksi' },
-    { key: 'low_trx', header: 'Low Trx', type: 'number', format: number, hint: 'Jumlah transaksi terendah dalam satu hari' },
-    { key: 'avg_price', header: 'Avg Price', type: 'number', format: rupiah, excelFormat: '#,##0.00', hint: 'Revenue dibagi Trx' },
-    { key: 'avg_trx', header: 'Avg Trx', type: 'number', format: number, excelFormat: '#,##0.00', hint: 'Trx dibagi jumlah hari yang ada penjualannya' },
-    { key: 'high_price', header: 'High Price', type: 'number', format: rupiah, hint: 'Nominal tertinggi dari satu transaksi' },
-    { key: 'high_trx', header: 'High Trx', type: 'number', format: number, hint: 'Jumlah transaksi tertinggi dalam satu hari' },
+    { key: 'low_price', header: 'Harga Terendah', type: 'number', format: rupiah, hint: 'Nominal terendah dari satu transaksi' },
+    { key: 'low_trx', header: 'Trx Terendah', type: 'number', format: number, hint: 'Jumlah transaksi terendah dalam satu hari' },
+    { key: 'avg_price', header: 'Harga Rata-rata', type: 'number', format: rupiah, excelFormat: '#,##0.00', hint: 'Revenue dibagi Trx' },
+    { key: 'avg_trx', header: 'Rata-rata Trx', type: 'number', format: number, excelFormat: '#,##0.00', hint: 'Trx dibagi jumlah hari yang ada penjualannya' },
+    { key: 'high_price', header: 'Harga Tertinggi', type: 'number', format: rupiah, hint: 'Nominal tertinggi dari satu transaksi' },
+    { key: 'high_trx', header: 'Trx Tertinggi', type: 'number', format: number, hint: 'Jumlah transaksi tertinggi dalam satu hari' },
 ].map((column) => ({ ...column, value: (row) => row[column.key] }));
 
 const PAGE_SIZE = 10;

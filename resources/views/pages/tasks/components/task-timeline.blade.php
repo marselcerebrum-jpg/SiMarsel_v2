@@ -2,12 +2,12 @@
 <section x-data="taskTimeline" class="{{ $card }} min-w-0 p-4 sm:p-5" aria-labelledby="timeline-title">
     <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div>
-            <h2 id="timeline-title" class="text-base font-semibold text-ink">Timeline</h2>
+            <h2 id="timeline-title" class="text-base font-semibold text-ink">Linimasa</h2>
             <p class="mt-1 text-sm text-muted"><span x-text="periodLabel"></span> · <span x-text="scopeLabel"></span></p>
         </div>
 
         <div class="flex flex-wrap items-center gap-2">
-            <div class="inline-flex rounded-lg border border-line bg-soft p-1" role="group" aria-label="Rentang timeline">
+            <div class="inline-flex rounded-lg border border-line bg-soft p-1" role="group" aria-label="Rentang linimasa">
                 <button type="button" class="rounded-md px-3 py-1 text-xs font-semibold" :class="mode === 'week' ? 'bg-white text-ink shadow-sm' : 'text-muted'" :aria-pressed="mode === 'week'" @click="setMode('week')">1 Minggu</button>
                 <button type="button" class="rounded-md px-3 py-1 text-xs font-semibold" :class="mode === 'biweek' ? 'bg-white text-ink shadow-sm' : 'text-muted'" :aria-pressed="mode === 'biweek'" @click="setMode('biweek')">2 Minggu</button>
             </div>
@@ -78,7 +78,7 @@
 
     <div x-show="state === 'error'" x-cloak class="mt-3 flex flex-col items-center gap-3 rounded-lg border border-red-200 bg-red-50 px-4 py-8 text-center" role="alert">
         <p class="text-sm text-red-700" x-text="message"></p>
-        <button type="button" class="{{ $button }}" @click="loadPeriod()">Try Again</button>
+        <button type="button" class="{{ $button }}" @click="loadPeriod()">Coba Lagi</button>
     </div>
 
     <p x-show="state === 'ready' && !rows.length" x-cloak class="mt-3 rounded-lg border border-dashed border-line bg-soft px-4 py-8 text-center text-sm text-muted">

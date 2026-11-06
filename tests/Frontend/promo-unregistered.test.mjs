@@ -44,7 +44,7 @@ test('without a search the badge shows the unregistered count', async () => {
 
     await alert.fetchItems();
 
-    assert.equal(alert.status.text, '5 Unregistered');
+    assert.equal(alert.status.text, '5 Belum Terdaftar');
 });
 
 test('All Registered only shows without a search and with no unregistered codes', async () => {
@@ -52,7 +52,7 @@ test('All Registered only shows without a search and with no unregistered codes'
 
     await alert.fetchItems();
 
-    assert.equal(alert.status.text, 'All Registered');
+    assert.equal(alert.status.text, 'Semua Terdaftar');
 });
 
 test('a search without matches shows 0 Results, not All Registered', async () => {
@@ -61,7 +61,7 @@ test('a search without matches shows 0 Results, not All Registered', async () =>
     await alert.fetchItems();
     await search(alert, 'TIDAKADA');
 
-    assert.equal(alert.status.text, '0 Results');
+    assert.equal(alert.status.text, '0 Hasil');
     assert.notEqual(alert.status.tone, 'bg-emerald-100 text-emerald-700');
 });
 
@@ -70,10 +70,10 @@ test('a search with matches shows the result count', async () => {
 
     await alert.fetchItems();
     await search(alert, 'HEMAT');
-    assert.equal(alert.status.text, '1 Result');
+    assert.equal(alert.status.text, '1 Hasil');
 
     await search(alert, 'CPNS');
-    assert.equal(alert.status.text, '2 Results');
+    assert.equal(alert.status.text, '2 Hasil');
 });
 
 test('clearing the search shows the unregistered count again', async () => {
@@ -83,7 +83,7 @@ test('clearing the search shows the unregistered count again', async () => {
     await search(alert, 'TIDAKADA');
     await search(alert, '');
 
-    assert.equal(alert.status.text, '5 Unregistered');
+    assert.equal(alert.status.text, '5 Belum Terdaftar');
 });
 
 test('the badge keeps the loaded status until the search response arrives', async () => {
@@ -92,5 +92,5 @@ test('the badge keeps the loaded status until the search response arrives', asyn
     await alert.fetchItems();
     alert.filter.search = 'TIDAKADA';
 
-    assert.equal(alert.status.text, '5 Unregistered');
+    assert.equal(alert.status.text, '5 Belum Terdaftar');
 });

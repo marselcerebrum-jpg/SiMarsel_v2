@@ -92,7 +92,7 @@ class PerformanceTrendRequest extends PerformanceFilterRequest
     {
         return [
             ...parent::attributes(),
-            'metric' => 'Metric',
+            'metric' => 'Metrik',
             'period' => 'Periode',
         ];
     }

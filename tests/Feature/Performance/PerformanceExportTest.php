@@ -118,7 +118,7 @@ class PerformanceExportTest extends TestCase
         $this->assertEquals(['Konversi (%)', $kpis['conversion_rate']['value']], array_slice($summary[11], 0, 2));
 
         $trend = $sheets['Tren'];
-        $this->assertSame(['Periode', 'Tanggal Mulai', 'Tanggal Akhir', 'Revenue', 'Transactions', 'Downloader', 'Conversion (%)', 'User Baru', 'Repeat Order'], $trend[0]);
+        $this->assertSame(['Periode', 'Tanggal Mulai', 'Tanggal Akhir', 'Revenue', 'Transaksi', 'Downloader', 'Konversi (%)', 'Pengguna Baru', 'Repeat Order'], $trend[0]);
         $this->assertCount(31, $trend);
         $this->assertEquals(['05 Sep 2026', '2026-09-05', '2026-09-05', 300000, 1, 0, '', 1, 0], $trend[5]);
 

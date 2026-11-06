@@ -1,19 +1,19 @@
 @extends('layouts.dashboard')
 
-@section('title', 'Promo Management')
+@section('title', 'Manajemen Promo')
 @push('scripts')
     @vite('resources/js/pages/promo/index.js')
 @endpush
 
 @php
     $card = 'rounded-panel border border-line bg-surface shadow-sm';
-    $tabs = ['promo-codes' => 'Promo Codes', 'master-data' => 'Master Data'];
+    $tabs = ['promo-codes' => 'Kode Promo', 'master-data' => 'Data Master'];
 @endphp
 
 @section('page')
     <div x-data="promoManagement" class="min-w-0">
         <header>
-            <h1 class="text-2xl font-bold tracking-tight text-ink">Promo Management</h1>
+            <h1 class="text-2xl font-bold tracking-tight text-ink">Manajemen Promo</h1>
             <p class="mt-1 text-sm text-muted">Analisis dan kelola kode promo beserta master funnel, source, dan platform.</p>
         </header>
 
