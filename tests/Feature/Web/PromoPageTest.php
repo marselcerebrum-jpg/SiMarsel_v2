@@ -173,8 +173,7 @@ class PromoPageTest extends TestCase
                 'id="promo-analysis-search"',
             ], false)
             ->assertSee('@promo-analysis-filter.window="clearStatus()"', false)
-            ->assertSeeInOrder(['Promo Code Usage Details', '@click="copy()"', 'aria-label="Close"'], false)
-            ->assertSee('x-text="copyError"', false);
+            ->assertSeeInOrder(['x-data="promoAnalysisCodeUsage"', 'x-ref="codeUsageClose"', '@click="copy()"', 'x-text="copyError"'], false);
     }
 
     public function test_every_analysis_component_answers_copy_and_the_export_gets_trend_period_and_code_sort(): void

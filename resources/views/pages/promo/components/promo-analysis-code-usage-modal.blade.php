@@ -25,19 +25,20 @@
                     <span class="inline-flex items-center rounded-md bg-primary-soft px-2 py-0.5 text-xs font-semibold text-primary-hover" x-text="row?.platform.name"></span>
                 </p>
             </div>
-            <div class="flex shrink-0 items-center gap-2">
+            <button type="button" x-ref="codeUsageClose" class="rounded-lg p-1.5 text-muted hover:bg-soft hover:text-ink focus-visible:outline-2 focus-visible:outline-primary" aria-label="Close" @click="close()">
+                <x-icon name="close" />
+            </button>
+        </div>
+
+        <div class="overflow-y-auto p-5">
+            <div class="mb-4 flex justify-end">
                 <button type="button" class="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-line bg-white px-3 text-sm font-semibold text-ink hover:bg-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-50" :disabled="copying || loading" @click="copy()">
                     <span x-show="copying" x-cloak class="size-3.5 animate-spin rounded-full border-2 border-primary border-t-transparent motion-reduce:animate-none" aria-hidden="true"></span>
                     <x-icon name="clipboard" x-show="!copying" class="size-4" />
                     Copy
                 </button>
-                <button type="button" x-ref="codeUsageClose" class="rounded-lg p-1.5 text-muted hover:bg-soft hover:text-ink focus-visible:outline-2 focus-visible:outline-primary" aria-label="Close" @click="close()">
-                    <x-icon name="close" />
-                </button>
             </div>
-        </div>
 
-        <div class="overflow-y-auto p-5">
             <p x-show="copyError" x-cloak class="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-2.5 text-sm text-red-700" role="alert" x-text="copyError"></p>
 
             <div class="overflow-hidden rounded-lg border border-line">
