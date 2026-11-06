@@ -31,6 +31,16 @@
         </div>
 
         <div class="overflow-y-auto p-5">
+            <div class="mb-4 flex justify-end">
+                <button type="button" class="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-line bg-white px-3 text-sm font-semibold text-ink hover:bg-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-50" :disabled="copying || loading" @click="copy()">
+                    <span x-show="copying" x-cloak class="size-3.5 animate-spin rounded-full border-2 border-primary border-t-transparent motion-reduce:animate-none" aria-hidden="true"></span>
+                    <x-icon name="clipboard" x-show="!copying" class="size-4" />
+                    Copy
+                </button>
+            </div>
+
+            <p x-show="copyError" x-cloak class="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-2.5 text-sm text-red-700" role="alert" x-text="copyError"></p>
+
             <div class="overflow-hidden rounded-lg border border-line">
                 <div class="overflow-x-auto">
                     <table class="w-full min-w-[560px] text-left text-sm" :aria-busy="loading.toString()">
