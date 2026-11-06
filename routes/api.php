@@ -173,6 +173,9 @@ Route::middleware('auth')->group(function () {
         Route::get('/schedule', [TaskController::class, 'schedule'])
             ->can('viewAny', Task::class)
             ->name('schedule');
+        Route::get('/calendar', [TaskController::class, 'calendar'])
+            ->can('viewAny', Task::class)
+            ->name('calendar');
         Route::get('/create-options', [TaskController::class, 'createOptions'])
             ->can('create', Task::class)
             ->name('create-options');
