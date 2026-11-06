@@ -77,7 +77,7 @@ class PromoPageTest extends TestCase
     {
         $this->actingAs($this->employee)
             ->get(route('promo.index'))
-            ->assertSee('x-data="promoAnalysisSummary"', false)
+            ->assertSee('x-data="promoAnalysisSummary(', false)
             ->assertSee('@promo-analysis-filter.window="load($event.detail)"', false)
             ->assertSeeInOrder([
                 'Total Transactions with Promo',
@@ -97,7 +97,7 @@ class PromoPageTest extends TestCase
             ->get(route('promo.index'))
             ->assertSeeInOrder([
                 'x-data="promoAnalysis"',
-                'x-data="promoAnalysisSummary"',
+                'x-data="promoAnalysisSummary(',
                 'x-data="promoAnalysisTrend"',
                 'x-data="promoAnalysisTopCodes"',
                 'x-data="promoAnalysisFunnel"',
@@ -119,7 +119,7 @@ class PromoPageTest extends TestCase
             ->get(route('promo.index'))
             ->assertSeeInOrder([
                 'x-data="promoAnalysis"',
-                'x-data="promoAnalysisSummary"',
+                'x-data="promoAnalysisSummary(',
                 'x-data="promoAnalysisFunnel"',
                 'Promo Code List',
             ], false)
@@ -158,6 +158,32 @@ class PromoPageTest extends TestCase
             ->assertDontSee('Persentase Transaksi (%)')
             ->assertSee('Dihitung per transaksi unik yang memakai promo, bukan per penggunaan kode; transaksi dengan dua kode promo dihitung satu kali.')
             ->assertSee('Memuat rekap tipe produk');
+    }
+
+    public function test_promo_analysis_offers_export_excel_and_copy_for_every_component(): void
+    {
+        $this->actingAs($this->employee)
+            ->get(route('promo.index'))
+            ->assertSeeInOrder([
+                'x-data="promoAnalysis"',
+                'x-data="promoAnalysisActions"',
+                'Component to Copy',
+                'Copy',
+                'Export Excel',
+                'id="promo-analysis-search"',
+            ], false)
+            ->assertSee('@promo-analysis-filter.window="clearStatus()"', false)
+            ->assertSeeInOrder(['Promo Code Usage Details', '@click="copy()"', 'aria-label="Close"'], false)
+            ->assertSee('x-text="copyError"', false);
+    }
+
+    public function test_every_analysis_component_answers_copy_and_the_export_gets_trend_period_and_code_sort(): void
+    {
+        $response = $this->actingAs($this->employee)->get(route('promo.index'));
+
+        $this->assertSame(7, substr_count($response->getContent(), '@promo-analysis-copy.window="provideCopy($event.detail)"'));
+        $this->assertSame(2, substr_count($response->getContent(), '@promo-analysis-export-params.window="provideExportParams($event.detail)"'));
+        $response->assertSee('x-data="promoAnalysisSummary(', false);
     }
 
     public function test_promo_code_summary_follows_the_shared_filter_and_opens_a_read_only_usage_detail(): void
