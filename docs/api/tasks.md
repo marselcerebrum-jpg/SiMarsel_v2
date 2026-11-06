@@ -56,7 +56,7 @@ Backend **wajib** menerapkan cakupan ini di setiap endpoint. Staff yang mengubah
 | `POST /api/tasks` | `title`*, `description`, `category_id`, `division`*, `pic_id`, `platform`, `priority`*, `start_date`, `deadline`, `status`* (`backlog`\|`todo`), `requires_review`, `client_request_id`* | `201 { data: Task, message }` |
 | `GET /api/tasks/{id}` | – | `{ data: TaskDetail }` |
 | `PATCH /api/tasks/{id}` | `title`, `description`, `category_id`, `platform`, `priority`, `start_date`, `deadline`, `updated_at`* | `{ data: TaskDetail, message }` |
-| `PATCH /api/tasks/{id}/status` | `status`*, `updated_at`* | `{ data: TaskDetail, message }` |
+| `PATCH /api/tasks/{id}/status` | `status`*, `version`* | `{ data: TaskDetail, message }`; `422` dengan alasan di `errors.status` bila transisi ditolak; `409 { message, current_version }` bila `version` sudah usang |
 | `PATCH /api/tasks/{id}/assignee` | `pic_id`*, `note`, `updated_at`* | `{ data: TaskDetail, message }` |
 | `GET /api/tasks/assignees` | `division` | `{ data: [{ id, fullname, division }] }`, hanya user yang memenuhi aturan penugasan |
 | `GET /api/tasks/{id}/evidences` | – | `{ data: [Evidence] }` |
