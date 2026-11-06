@@ -54,7 +54,7 @@ class TaskService
 
     public function detail(Task $task): Task
     {
-        return $task->load(['category', 'division', 'platform', 'pic', 'creator', 'activities.actor', 'evidences.submitter'])
+        return $task->load(['category', 'division', 'platform', 'pic', 'creator', 'activities.actor', 'evidences.submitter', 'reviews.reviewer'])
             ->loadCount('evidences');
     }
 
@@ -167,8 +167,8 @@ class TaskService
     /**
      * Move the task to another status following the transition matrix: the PIC starts the work and hands it
      * to QA (or finishes it when QA is not required), and Admin or the division's Manager moves Back Log to
-     * To Do and runs the review (Ready for QA → On QA → Done, or back to On Process for revision). The change
-     * is appended to the history.
+     * To Do and starts the review (Ready for QA → On QA). The decision that ends it is made through
+     * TaskReviewService. The change is appended to the history.
      *
      * @param  array{version: int|string, status: string}  $data
      *
@@ -201,6 +201,9 @@ class TaskService
                 throw ValidationException::withMessages(['pic_id' => 'Tetapkan PIC sebelum memindahkan tugas dari Back Log.']);
             }
 
+            // A task that already has a review got there through a revision, so handing it to QA again is a resubmission.
+            $resubmitted = $status === TaskStatus::ReadyForQa && $locked->reviews()->exists();
+
             $locked->status = $status;
             $locked->completed_at = $status === TaskStatus::Done ? now() : null;
 
@@ -211,7 +214,7 @@ class TaskService
 
             $locked->activities()->create([
                 'account_id' => $actor->id,
-                'action' => TaskActivity::STATUS_CHANGED,
+                'action' => $resubmitted ? TaskActivity::RESUBMITTED : TaskActivity::STATUS_CHANGED,
                 'changes' => $changes,
             ]);
         });

@@ -336,7 +336,9 @@ class TaskEvidenceTest extends TestCase
         $this->actingAs($this->staff)->postJson($this->url($task), ['url' => 'https://example.com/v1'])->assertCreated();
         $this->moveTo($task, $this->staff, 'ready_for_qa');
         $this->moveTo($task, $this->manager, 'on_qa');
-        $this->moveTo($task, $this->manager, 'in_progress');
+        $this->actingAs($this->manager)
+            ->postJson("/api/tasks/{$task->id}/reviews", ['version' => $task->fresh()->version, 'decision' => 'revision', 'note' => 'Perbaiki data.'])
+            ->assertOk();
 
         $this->actingAs($this->staff)->postJson($this->url($task), ['url' => 'https://example.com/v2'])->assertCreated();
         $this->moveTo($task, $this->staff, 'ready_for_qa');
