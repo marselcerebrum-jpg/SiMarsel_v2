@@ -58,6 +58,16 @@ class ScheduleEvent extends Model
     }
 
     /**
+     * Focus on a division: its agendas plus those of every division. No division keeps every agenda.
+     */
+    public function scopeForDivision(Builder $query, ?string $division): void
+    {
+        $query->when($division, fn (Builder $query, string $division) => $query->where(fn (Builder $query) => $query
+            ->whereNull('division_id')
+            ->orWhereHas('division', fn (Builder $query) => $query->where('code_division', $division))));
+    }
+
+    /**
      * Shared agendas are visible to every role. An agenda that is not shared is visible to Admin and to the
      * accounts of its division; one of every division (no division) to everyone.
      */
