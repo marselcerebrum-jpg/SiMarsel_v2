@@ -7,7 +7,6 @@ use App\Models\ScheduleEvent;
 use App\Models\Task;
 use App\Repositories\TaskRepository;
 use Carbon\CarbonInterface;
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 
 class TaskScheduleService
@@ -29,9 +28,7 @@ class TaskScheduleService
             ->with(['division', 'task'])
             ->visibleTo($account)
             ->within($from, $to)
-            ->when($division, fn (Builder $query, string $division) => $query->where(fn (Builder $query) => $query
-                ->whereNull('division_id')
-                ->orWhereHas('division', fn (Builder $query) => $query->where('code_division', $division))))
+            ->forDivision($division)
             ->orderBy('start_date')
             ->orderBy('id')
             ->get();
