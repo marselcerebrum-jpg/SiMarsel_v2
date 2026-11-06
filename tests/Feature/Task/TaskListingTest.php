@@ -194,6 +194,7 @@ class TaskListingTest extends TestCase
                 'deadline' => '2026-10-20',
                 'requires_review' => true,
                 'evidence_required' => false,
+                'evidence_count' => 0,
                 'can_view_detail' => true,
                 'can_edit' => true,
                 'can_assign' => false,

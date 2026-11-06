@@ -2,17 +2,25 @@
 
 namespace App\Http\Controllers\Task;
 
+use App\Enums\TaskReviewDecision;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Task\AssignTaskRequest;
 use App\Http\Requests\Task\ChangeTaskStatusRequest;
+use App\Http\Requests\Task\ReviewTaskRequest;
+use App\Http\Requests\Task\StoreTaskEvidenceRequest;
 use App\Http\Requests\Task\StoreTaskRequest;
 use App\Http\Requests\Task\TaskListRequest;
 use App\Http\Requests\Task\UpdateTaskRequest;
+use App\Http\Resources\TaskActivityResource;
 use App\Http\Resources\TaskDetailResource;
+use App\Http\Resources\TaskEvidenceResource;
 use App\Http\Resources\TaskResource;
+use App\Http\Resources\TaskReviewResource;
 use App\Models\Task;
 use App\Models\TaskEvidence;
+use App\Services\TaskActivityService;
 use App\Services\TaskEvidenceService;
+use App\Services\TaskReviewService;
 use App\Services\TaskService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -63,6 +71,26 @@ class TaskController extends Controller
         return TaskDetailResource::make($this->taskService->detail($task));
     }
 
+    public function activities(Task $task, TaskActivityService $service): AnonymousResourceCollection
+    {
+        return TaskActivityResource::collection($service->list($task));
+    }
+
+    public function evidences(Task $task, TaskEvidenceService $service): AnonymousResourceCollection
+    {
+        return TaskEvidenceResource::collection($service->list($task));
+    }
+
+    public function storeEvidence(StoreTaskEvidenceRequest $request, Task $task, TaskEvidenceService $service): JsonResponse
+    {
+        $evidence = $service->store($task, $request->user(), $request->validated());
+
+        return TaskEvidenceResource::make($evidence)
+            ->additional(['message' => 'Bukti tugas berhasil dikirim.'])
+            ->response()
+            ->setStatusCode(201);
+    }
+
     public function downloadEvidence(Task $task, TaskEvidence $evidence, TaskEvidenceService $service): StreamedResponse
     {
         return $service->download($task, $evidence);
@@ -80,6 +108,23 @@ class TaskController extends Controller
         $task = $this->taskService->changeStatus($request->user(), $task, $request->validated());
 
         return TaskDetailResource::make($task)->additional(['message' => 'Status tugas berhasil diperbarui.']);
+    }
+
+    public function reviews(Task $task, TaskReviewService $service): AnonymousResourceCollection
+    {
+        return TaskReviewResource::collection($service->list($task));
+    }
+
+    public function review(ReviewTaskRequest $request, Task $task, TaskReviewService $service): TaskDetailResource
+    {
+        $data = $request->validated();
+        $task = $service->decide($request->user(), $task, $data);
+
+        $message = $data['decision'] === TaskReviewDecision::Approve->value
+            ? 'Tugas berhasil disetujui.'
+            : 'Permintaan revisi berhasil dikirim.';
+
+        return TaskDetailResource::make($task)->additional(['message' => $message]);
     }
 
     public function assignmentOptions(Request $request, Task $task): JsonResponse

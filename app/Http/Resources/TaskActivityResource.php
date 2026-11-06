@@ -17,6 +17,8 @@ class TaskActivityResource extends JsonResource
         return [
             'id' => $this->id,
             'action' => $this->action,
+            'action_label' => $this->resource->actionLabel(),
+            'description' => $this->resource->description(),
             'changes' => $this->changes ?? (object) [],
             'actor' => $this->actor ? [
                 'id' => $this->actor->id,
