@@ -11,13 +11,13 @@
 >
     <div class="flex flex-col gap-4 2xl:flex-row 2xl:items-start 2xl:justify-between">
         <div class="2xl:max-w-56">
-            <h2 id="performance-trend-title" class="text-base font-semibold text-ink">Trend &amp; Performance Analysis</h2>
+            <h2 id="performance-trend-title" class="text-base font-semibold text-ink">Analisis Tren &amp; Performa</h2>
             <p class="mt-1 text-sm text-muted">Pilih metrik, periode data, dan tipe tampilan.</p>
         </div>
 
         <div class="flex min-w-0 flex-col gap-3">
             {{-- Metric --}}
-            <div class="{{ $group }} self-start" role="radiogroup" aria-label="Metric">
+            <div class="{{ $group }} self-start" role="radiogroup" aria-label="Metrik">
                 @foreach ($trend['metrics'] as $option)
                     <button
                         type="button"
@@ -32,7 +32,7 @@
 
             <div class="flex flex-wrap items-center gap-3">
                 {{-- Data period; several years or more than 366 days only allow monthly --}}
-                <div class="{{ $group }}" role="radiogroup" aria-label="Data Period">
+                <div class="{{ $group }}" role="radiogroup" aria-label="Periode Data">
                     @foreach ($trend['granularities'] as $option)
                         <button
                             type="button"
@@ -48,7 +48,7 @@
 
                 {{-- Visualization --}}
                 <div class="relative">
-                    <label for="trend-chart" class="sr-only">Visualization</label>
+                    <label for="trend-chart" class="sr-only">Visualisasi</label>
                     <select
                         id="trend-chart"
                         x-model="chartType"
@@ -88,9 +88,9 @@
             <table class="w-full min-w-[560px] text-left text-sm">
                 <thead class="sticky top-0 bg-soft text-xs font-semibold text-label">
                     <tr>
-                        <th scope="col" class="px-5 py-3">Period</th>
+                        <th scope="col" class="px-5 py-3">Periode</th>
                         <th scope="col" class="px-5 py-3 text-right" x-text="metricMeta.label"></th>
-                        <th scope="col" class="px-5 py-3 text-right">Change</th>
+                        <th scope="col" class="px-5 py-3 text-right">Perubahan</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-line">

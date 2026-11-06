@@ -1,7 +1,7 @@
 {{-- Read-only: platforms are managed in the global platform master, so there are no create/edit/delete actions here. --}}
 <section x-data="promoPlatformTable" class="{{ $card }} min-w-0 p-5" aria-labelledby="platform-list-title">
     <div class="flex flex-wrap items-center gap-2">
-        <h2 id="platform-list-title" class="text-base font-semibold text-ink">Platform List</h2>
+        <h2 id="platform-list-title" class="text-base font-semibold text-ink">Daftar Platform</h2>
         <span class="inline-flex items-center gap-1 rounded-md bg-soft px-2 py-0.5 text-xs font-semibold text-muted">
             <x-icon name="lock" class="size-3" />
             Read Only
@@ -14,7 +14,7 @@
             <table class="w-full min-w-[360px] text-left text-sm">
                 <thead class="bg-soft text-xs font-semibold text-label">
                     <tr>
-                        <th scope="col" class="px-4 py-3">Platform Name</th>
+                        <th scope="col" class="px-4 py-3">Nama Platform</th>
                         <th scope="col" class="px-4 py-3">Slug</th>
                     </tr>
                 </thead>
@@ -36,7 +36,7 @@
                     <tr x-show="!loading && loadError" x-cloak>
                         <td colspan="2" class="px-4 py-10 text-center">
                             <p class="text-sm font-medium text-red-600" x-text="loadError"></p>
-                            <button type="button" class="mt-2 text-xs font-semibold text-primary hover:text-primary-hover" @click="fetchPlatforms()">Retry</button>
+                            <button type="button" class="mt-2 text-xs font-semibold text-primary hover:text-primary-hover" @click="fetchPlatforms()">Coba Lagi</button>
                         </td>
                     </tr>
 

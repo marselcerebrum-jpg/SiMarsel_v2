@@ -3,11 +3,11 @@
  * component. Only one period mode is sent at a time; payment dates follow Markaz paid_date.
  */
 export const PERIOD_MODES = [
-    { value: 'date_range', label: 'Date Range' },
-    { value: 'month', label: 'Month & Year' },
+    { value: 'date_range', label: 'Rentang Tanggal' },
+    { value: 'month', label: 'Bulan & Tahun' },
 ];
 
-export const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+export const MONTHS = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
 
 export const MIN_YEAR = 2000;
 

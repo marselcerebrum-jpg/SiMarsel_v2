@@ -1,6 +1,6 @@
 @extends('layouts.dashboard')
 
-@section('title', 'Product Overview')
+@section('title', 'Ikhtisar Produk')
 @push('scripts')
     @vite('resources/js/pages/performance/products.js')
 @endpush
@@ -12,7 +12,7 @@
 @section('page')
     <div x-data="productOverview" class="min-w-0">
         <header>
-            <h1 class="text-2xl font-bold tracking-tight text-ink">Product Overview</h1>
+            <h1 class="text-2xl font-bold tracking-tight text-ink">Performa Produk</h1>
             <p class="mt-1 text-sm text-muted">Pantau performa paket produk berdasarkan platform dan periode.</p>
         </header>
 
@@ -24,7 +24,7 @@
             @include('pages.performance.components.bar-chart-card', [
                 'component' => 'topPackagesByRevenue',
                 'id' => 'top-revenue-title',
-                'title' => 'Top Packages by Revenue',
+                'title' => 'Paket Teratas berdasarkan Revenue',
                 'placeholder' => 'bars-y',
                 'emptyText' => 'Tidak ada data pendapatan paket',
                 'chartLabel' => 'Diagram batang pendapatan per paket',
@@ -33,7 +33,7 @@
             @include('pages.performance.components.bar-chart-card', [
                 'component' => 'topPackagesByVolume',
                 'id' => 'top-volume-title',
-                'title' => 'Top Packages by Transaction Volume',
+                'title' => 'Paket Teratas berdasarkan Volume Transaksi',
                 'placeholder' => 'bars-y',
                 'emptyText' => 'Tidak ada data transaksi paket',
                 'chartLabel' => 'Diagram batang jumlah transaksi per paket',

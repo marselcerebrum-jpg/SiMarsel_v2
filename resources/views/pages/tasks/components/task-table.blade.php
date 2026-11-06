@@ -50,7 +50,7 @@
                                     <td class="truncate px-4 py-3 text-ink" x-text="task.division?.name ?? '-'" :title="task.division?.name"></td>
                                     <td class="px-4 py-3 text-right whitespace-nowrap">
                                         <button x-show="canOpen(task)" type="button" class="text-xs font-semibold text-primary hover:underline" @click="openTask(task)">Detail</button>
-                                        <button x-show="canEdit(task)" type="button" class="ml-3 text-xs font-semibold text-ink hover:underline" @click="openTask(task, { focus: 'edit' })">Edit</button>
+                                        <button x-show="canEdit(task)" type="button" class="ml-3 text-xs font-semibold text-ink hover:underline" @click="openTask(task, { focus: 'edit' })">Ubah</button>
                                         <span x-show="!canOpen(task)" class="text-xs text-label">Terbatas</span>
                                     </td>
                                 </tr>
@@ -66,8 +66,8 @@
                     dari <span class="font-semibold text-ink" x-text="sortedTasks.length"></span> tugas
                 </p>
 
-                <nav x-show="pageCount > 1" class="flex items-center gap-1" aria-label="Task table pagination">
-                    <button type="button" class="{{ $pageButton }} {{ $pageIdle }}" :disabled="currentPage === 1" @click="goTo(currentPage - 1)" aria-label="Previous page">
+                <nav x-show="pageCount > 1" class="flex items-center gap-1" aria-label="Navigasi halaman tabel tugas">
+                    <button type="button" class="{{ $pageButton }} {{ $pageIdle }}" :disabled="currentPage === 1" @click="goTo(currentPage - 1)" aria-label="Halaman sebelumnya">
                         <x-icon name="chevron-left" />
                     </button>
                     <template x-for="link in pageLinks" :key="link.key">
@@ -75,10 +75,10 @@
                             <span x-show="link.page === null" class="grid size-8 place-items-center text-xs text-label">…</span>
                             <button x-show="link.page !== null" type="button" class="{{ $pageButton }}"
                                 :class="link.page === currentPage ? 'border-primary bg-primary text-white' : @js($pageIdle)"
-                                :aria-current="link.page === currentPage ? 'page' : null" :aria-label="`Page ${link.page}`" @click="goTo(link.page)" x-text="link.page"></button>
+                                :aria-current="link.page === currentPage ? 'page' : null" :aria-label="`Halaman ${link.page}`" @click="goTo(link.page)" x-text="link.page"></button>
                         </span>
                     </template>
-                    <button type="button" class="{{ $pageButton }} {{ $pageIdle }}" :disabled="currentPage === pageCount" @click="goTo(currentPage + 1)" aria-label="Next page">
+                    <button type="button" class="{{ $pageButton }} {{ $pageIdle }}" :disabled="currentPage === pageCount" @click="goTo(currentPage + 1)" aria-label="Halaman berikutnya">
                         <x-icon name="chevron-right" />
                     </button>
                 </nav>

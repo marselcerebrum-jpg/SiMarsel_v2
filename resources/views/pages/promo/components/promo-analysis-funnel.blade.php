@@ -6,7 +6,7 @@
     class="mt-5 border-t border-line pt-5"
     aria-labelledby="promo-funnel-title"
 >
-    <h3 id="promo-funnel-title" class="text-sm font-semibold text-ink">Promo Analysis by Funnel</h3>
+    <h3 id="promo-funnel-title" class="text-sm font-semibold text-ink">Analisis Promo per Funnel</h3>
 
     <div class="mt-4 overflow-hidden rounded-lg border border-line">
         <div class="overflow-x-auto">
@@ -37,7 +37,7 @@
                     <tr x-show="!loading && loadError" x-cloak>
                         <td colspan="4" class="px-4 py-10 text-center" role="alert">
                             <p class="text-sm font-medium text-red-600" x-text="loadError"></p>
-                            <button type="button" class="mt-2 text-xs font-semibold text-primary hover:text-primary-hover" @click="retry()">Try Again</button>
+                            <button type="button" class="mt-2 text-xs font-semibold text-primary hover:text-primary-hover" @click="retry()">Coba Lagi</button>
                         </td>
                     </tr>
 

@@ -125,7 +125,7 @@ test('top codes hide server details, retry, and hand 422 errors back to the filt
     widget.$dispatch = (name, detail) => dispatched.push({ name, detail });
 
     await widget.load('q=1');
-    assert.equal(widget.loadError, 'Gagal memuat Top 5 kode promo.');
+    assert.equal(widget.loadError, 'Gagal memuat 5 kode promo teratas.');
     assert.equal(widget.codes.length, 0);
 
     await widget.retry();
