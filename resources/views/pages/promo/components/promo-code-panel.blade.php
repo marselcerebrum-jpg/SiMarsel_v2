@@ -21,6 +21,7 @@
         @include('pages.promo.components.promo-analysis-top-codes')
         @include('pages.promo.components.promo-analysis-funnel')
         @include('pages.promo.components.promo-analysis-source')
+        @include('pages.promo.components.promo-analysis-product-type')
         @include('pages.promo.components.promo-analysis-code')
     </section>
 
