@@ -28,6 +28,7 @@ class TaskDetailResource extends TaskResource
                 'id' => $this->category->id,
                 'name' => $this->category->name,
                 'requires_review' => $this->category->requires_review,
+                'evidence_required' => $this->category->evidence_required,
             ] : null,
             'platform' => $this->platform ? [
                 'id' => $this->platform->id,
