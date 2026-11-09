@@ -149,6 +149,7 @@ class TaskService
                 $locked->completed_at = $locked->status === TaskStatus::Done ? now() : null;
             }
 
+            $resubmitted = $locked->isDirty('status') && $locked->resubmitsTo($locked->status);
             $changes = $this->describeChanges($locked);
 
             $locked->version = $baseVersion + 1;
@@ -156,7 +157,7 @@ class TaskService
 
             $locked->activities()->create([
                 'account_id' => $editor->id,
-                'action' => TaskActivity::UPDATED,
+                'action' => $resubmitted ? TaskActivity::RESUBMITTED : TaskActivity::UPDATED,
                 'changes' => $changes,
             ]);
         });
@@ -201,8 +202,7 @@ class TaskService
                 throw ValidationException::withMessages(['pic_id' => 'Tetapkan PIC sebelum memindahkan tugas dari Back Log.']);
             }
 
-            // A task that already has a review got there through a revision, so handing it to QA again is a resubmission.
-            $resubmitted = $status === TaskStatus::ReadyForQa && $locked->reviews()->exists();
+            $resubmitted = $locked->resubmitsTo($status);
 
             $locked->status = $status;
             $locked->completed_at = $status === TaskStatus::Done ? now() : null;
