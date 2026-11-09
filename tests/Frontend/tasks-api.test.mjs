@@ -51,3 +51,14 @@ test('status changes send the version to the status workflow endpoint', async ()
     assert.equal(requests[0].options.method, 'PATCH');
     assert.equal(requests[0].options.body, payload);
 });
+
+test('QA decisions send the version to the review endpoint', async () => {
+    const { api, requests } = await taskApiFixture();
+    const payload = { decision: 'revision', note: 'Perbaiki ukuran banner.', version: 4 };
+
+    await api.reviewTask(12, payload);
+
+    assert.equal(requests[0].url, '/api/tasks/12/reviews');
+    assert.equal(requests[0].options.method, 'POST');
+    assert.equal(requests[0].options.body, payload);
+});

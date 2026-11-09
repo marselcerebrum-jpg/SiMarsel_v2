@@ -13,6 +13,7 @@ import { http } from '../http';
  * PATCH  /api/tasks/{id}/status                → { data: TaskDetail, message }         (kirim status, version)
  * GET    /api/tasks/{id}/assignment-options    → { data: { current_division, can_change_division, locked_reason, divisions } }
  * PATCH  /api/tasks/{id}/assignment            → { data: TaskDetail, message }         (kirim pic_id, version, division_id opsional)
+ * POST   /api/tasks/{id}/reviews               → { data: TaskDetail, message }         (kirim decision, note, version)
  * GET    /api/tasks/{id}/evidences             → { data: [Evidence] }
  * POST   /api/tasks/{id}/evidences             → { data: Evidence, message }           (multipart: file atau url, note)
  * GET    /api/tasks/schedule?from&to&division  → { data: [ScheduleItem] }
@@ -47,6 +48,8 @@ export const changeTaskStatus = (id, body) => http(`/api/tasks/${id}/status`, { 
 export const fetchAssignmentOptions = (id) => http(`/api/tasks/${id}/assignment-options`);
 
 export const assignTask = (id, body) => http(`/api/tasks/${id}/assignment`, { method: 'PATCH', body });
+
+export const reviewTask = (id, body) => http(`/api/tasks/${id}/reviews`, { method: 'POST', body });
 
 export const fetchEvidences = (id) => request(`/api/tasks/${id}/evidences`);
 
