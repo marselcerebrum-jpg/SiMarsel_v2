@@ -16,7 +16,7 @@ class TaskCalendarService
     /**
      * The Calendar of a month, as two separate lists: the agendas the account may see, shared across divisions,
      * and the deadlines of the tasks the account may see (Admin every division, a Manager their division,
-     * Staff their own tasks). A division filter narrows both lists and never widens the deadline scope.
+     * Staff their own tasks). A division filter narrows both lists and never widens what the account may see.
      *
      * @return array{events: Collection<int, ScheduleEvent>, deadlines: Collection<int, Task>}
      */
@@ -27,7 +27,7 @@ class TaskCalendarService
 
         return [
             'events' => ScheduleEvent::query()
-                ->with(['division', 'task'])
+                ->with(['ownerDivision', 'targetDivisions', 'task'])
                 ->visibleTo($account)
                 ->within($from, $to)
                 ->forDivision($division)
