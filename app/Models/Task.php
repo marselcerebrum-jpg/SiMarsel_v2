@@ -217,6 +217,14 @@ class Task extends Model
         return null;
     }
 
+    /**
+     * A task that already has a review got there through a revision, so handing it to QA again is a resubmission.
+     */
+    public function resubmitsTo(TaskStatus $status): bool
+    {
+        return $status === TaskStatus::ReadyForQa && $this->reviews()->exists();
+    }
+
     private function movesStatusFor(Account $account): bool
     {
         return $this->status->movedByPic() ? $this->assignedTo($account) : $this->managedBy($account);

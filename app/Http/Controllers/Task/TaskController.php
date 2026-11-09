@@ -13,12 +13,14 @@ use App\Http\Requests\Task\TaskListRequest;
 use App\Http\Requests\Task\TaskScheduleRequest;
 use App\Http\Requests\Task\UpdateTaskRequest;
 use App\Http\Resources\ScheduleItemResource;
+use App\Http\Resources\TaskActivityResource;
 use App\Http\Resources\TaskDetailResource;
 use App\Http\Resources\TaskEvidenceResource;
 use App\Http\Resources\TaskResource;
 use App\Http\Resources\TaskReviewResource;
 use App\Models\Task;
 use App\Models\TaskEvidence;
+use App\Services\TaskActivityService;
 use App\Services\TaskEvidenceService;
 use App\Services\TaskReviewService;
 use App\Services\TaskScheduleService;
@@ -77,6 +79,11 @@ class TaskController extends Controller
     public function show(Task $task): TaskDetailResource
     {
         return TaskDetailResource::make($this->taskService->detail($task));
+    }
+
+    public function activities(Task $task, TaskActivityService $service): AnonymousResourceCollection
+    {
+        return TaskActivityResource::collection($service->list($task));
     }
 
     public function evidences(Task $task, TaskEvidenceService $service): AnonymousResourceCollection

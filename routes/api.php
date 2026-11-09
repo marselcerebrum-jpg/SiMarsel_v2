@@ -191,6 +191,10 @@ Route::middleware('auth')->group(function () {
             ->whereNumber('task')
             ->can('changeStatus', 'task')
             ->name('change-status');
+        Route::get('/{task}/activities', [TaskController::class, 'activities'])
+            ->whereNumber('task')
+            ->can('view', 'task')
+            ->name('activities');
         Route::get('/{task}/evidences', [TaskController::class, 'evidences'])
             ->whereNumber('task')
             ->can('view', 'task')
