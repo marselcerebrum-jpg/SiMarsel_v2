@@ -188,6 +188,126 @@ class TaskMonitoringTest extends TestCase
             ->assertJsonPath('data.metrics.due_today', 1);
     }
 
+    public function test_period_defaults_to_deadline_basis_and_reports_it(): void
+    {
+        $this->actingAs($this->admin)
+            ->getJson('/api/tasks/monitoring')
+            ->assertOk()
+            ->assertJsonPath('data.filters.date_basis', 'deadline')
+            ->assertJsonPath('data.period', ['basis' => 'deadline', 'label' => 'Deadline', 'from' => null, 'to' => null, 'active' => false]);
+
+        $this->actingAs($this->admin)
+            ->getJson('/api/tasks/monitoring?date_basis=created_at&date_from=2026-11-01&date_to=2026-11-30')
+            ->assertOk()
+            ->assertJsonPath('data.period', ['basis' => 'created_at', 'label' => 'Tanggal dibuat', 'from' => '2026-11-01', 'to' => '2026-11-30', 'active' => true]);
+    }
+
+    public function test_task_created_and_due_in_different_months_follows_the_chosen_basis(): void
+    {
+        $this->task($this->marketing, $this->staff, TaskStatus::Todo, TaskPriority::High, '2026-12-10', 'Created Nov due Dec', '2026-11-03 09:00:00');
+        $this->task($this->finance, null, TaskStatus::Todo, TaskPriority::Low, '2026-11-20', 'Created Oct due Nov', '2026-10-15 09:00:00');
+
+        $november = 'date_from=2026-11-01&date_to=2026-11-30';
+
+        $this->assertSame(1, $this->countInPeriod('created_at', $november, 'Created Nov due Dec'));
+        $this->assertSame(0, $this->countInPeriod('deadline', $november, 'Created Nov due Dec'));
+        $this->assertSame(0, $this->countInPeriod('created_at', $november, 'Created Oct due Nov'));
+        $this->assertSame(1, $this->countInPeriod('deadline', $november, 'Created Oct due Nov'));
+
+        // Every KPI and breakdown follows the same basis, not only Total Tasks.
+        $this->actingAs($this->admin)
+            ->getJson("/api/tasks/monitoring?date_basis=created_at&{$november}")
+            ->assertOk()
+            ->assertJsonPath('data.metrics.total_tasks', 9)
+            ->assertJsonPath('data.metrics.todo', 3)
+            ->assertJsonPath('data.metrics.unfinished', 7)
+            ->assertJsonPath('data.by_priority.high', ['total' => 2, 'unfinished' => 2])
+            ->assertJsonPath('data.by_division.0.total', 2)
+            ->assertJsonPath('data.by_division.1.total', 7);
+
+        $this->actingAs($this->admin)
+            ->getJson("/api/tasks/monitoring?date_basis=deadline&{$november}")
+            ->assertOk()
+            ->assertJsonPath('data.metrics.total_tasks', 7)
+            ->assertJsonPath('data.metrics.todo', 2)
+            ->assertJsonPath('data.metrics.unfinished', 5)
+            ->assertJsonPath('data.by_priority.high', ['total' => 0, 'unfinished' => 0])
+            ->assertJsonPath('data.by_division.0.total', 2)
+            ->assertJsonPath('data.by_division.1.total', 5);
+    }
+
+    public function test_overdue_and_due_today_stay_based_on_deadline_in_both_period_modes(): void
+    {
+        // Created in November but overdue since October: still Overdue when the period is on the creation date.
+        $this->actingAs($this->admin)
+            ->getJson('/api/tasks/monitoring?date_basis=created_at&date_from=2026-11-01&date_to=2026-11-30')
+            ->assertOk()
+            ->assertJsonPath('data.metrics.overdue', 3)
+            ->assertJsonPath('data.metrics.due_today', 1)
+            ->assertJsonPath('data.metrics.urgent', 2);
+
+        // On the deadline basis that task falls outside November, so only November deadlines remain.
+        $this->actingAs($this->admin)
+            ->getJson('/api/tasks/monitoring?date_basis=deadline&date_from=2026-11-01&date_to=2026-11-30')
+            ->assertOk()
+            ->assertJsonPath('data.metrics.overdue', 2)
+            ->assertJsonPath('data.metrics.due_today', 1);
+
+        // A deadline period ending yesterday leaves no task due today.
+        $this->actingAs($this->admin)
+            ->getJson('/api/tasks/monitoring?date_basis=deadline&date_from=2026-11-01&date_to='.self::YESTERDAY)
+            ->assertOk()
+            ->assertJsonPath('data.metrics.overdue', 2)
+            ->assertJsonPath('data.metrics.due_today', 0);
+    }
+
+    public function test_tasks_without_deadline_appear_only_on_the_created_at_basis(): void
+    {
+        $period = 'date_from=2026-11-01&date_to=2026-11-30&status=in_progress';
+
+        $this->actingAs($this->admin)
+            ->getJson("/api/tasks/monitoring?date_basis=created_at&{$period}")
+            ->assertOk()
+            ->assertJsonPath('data.metrics.total_tasks', 1)
+            ->assertJsonPath('data.metrics.overdue', 0)
+            ->assertJsonPath('data.metrics.due_today', 0);
+
+        $this->actingAs($this->admin)
+            ->getJson("/api/tasks/monitoring?date_basis=deadline&{$period}")
+            ->assertOk()
+            ->assertJsonPath('data.metrics.total_tasks', 0);
+    }
+
+    public function test_period_basis_combines_with_division_status_and_priority_filters(): void
+    {
+        $this->task($this->marketing, $this->staff, TaskStatus::Todo, TaskPriority::High, '2026-12-10', 'Created Nov due Dec', '2026-11-03 09:00:00');
+        $this->task($this->finance, null, TaskStatus::Todo, TaskPriority::Low, '2026-11-20', 'Created Oct due Nov', '2026-10-15 09:00:00');
+
+        $november = 'date_from=2026-11-01&date_to=2026-11-30';
+
+        $this->actingAs($this->admin)
+            ->getJson("/api/tasks/monitoring?date_basis=created_at&{$november}&division=MKT&status=todo&priority=high")
+            ->assertOk()
+            ->assertJsonPath('data.metrics.total_tasks', 1);
+        $this->actingAs($this->admin)
+            ->getJson("/api/tasks/monitoring?date_basis=deadline&{$november}&division=MKT&status=todo&priority=high")
+            ->assertOk()
+            ->assertJsonPath('data.metrics.total_tasks', 0);
+
+        $this->actingAs($this->admin)
+            ->getJson("/api/tasks/monitoring?date_basis=deadline&{$november}&division=FIN")
+            ->assertOk()
+            ->assertJsonPath('data.metrics.total_tasks', 2)
+            ->assertJsonPath('data.metrics.completed', 1)
+            ->assertJsonPath('data.metrics.overdue', 0)
+            ->assertJsonPath('data.metrics.completion_rate', 50);
+        $this->actingAs($this->admin)
+            ->getJson("/api/tasks/monitoring?date_basis=created_at&{$november}&division=FIN")
+            ->assertOk()
+            ->assertJsonPath('data.metrics.total_tasks', 2)
+            ->assertJsonPath('data.metrics.overdue', 1);
+    }
+
     public function test_done_tasks_and_tasks_without_deadline_are_never_overdue_or_due_today(): void
     {
         $this->actingAs($this->admin)
@@ -257,9 +377,9 @@ class TaskMonitoringTest extends TestCase
     public function test_invalid_filters_are_rejected(): void
     {
         $this->actingAs($this->admin)
-            ->getJson('/api/tasks/monitoring?scope=all&status=archived&priority=critical&division=XXX&date_from=06-11-2026')
+            ->getJson('/api/tasks/monitoring?scope=all&status=archived&priority=critical&division=XXX&date_basis=updated_at&date_from=06-11-2026')
             ->assertUnprocessable()
-            ->assertJsonValidationErrors(['scope', 'status', 'priority', 'division', 'date_from']);
+            ->assertJsonValidationErrors(['scope', 'status', 'priority', 'division', 'date_basis', 'date_from']);
 
         $this->actingAs($this->admin)
             ->getJson('/api/tasks/monitoring?date_from='.self::TODAY.'&date_to='.self::YESTERDAY)
@@ -278,9 +398,18 @@ class TaskMonitoringTest extends TestCase
         ]);
     }
 
-    private function task(Division $division, ?Account $pic, TaskStatus $status, TaskPriority $priority, ?string $deadline, string $title): Task
+    private function countInPeriod(string $basis, string $period, string $title): int
+    {
+        return $this->actingAs($this->admin)
+            ->getJson("/api/tasks/monitoring?date_basis={$basis}&{$period}&search=".urlencode($title))
+            ->assertOk()
+            ->json('data.metrics.total_tasks');
+    }
+
+    private function task(Division $division, ?Account $pic, TaskStatus $status, TaskPriority $priority, ?string $deadline, string $title, ?string $createdAt = null): Task
     {
         return Task::factory()->create([
+            'created_at' => $createdAt ?? now(),
             'title' => $title,
             'division_id' => $division->id,
             'pic_id' => $pic?->id,
