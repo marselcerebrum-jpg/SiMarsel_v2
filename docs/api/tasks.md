@@ -52,7 +52,7 @@ Backend **wajib** menerapkan cakupan ini di setiap endpoint. Staff yang mengubah
 | Method & path | Body / query | Respons |
 |---|---|---|
 | `GET /api/tasks/meta` | – | `{ data: { role, division, default_division, can_create, divisions, statuses, priorities } }` |
-| `GET /api/tasks` | `search`, `division`, `priority`, `status` (opsional) | `{ data: [Task] }`, semua tugas dalam cakupan user; tiap filter juga diterapkan backend. |
+| `GET /api/tasks` | `search`, `division`, `priority`, `status`, `sort`, `direction`, `per_page`, `page` (semua opsional) | `{ data: [Task], meta: { status_counts } }`, tugas dalam cakupan user. Tanpa `per_page` semua tugas dikembalikan sekaligus; Board/Table mengirim filter ke server dan mengurutkan serta mempaginasi di frontend. |
 | `GET /api/tasks/create-options` | – | Pilihan divisi sesuai kewenangan, PIC per divisi, kategori/aturan QA, platform, prioritas, status awal, dan default form. Admin/Manajer saja. |
 | `POST /api/tasks` | `title`*, `description`, `category_id`, `division_id`*, `pic_id`, `platform_id`, `priority`, `start_date`, `deadline`, `status`, `requires_review`, `evidence_required` | `201 { data: TaskDetail, message }`; Admin/Manajer saja. Field pembuat ditentukan dari akun yang login. |
 | `GET /api/tasks/{id}` | – | `{ data: TaskDetail }` |
