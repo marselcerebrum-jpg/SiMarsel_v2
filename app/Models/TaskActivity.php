@@ -11,9 +11,10 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
  * One entry of a task's history. changes maps each changed field to its old and new value.
- * Entries are append-only: once written they are never updated or deleted.
+ * Entries are append-only: once written they are never updated or deleted. The actor's name is copied in
+ * when the entry is written, so it is still shown after the account is deleted.
  */
-#[Fillable(['task_id', 'account_id', 'action', 'changes'])]
+#[Fillable(['task_id', 'account_id', 'actor_name_snapshot', 'action', 'changes'])]
 class TaskActivity extends Model
 {
     public const CREATED = 'created';
@@ -68,6 +69,12 @@ class TaskActivity extends Model
 
     protected static function booted(): void
     {
+        static::creating(function (TaskActivity $activity) {
+            if ($activity->actor_name_snapshot === null && $activity->account_id !== null) {
+                $activity->actor_name_snapshot = Account::whereKey($activity->account_id)->value('fullname');
+            }
+        });
+
         static::updating(fn () => throw new TaskActivityImmutableException);
         static::deleting(fn () => throw new TaskActivityImmutableException);
     }
@@ -92,6 +99,23 @@ class TaskActivity extends Model
     public function actor(): BelongsTo
     {
         return $this->belongsTo(Account::class, 'account_id');
+    }
+
+    /**
+     * Who did it: the account as it is now, or the name copied in when the entry was written once the
+     * account no longer exists.
+     *
+     * @return array{id: ?int, fullname: string}|null
+     */
+    public function actorSummary(): ?array
+    {
+        if ($this->actor) {
+            return ['id' => $this->actor->id, 'fullname' => $this->actor->fullname];
+        }
+
+        return $this->actor_name_snapshot === null
+            ? null
+            : ['id' => $this->account_id, 'fullname' => $this->actor_name_snapshot];
     }
 
     public function actionLabel(): string
