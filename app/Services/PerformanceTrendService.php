@@ -75,7 +75,7 @@ class PerformanceTrendService
         }
 
         return [
-            'labels' => array_map(fn (int $month) => CarbonImmutable::create(2000, $month, 1)->format('M'), range(1, 12)),
+            'labels' => array_map(TrendBuckets::monthName(...), range(1, 12)),
             'datasets' => array_map(
                 fn (int $year, array $data) => ['label' => (string) $year, 'data' => $data],
                 array_keys($datasets),

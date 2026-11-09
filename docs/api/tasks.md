@@ -118,6 +118,7 @@ Backend **wajib** menerapkan cakupan ini di setiap endpoint. Staff yang mengubah
 - File yang diterima: PDF, JPG, JPEG, PNG, WEBP, DOC, DOCX, XLS, XLSX, PPT, PPTX, ZIP, maks. 10 MB. Backend memvalidasi ulang jenis dan ukuran file. File disimpan privat dan hanya dapat diunduh lewat endpoint download.
 - Tautan wajib URL valid dengan `http://` atau `https://`, maks. 2048 karakter.
 - Evidence terikat pada tugas di URL; `task_id` di body diabaikan.
+- PIC diperiksa ulang saat evidence disimpan (row tugas dikunci). Bila PIC diganti ketika evidence sedang dikirim, evidence dari PIC lama ditolak `403` dan file yang sudah terunggah dihapus.
 - `evidence_required` mengikuti kategori: kategori dengan `evidence_required = true` selalu mewajibkan evidence. Untuk kategori lain, pembuat tugas boleh mengirim `evidence_required` di `POST /api/tasks`. Memindahkan tugas ke kategori yang mewajibkan evidence membuat evidence wajib.
 - Submission tetap lewat `PATCH /api/tasks/{id}/status` (`ready_for_qa` bila wajib QA, `done` bila tidak); ditolak `422` bila evidence wajib tapi belum ada.
 - Setelah revisi (`on_qa` → `in_progress`), PIC dapat mengirim evidence baru dan submit ulang. Evidence lama tetap tersimpan dan tampil di detail (terbaru lebih dulu).

@@ -6,12 +6,12 @@ import { purchaseTimeRows } from './table';
 
 const EMPTY_MESSAGE = 'Tidak ada data waktu pembelian untuk filter yang dipilih.';
 
-const METRIC = { label: 'Transactions', format: 'number' };
+const METRIC = { label: 'Transaksi', format: 'number' };
 
 const TOOLTIP = {
     title: (row) => row.title,
-    label: (row) => `Transactions: ${row.transactions}`,
-    details: (row) => [`Share: ${row.percentage}`],
+    label: (row) => `Transaksi: ${row.transactions}`,
+    details: (row) => [`Porsi: ${row.percentage}`],
 };
 
 /**
@@ -56,9 +56,9 @@ export default (labels = {}) => {
         },
 
         get purchaseTimeChartLabel() {
-            const slices = this.purchaseTimeRows.map((row) => `${row.title} ${row.transactions} transactions`).join(', ');
+            const slices = this.purchaseTimeRows.map((row) => `${row.title} ${row.transactions} transaksi`).join(', ');
 
-            return `Purchase time distribution pie chart: ${slices}`;
+            return `Diagram lingkaran distribusi waktu pembelian: ${slices}`;
         },
 
         async loadPurchaseTime(query) {

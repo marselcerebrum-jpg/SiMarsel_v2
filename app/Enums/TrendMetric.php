@@ -15,10 +15,10 @@ enum TrendMetric: string
     {
         return match ($this) {
             self::Revenue => 'Revenue',
-            self::Transactions => 'Transactions',
+            self::Transactions => 'Transaksi',
             self::Downloaders => 'Downloader',
-            self::Conversion => 'Conversion',
-            self::NewUsers => 'User Baru',
+            self::Conversion => 'Konversi',
+            self::NewUsers => 'Pengguna Baru',
             self::RepeatOrders => 'Repeat Order',
         };
     }

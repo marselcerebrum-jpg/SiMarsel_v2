@@ -3,15 +3,15 @@
  * performance endpoint and to the export link. Only one period mode is sent at a time.
  */
 export const PERIOD_MODES = [
-    { value: 'current_month', label: 'This Month' },
-    { value: 'years', label: 'Year & Month' },
-    { value: 'year_range', label: 'Year Range' },
-    { value: 'date_range', label: 'Date Range' },
+    { value: 'current_month', label: 'Bulan Ini' },
+    { value: 'years', label: 'Tahun & Bulan' },
+    { value: 'year_range', label: 'Rentang Tahun' },
+    { value: 'date_range', label: 'Rentang Tanggal' },
 ];
 
 export const MAX_YEARS = 5;
 
-export const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+export const MONTHS = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
 
 export function today() {
     const date = new Date();

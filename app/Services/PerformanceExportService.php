@@ -114,7 +114,7 @@ class PerformanceExportService
             'Periode',
             'Tanggal Mulai',
             'Tanggal Akhir',
-            ...array_map(fn (TrendMetric $metric) => $metric === TrendMetric::Conversion ? 'Conversion (%)' : $metric->label(), $metrics),
+            ...array_map(fn (TrendMetric $metric) => $metric === TrendMetric::Conversion ? 'Konversi (%)' : $metric->label(), $metrics),
         ]];
 
         foreach ($trends[0]['rows'] as $index => $row) {

@@ -13,10 +13,10 @@
     class="min-w-0"
 >
         {{-- Ringkasan --}}
-        <section class="{{ $card }} mt-6 p-5" aria-label="Account Summary">
+        <section class="{{ $card }} mt-6 p-5" aria-label="Ringkasan Akun">
             <div class="flex flex-col sm:flex-row sm:items-stretch">
                 <div class="pb-4 sm:w-1/4 sm:pb-0 sm:pr-6">
-                <p class="{{ $tileLabel }}">Total Accounts</p>
+                <p class="{{ $tileLabel }}">Total Akun</p>
                 <p class="{{ $tileValue }}" x-text="loading ? '—' : accountSummary.total">—</p>
                 <p class="mt-1 text-sm text-muted">Terdaftar di sistem</p>
                 </div>
@@ -36,7 +36,7 @@
         <section class="{{ $card }} mt-6 p-5" aria-labelledby="account-list-title">
             <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                 <div>
-                    <h2 id="account-list-title" class="text-base font-semibold text-ink">Account List</h2>
+                    <h2 id="account-list-title" class="text-base font-semibold text-ink">Daftar Akun</h2>
                     <p class="mt-1 text-sm text-muted">
                         {{ $canManageAccounts ? 'Tambah, ubah, atau hapus akun anggota tim beserta role dan divisinya.' : 'Cari akun anggota tim dan saring berdasarkan divisi.' }}
                     </p>
@@ -48,7 +48,7 @@
                         class="inline-flex h-9 shrink-0 items-center justify-center gap-2 self-start rounded-lg bg-primary px-4 text-sm font-semibold text-white hover:bg-primary-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-50"
                         @click="openCreate()"
                     >
-                        Create Account
+                        Tambah Akun
                     </button>
                 @endif
             </div>

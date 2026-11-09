@@ -126,8 +126,8 @@ export function chartConfig({ type, labels, datasets, metric }) {
 
 const paymentTooltip = {
     title: (row) => row.name,
-    label: (row) => `Contribution: ${row.percentage}`,
-    details: (row) => [`Transactions: ${row.transactions}`, `Revenue: ${row.revenue}`],
+    label: (row) => `Kontribusi: ${row.percentage}`,
+    details: (row) => [`Transaksi: ${row.transactions}`, `Revenue: ${row.revenue}`],
 };
 
 /**

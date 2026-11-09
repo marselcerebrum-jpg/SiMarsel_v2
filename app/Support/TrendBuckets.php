@@ -11,6 +11,14 @@ use Carbon\CarbonInterface;
  */
 final class TrendBuckets
 {
+    /** Indonesian short month names, matching Intl.DateTimeFormat('id-ID') on the frontend. */
+    private const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+
+    public static function monthName(int $month): string
+    {
+        return self::MONTHS[$month - 1];
+    }
+
     /**
      * The buckets of every range of the filter, in order.
      *
@@ -71,19 +79,21 @@ final class TrendBuckets
     private static function label(CarbonImmutable $start, CarbonImmutable $end, TrendPeriod $period): string
     {
         if ($period === TrendPeriod::Monthly) {
-            return $start->format('M Y');
+            return self::monthName($start->month).' '.$start->year;
         }
+
+        $full = fn (CarbonImmutable $date) => $date->format('d').' '.self::monthName($date->month).' '.$date->year;
 
         if ($start->isSameDay($end)) {
-            return $start->format('d M Y');
+            return $full($start);
         }
 
-        $startFormat = match (true) {
-            $start->isSameMonth($end) => 'd',
-            $start->isSameYear($end) => 'd M',
-            default => 'd M Y',
+        $startLabel = match (true) {
+            $start->isSameMonth($end) => $start->format('d'),
+            $start->isSameYear($end) => $start->format('d').' '.self::monthName($start->month),
+            default => $full($start),
         };
 
-        return $start->format($startFormat).' - '.$end->format('d M Y');
+        return $startLabel.' - '.$full($end);
     }
 }

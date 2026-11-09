@@ -9,12 +9,12 @@
     <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         @include('pages.performance.components.card-header', [
             'id' => 'package-performance-title',
-            'title' => 'Package Performance Details',
+            'title' => 'Detail Performa Paket',
         ])
 
         <div class="flex flex-col gap-2 sm:flex-row sm:items-center">
             <label class="relative block sm:w-64">
-                <span class="sr-only">Search packages</span>
+                <span class="sr-only">Cari paket</span>
                 <x-icon name="search" class="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-label" />
                 <input
                     type="search"
@@ -76,8 +76,8 @@
                     <span x-show="rows.length !== items.length">(hasil pencarian dari <span x-text="items.length"></span> paket)</span>
                 </p>
 
-                <nav x-show="pageCount > 1" class="flex items-center gap-1" aria-label="Package table pagination">
-                    <button type="button" class="{{ $pageButton }} {{ $pageButtonIdle }}" :disabled="currentPage === 1" @click="goTo(currentPage - 1)" aria-label="Previous page">
+                <nav x-show="pageCount > 1" class="flex items-center gap-1" aria-label="Navigasi halaman tabel paket">
+                    <button type="button" class="{{ $pageButton }} {{ $pageButtonIdle }}" :disabled="currentPage === 1" @click="goTo(currentPage - 1)" aria-label="Halaman sebelumnya">
                         <x-icon name="chevron-left" />
                     </button>
 
@@ -90,21 +90,21 @@
                                 class="{{ $pageButton }}"
                                 :class="link.page === currentPage ? 'border-primary bg-primary text-white hover:bg-primary-hover' : @js($pageButtonIdle)"
                                 :aria-current="link.page === currentPage ? 'page' : null"
-                                :aria-label="`Page ${link.page}`"
+                                :aria-label="`Halaman ${link.page}`"
                                 @click="goTo(link.page)"
                                 x-text="link.page"
                             ></button>
                         </span>
                     </template>
 
-                    <button type="button" class="{{ $pageButton }} {{ $pageButtonIdle }}" :disabled="currentPage === pageCount" @click="goTo(currentPage + 1)" aria-label="Next page">
+                    <button type="button" class="{{ $pageButton }} {{ $pageButtonIdle }}" :disabled="currentPage === pageCount" @click="goTo(currentPage + 1)" aria-label="Halaman berikutnya">
                         <x-icon name="chevron-right" />
                     </button>
                 </nav>
             </div>
 
             <p class="mt-1 text-xs text-muted">
-                Hanya transaksi berhasil yang dihitung. <span class="font-semibold text-ink">Price</span> dihitung per transaksi,
+                Hanya transaksi berhasil yang dihitung. <span class="font-semibold text-ink">Harga</span> dihitung per transaksi,
                 <span class="font-semibold text-ink">Trx</span> dihitung per hari (hanya hari yang ada penjualannya).
                 Arahkan kursor ke judul kolom untuk definisi lengkap.
             </p>

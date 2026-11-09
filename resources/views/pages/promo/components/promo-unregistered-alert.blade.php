@@ -13,7 +13,7 @@
     <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
             <div class="flex flex-wrap items-center gap-2">
-                <h2 id="unregistered-title" class="text-base font-semibold text-ink">Unregistered Promo Codes</h2>
+                <h2 id="unregistered-title" class="text-base font-semibold text-ink">Kode Promo Belum Terdaftar</h2>
                 <span
                     x-show="!loadError && (!loading || meta)"
                     x-cloak
@@ -26,7 +26,7 @@
         </div>
 
         <label class="relative block w-full sm:max-w-xs" x-show="total > 0 || hasFilter" x-cloak>
-            <span class="sr-only">Search Unregistered Codes</span>
+            <span class="sr-only">Cari Kode Belum Terdaftar</span>
             <svg class="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-label" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true">
                 <circle cx="11" cy="11" r="7" />
                 <path d="M20 20l-3.5-3.5" />
@@ -52,11 +52,11 @@
             <table class="w-full min-w-[720px] text-left text-sm" :aria-busy="loading">
                 <thead class="bg-soft text-xs font-semibold text-label">
                     <tr>
-                        <th scope="col" class="px-4 py-3">Raw Code</th>
+                        <th scope="col" class="px-4 py-3">Kode Asli</th>
                         <th scope="col" class="px-4 py-3">Platform</th>
-                        <th scope="col" class="px-4 py-3">Usage</th>
-                        <th scope="col" class="px-4 py-3">Last Used</th>
-                        <th scope="col" class="px-4 py-3 text-right">Actions</th>
+                        <th scope="col" class="px-4 py-3">Penggunaan</th>
+                        <th scope="col" class="px-4 py-3">Terakhir Dipakai</th>
+                        <th scope="col" class="px-4 py-3 text-right">Aksi</th>
                     </tr>
                 </thead>
 
@@ -88,9 +88,9 @@
                                 <button
                                     type="button"
                                     class="inline-flex h-8 items-center justify-center rounded-lg bg-primary px-3 text-xs font-semibold text-white hover:bg-primary-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-                                    :aria-label="'Register Code ' + item.code + ' ' + item.platform.name"
+                                    :aria-label="'Daftarkan kode ' + item.code + ' ' + item.platform.name"
                                     @click="register(item)"
-                                >Register Code</button>
+                                >Daftarkan Kode</button>
                             </td>
                         </tr>
                     </template>
@@ -102,14 +102,14 @@
                     <tr x-show="!loading && loadError" x-cloak>
                         <td colspan="5" class="px-4 py-8 text-center">
                             <p class="text-sm font-medium text-red-600" x-text="loadError"></p>
-                            <button type="button" class="mt-2 text-xs font-semibold text-primary hover:text-primary-hover" @click="fetchItems()">Retry</button>
+                            <button type="button" class="mt-2 text-xs font-semibold text-primary hover:text-primary-hover" @click="fetchItems()">Coba Lagi</button>
                         </td>
                     </tr>
 
                     <tr x-show="!loading && !loadError && !items.length && hasFilter" x-cloak>
                         <td colspan="5" class="px-4 py-8 text-center">
                             <p class="text-sm font-medium text-ink">Tidak ada kode belum terdaftar yang cocok.</p>
-                            <button type="button" class="mt-2 text-xs font-semibold text-primary hover:text-primary-hover" @click="filter.search = ''">Reset Search</button>
+                            <button type="button" class="mt-2 text-xs font-semibold text-primary hover:text-primary-hover" @click="filter.search = ''">Atur Ulang Pencarian</button>
                         </td>
                     </tr>
                 </tbody>
@@ -121,7 +121,7 @@
         Semua kode promo di transaksi Markaz sudah terdaftar di master.
     </p>
 
-    <nav x-show="meta && meta.last_page > 1" x-cloak class="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between" aria-label="Unregistered Code Pagination">
+    <nav x-show="meta && meta.last_page > 1" x-cloak class="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between" aria-label="Navigasi halaman kode belum terdaftar">
         <p class="text-xs text-muted">
             Menampilkan <span class="font-semibold text-ink" x-text="meta?.from ?? 0"></span>–<span class="font-semibold text-ink" x-text="meta?.to ?? 0"></span>
             dari <span x-text="meta?.total ?? 0"></span> kode
@@ -130,13 +130,13 @@
         <div class="flex items-center gap-2">
             <button type="button" class="{{ $pageButton }}" :disabled="loading || filter.page <= 1" @click="goToPage(filter.page - 1)">
                 <x-icon name="chevron-left" class="size-3.5" />
-                Previous
+                Sebelumnya
             </button>
             <span class="text-xs text-muted">
                 Halaman <span class="font-semibold text-ink" x-text="meta?.current_page"></span> dari <span x-text="meta?.last_page"></span>
             </span>
             <button type="button" class="{{ $pageButton }}" :disabled="loading || filter.page >= (meta?.last_page ?? 1)" @click="goToPage(filter.page + 1)">
-                Next
+                Berikutnya
                 <x-icon name="chevron-right" class="size-3.5" />
             </button>
         </div>
