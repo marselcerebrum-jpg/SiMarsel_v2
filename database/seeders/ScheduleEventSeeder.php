@@ -10,7 +10,7 @@ use Illuminate\Database\Seeder;
 class ScheduleEventSeeder extends Seeder
 {
     /**
-     * Agendas of every division: title => [days from this Monday to the start, length in days].
+     * Agendas shared with everyone: title => [days from this Monday to the start, length in days].
      */
     public const SHARED_AGENDAS = [
         'Rapat koordinasi bulanan' => [0, 1],
@@ -20,7 +20,8 @@ class ScheduleEventSeeder extends Seeder
     ];
 
     /**
-     * Demo agendas around the current week, so the Timeline has something to show locally.
+     * Demo agendas around the current week, so the Timeline has something to show locally: the shared ones,
+     * an internal briefing per division, one internal agenda for several divisions, and one for Admin only.
      */
     public function run(): void
     {
@@ -39,12 +40,34 @@ class ScheduleEventSeeder extends Seeder
             ]);
         }
 
-        // One internal agenda per division, visible only to that division and Admin.
-        Division::query()->orderBy('id')->get()->each(fn (Division $division, int $index) => ScheduleEvent::create([
-            'title' => "Briefing internal {$division->name}",
-            'division_id' => $division->id,
-            'start_date' => $monday->addDays(1 + $index % 5),
+        $divisions = Division::query()->orderBy('id')->get();
+
+        $divisions->each(fn (Division $division, int $index) => $this->internal(
+            "Briefing internal {$division->name}",
+            $monday->addDays(1 + $index % 5),
+            $division,
+            [$division->id],
+        ));
+
+        if ($divisions->count() >= 2) {
+            [$owner, $target] = [$divisions[0], $divisions[1]];
+
+            $this->internal("Sinkronisasi {$owner->name} dan {$target->name}", $monday->addDays(2), $owner, [$owner->id, $target->id]);
+        }
+
+        $this->internal('Rapat pimpinan', $monday->addDays(4), null, []);
+    }
+
+    /**
+     * @param  array<int, int>  $targetDivisionIds
+     */
+    private function internal(string $title, CarbonImmutable $date, ?Division $owner, array $targetDivisionIds): void
+    {
+        ScheduleEvent::create([
+            'title' => $title,
+            'owner_division_id' => $owner?->id,
+            'start_date' => $date,
             'is_shared' => false,
-        ]));
+        ])->targetDivisions()->attach($targetDivisionIds);
     }
 }
