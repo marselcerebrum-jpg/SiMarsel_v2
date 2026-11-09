@@ -15,7 +15,6 @@ import { http } from '../http';
  * PATCH  /api/tasks/{id}/assignment            → { data: TaskDetail, message }         (kirim pic_id, version, division_id opsional)
  * GET    /api/tasks/{id}/evidences             → { data: [Evidence] }
  * POST   /api/tasks/{id}/evidences             → { data: Evidence, message }           (multipart: file atau url, note)
- * POST   /api/tasks/{id}/reviews               → { data: TaskDetail, message }         (kirim decision, note, version)
  * GET    /api/tasks/schedule?from&to&division  → { data: [ScheduleItem] }
  * GET    /api/tasks/calendar?month&division    → { data: { events: [Event], deadlines: [Task] } }
  */
@@ -50,8 +49,6 @@ export const fetchAssignmentOptions = (id) => http(`/api/tasks/${id}/assignment-
 export const assignTask = (id, body) => http(`/api/tasks/${id}/assignment`, { method: 'PATCH', body });
 
 export const fetchEvidences = (id) => request(`/api/tasks/${id}/evidences`);
-
-export const reviewTask = (id, body) => request(`/api/tasks/${id}/reviews`, { method: 'POST', body });
 
 export const fetchSchedule = (params) => request(`/api/tasks/schedule${query(params)}`);
 

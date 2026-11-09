@@ -90,28 +90,6 @@
                         </div>
                     </header>
 
-                    {{-- Keputusan review (TASK-07) --}}
-                    <section x-show="reviewMode" x-cloak class="rounded-lg border p-4" :class="reviewMode === 'revision' ? 'border-amber-200 bg-amber-50/60' : 'border-primary/30 bg-primary-soft'">
-                        <h3 class="{{ $sectionTitle }}" x-text="reviewMode === 'revision' ? 'Minta Revisi' : 'Setujui Tugas'"></h3>
-                        <p class="mt-1 text-xs text-muted" x-text="reviewMode === 'revision' ? 'Tugas kembali ke On Process. Jelaskan apa yang perlu diperbaiki PIC.' : 'Tugas akan ditandai Done dan waktu penyelesaian dicatat.'"></p>
-                        <label for="review-note" class="{{ $labelClass }} mt-3">Catatan <span x-show="reviewMode === 'revision'" class="text-red-500">*</span><span x-show="reviewMode !== 'revision'">(opsional)</span></label>
-                        <textarea id="review-note" x-ref="reviewNote" x-model="reviewNote" rows="3" class="{{ $textareaClass }}" @input="reviewError = ''" maxlength="1000"
-                            :placeholder="reviewMode === 'revision' ? 'Contoh: lampirkan versi final desain dan perbaiki ukuran banner.' : 'Catatan untuk PIC'"></textarea>
-                        <p x-show="reviewError" x-text="reviewError" class="{{ $errorClass }}"></p>
-                        <div class="mt-3 flex justify-end gap-2">
-                            <button type="button" class="{{ $button }}" :disabled="acting !== null" @click="reviewMode = null">Batal</button>
-                            <button type="button" class="{{ $primaryButton }}" :disabled="acting !== null" @click="submitReview()"
-                                x-text="acting ? 'Menyimpan…' : (reviewMode === 'revision' ? 'Kirim Revisi' : 'Setujui')"></button>
-                        </div>
-                    </section>
-
-                    {{-- Catatan review terakhir untuk PIC --}}
-                    <section x-show="task.last_review" class="rounded-lg border p-4" :class="task.last_review?.decision === 'revision' ? 'border-amber-200 bg-amber-50/60' : 'border-line bg-soft'">
-                        <h3 class="{{ $sectionTitle }}" x-text="task.last_review?.decision === 'revision' ? 'Catatan Revisi Terakhir' : 'Hasil Review Terakhir'"></h3>
-                        <p class="mt-1 text-sm text-ink" x-text="task.last_review?.note || 'Tanpa catatan.'"></p>
-                        <p class="mt-1 text-xs text-muted"><span x-text="task.last_review?.reviewer?.fullname ?? '-'"></span> · <span x-text="formatDateTime(task.last_review?.created_at)"></span></p>
-                    </section>
-
                     {{-- Informasi tugas / form edit (TASK-03) --}}
                     <section>
                         <h3 class="{{ $sectionTitle }}">Informasi Tugas</h3>

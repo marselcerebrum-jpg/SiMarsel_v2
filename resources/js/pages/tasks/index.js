@@ -12,7 +12,6 @@ import {
     fetchTaskCreateOptions,
     fetchTaskMeta,
     fetchTasks,
-    reviewTask,
     submitEvidence,
     updateTask,
 } from '../../services/tasks';
@@ -26,7 +25,6 @@ import {
     formatDate,
     formatDateTime,
     isOverdue,
-    managesTask,
     parseISODate,
     priorityOf,
     statusOf,
@@ -465,27 +463,24 @@ Alpine.data('tasklist', () => ({
             return;
         }
 
-        // Revisi wajib memiliki catatan alasan: buka form review di panel detail.
-        if (rule.review === 'revision') {
-            this.openTask(task, { focus: 'revision' });
-            return;
-        }
-
         await this.moveTask(task, rule);
     },
 
-    // Approve lewat drag-and-drop (On QA → Done) memakai endpoint review; transisi lain memakai endpoint status.
+    // Semua perpindahan status, termasuk hasil review, memakai endpoint workflow yang sama.
     async moveTask(task, transition) {
         this.movingId = task.id;
 
         try {
-            const { data, message } = transition.review === 'approve'
-                ? await reviewTask(task.id, { decision: 'approve', updated_at: task.updated_at })
-                : await changeTaskStatus(task.id, { status: transition.to, updated_at: task.updated_at });
+            const { data, message } = await changeTaskStatus(task.id, { status: transition.to, version: task.version });
             this.syncTask(data);
             showToast({ title: 'Status diperbarui', text: message ?? `${task.title} → ${statusOf(transition.to).label}` });
         } catch (error) {
-            notifyFailure(error, 'Status tugas gagal diperbarui.');
+            if (error?.status === 422) {
+                const errors = validationErrors(error);
+                notifyFailure({ ...error, data: { ...error.data, message: errors.status ?? errors.pic_id } }, 'Status tugas gagal diperbarui.');
+            } else {
+                notifyFailure(error, 'Status tugas gagal diperbarui.');
+            }
             if (error?.status === 409) this.load();
         } finally {
             this.movingId = null;
@@ -674,9 +669,6 @@ Alpine.data('taskDetail', () => ({
     evidenceErrors: {},
     sendingEvidence: false,
 
-    reviewMode: null,
-    reviewNote: '',
-    reviewError: '',
     acting: null,
 
     init() {
@@ -684,7 +676,7 @@ Alpine.data('taskDetail', () => ({
     },
 
     reset() {
-        Object.assign(this, { task: null, state: 'idle', editing: false, reviewMode: null, reviewNote: '', reviewError: '', evidences: [], activities: [] });
+        Object.assign(this, { task: null, state: 'idle', editing: false, evidences: [], activities: [] });
     },
 
     async open(id) {
@@ -699,7 +691,6 @@ Alpine.data('taskDetail', () => ({
             this.syncDetailCollections(data);
             // Tugas yang belum ada di daftar baru masuk Board setelah detailnya dimuat.
             if (this.highlightId === data.id) this.$nextTick(() => this.revealHighlight());
-            if (this.detailFocus === 'revision') this.startReview('revision');
             if (this.detailFocus === 'edit' && this.canEditThis) this.startEdit();
         } catch (error) {
             if (this.highlightId === id) this.highlightId = null;
@@ -741,10 +732,6 @@ Alpine.data('taskDetail', () => ({
     },
 
     // --- Hak akses pada tugas yang dibuka -----------------------------------------------------
-
-    get transitions() {
-        return this.task ? availableTransitions(this.task, this.user) : [];
-    },
 
     get isPicOfTask() {
         return this.task?.pic?.id !== undefined && this.task?.pic?.id === this.user.id;
@@ -814,10 +801,6 @@ Alpine.data('taskDetail', () => ({
 
     get canSubmitEvidence() {
         return this.isPicOfTask && ['todo', 'in_progress'].includes(this.task?.status);
-    },
-
-    get canReview() {
-        return this.task ? managesTask(this.task, this.user) : false;
     },
 
     // --- Edit informasi utama (TASK-03 C) -----------------------------------------------------
@@ -932,63 +915,32 @@ Alpine.data('taskDetail', () => ({
         }
     },
 
-    // --- Workflow status (TASK-05) & review (TASK-07) -----------------------------------------
+    // --- Workflow status (TASK-05) ------------------------------------------------------------
+
+    get transitions() {
+        if (!this.task) return [];
+
+        const backendStatuses = new Set((this.task.next_statuses ?? []).map(({ value }) => value));
+
+        return availableTransitions(this.task, this.user)
+            .filter(({ to }) => backendStatuses.has(to));
+    },
 
     async runTransition(transition) {
-        if (transition.review === 'revision') {
-            this.startReview('revision');
-            return;
-        }
-        if (transition.review === 'approve') {
-            this.startReview('approve');
-            return;
-        }
-
         this.acting = transition.to;
 
         try {
-            const { data, message } = await changeTaskStatus(this.task.id, { status: transition.to, updated_at: this.task.updated_at });
+            const { data, message } = await changeTaskStatus(this.task.id, { status: transition.to, version: this.task.version });
             this.applyTask(data);
+            this.load();
             showToast({ title: 'Status diperbarui', text: message ?? `Status menjadi ${statusOf(transition.to).label}.` });
         } catch (error) {
-            await this.handleFailure(error, 'Status tugas gagal diperbarui.');
-        } finally {
-            this.acting = null;
-        }
-    },
-
-    startReview(mode) {
-        this.reviewMode = mode;
-        this.reviewNote = '';
-        this.reviewError = '';
-        this.$nextTick(() => this.$refs.reviewNote?.focus());
-    },
-
-    async submitReview() {
-        if (this.reviewMode === 'revision' && !this.reviewNote.trim()) {
-            this.reviewError = 'Catatan alasan revisi wajib diisi.';
-            return;
-        }
-        if (this.acting) return;
-
-        const decision = this.reviewMode;
-        this.acting = decision;
-
-        try {
-            const { data, message } = await reviewTask(this.task.id, {
-                decision,
-                note: this.reviewNote.trim(),
-                updated_at: this.task.updated_at,
-            });
-            this.applyTask(data);
-            this.reviewMode = null;
-            showToast({
-                title: decision === 'revision' ? 'Revisi diminta' : 'Tugas disetujui',
-                text: message ?? `Status menjadi ${statusOf(data.status).label}.`,
-            });
-        } catch (error) {
-            if (error?.status === 422) this.reviewError = validationErrors(error).note ?? taskErrorMessage(error, 'Keputusan review tidak valid.');
-            else await this.handleFailure(error, 'Keputusan review gagal disimpan.');
+            if (error?.status === 422) {
+                const errors = validationErrors(error);
+                notifyFailure({ ...error, data: { ...error.data, message: errors.status ?? errors.pic_id } }, 'Status tugas gagal diperbarui.');
+            } else {
+                await this.handleFailure(error, 'Status tugas gagal diperbarui.');
+            }
         } finally {
             this.acting = null;
         }
