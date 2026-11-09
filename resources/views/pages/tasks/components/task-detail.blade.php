@@ -200,39 +200,48 @@
                                     <x-icon name="user" class="size-4 text-label" />
                                     <span :class="task.pic ? 'font-semibold text-ink' : @js($empty)" x-text="task.pic?.fullname ?? 'Belum ada PIC'"></span>
                                 </span>
-                                <button x-show="assignment.ok && assigneeState === 'idle'" type="button" class="{{ $button }}" @click="openAssign()" x-text="task.pic ? 'Ganti / Teruskan PIC' : 'Tetapkan PIC'"></button>
+                                <button x-show="canAssignThis && assigneeState === 'idle'" type="button" class="{{ $button }}" @click="openAssign()" x-text="task.pic ? 'Ganti / Teruskan PIC' : 'Tetapkan PIC'"></button>
                             </div>
                             <p x-show="!assignment.ok && user.role !== 'staff'" class="text-xs text-muted" x-text="assignment.reason"></p>
 
                             <div x-show="assigneeState !== 'idle'" x-cloak class="flex flex-col gap-3 border-t border-line pt-3">
                                 <div x-show="assigneeState === 'loading'" class="h-9 animate-pulse rounded-lg bg-soft"></div>
-                                <div x-show="assigneeState === 'unavailable'">
-                                    @include('pages.tasks.components.pending', ['text' => 'Daftar PIC yang memenuhi kriteria penugasan diambil dari API assignment.'])
-                                </div>
-                                <p x-show="assigneeState === 'error'" class="text-xs text-red-600">Daftar PIC gagal dimuat.</p>
+                                <p x-show="assigneeState === 'error'" class="text-xs text-red-600" role="alert" x-text="assignmentError"></p>
                                 <template x-if="assigneeState === 'ready'">
                                     <form class="flex flex-col gap-3" @submit.prevent="saveAssign()">
-                                        <div>
-                                            <label for="assign-pic" class="{{ $labelClass }}">PIC baru</label>
-                                            <select id="assign-pic" x-model="assignForm.pic_id" class="{{ $inputClass }}">
-                                                <option value="">Pilih PIC</option>
-                                                <template x-for="person in assignees" :key="person.id">
-                                                    <option :value="person.id" x-text="`${person.fullname}${person.division ? ' · ' + person.division.name : ''}`"></option>
+                                        <div x-show="canChangeAssignmentDivision">
+                                            <label for="assign-division" class="{{ $labelClass }}">Divisi tujuan</label>
+                                            <select id="assign-division" x-model="assignForm.division_id" class="{{ $inputClass }}" @change="changeAssignmentDivision()">
+                                                <template x-for="division in assignmentDivisions" :key="division.id">
+                                                    <option :value="String(division.id)" x-text="division.name"></option>
                                                 </template>
                                             </select>
                                         </div>
+                                        <p x-show="!canChangeAssignmentDivision" class="text-xs text-muted">
+                                            Divisi: <span class="font-semibold text-ink" x-text="task.division?.name"></span>
+                                        </p>
                                         <div>
-                                            <label for="assign-note" class="{{ $labelClass }}">Catatan (opsional)</label>
-                                            <input id="assign-note" type="text" x-model="assignForm.note" class="{{ $inputClass }}" maxlength="255" placeholder="Alasan penggantian atau penerusan">
+                                            <label for="assign-pic" class="{{ $labelClass }}">PIC baru</label>
+                                            <select id="assign-pic" x-model="assignForm.pic_id" class="{{ $inputClass }}" :disabled="!eligibleAssignees.length">
+                                                <option value="">Pilih PIC</option>
+                                                <template x-for="person in eligibleAssignees" :key="person.id">
+                                                    <option :value="String(person.id)" x-text="person.fullname"></option>
+                                                </template>
+                                            </select>
+                                            <p x-show="!eligibleAssignees.length" class="mt-1.5 text-xs text-muted">Tidak ada Staff lain yang memenuhi kriteria penugasan di divisi ini.</p>
                                         </div>
                                         <p class="text-xs text-muted">Mengganti PIC tidak mengubah status tugas. PIC lama dan baru tercatat di histori.</p>
                                         <div class="flex justify-end gap-2">
                                             <button type="button" class="{{ $button }}" :disabled="assigning" @click="assigneeState = 'idle'">Batal</button>
-                                            <button type="submit" class="{{ $primaryButton }}" :disabled="!assignForm.pic_id || assigning" x-text="assigning ? 'Menyimpan…' : 'Simpan PIC'"></button>
+                                            <button type="submit" class="{{ $primaryButton }}" :disabled="!assignForm.pic_id || !assignForm.division_id || assigning" x-text="assigning ? 'Menyimpan…' : 'Simpan PIC'"></button>
                                         </div>
                                     </form>
                                 </template>
-                                <button x-show="assigneeState !== 'ready'" type="button" class="self-end text-xs font-semibold text-muted hover:text-ink" @click="assigneeState = 'idle'">Tutup</button>
+                                <div x-show="assigneeState === 'error'" class="flex justify-end gap-3">
+                                    <button type="button" class="text-xs font-semibold text-muted hover:text-ink" @click="assigneeState = 'idle'">Tutup</button>
+                                    <button type="button" class="text-xs font-semibold text-primary hover:underline" @click="openAssign()">Coba lagi</button>
+                                </div>
+                                <button x-show="assigneeState === 'loading'" type="button" class="self-end text-xs font-semibold text-muted hover:text-ink" @click="assigneeState = 'idle'">Tutup</button>
                             </div>
                         </div>
                     </section>

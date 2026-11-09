@@ -2,7 +2,7 @@ import { http } from '../http';
 
 /**
  * API daftar, meta, detail, pembuatan, dan pembaruan tugas sudah tersedia dan dipakai langsung.
- * Endpoint Tasklist tambahan tetap menunggu VITE_TASK_API_READY=true.
+ * Endpoint Tasklist lain yang belum terintegrasi tetap menunggu VITE_TASK_API_READY=true.
  * Kontrak lengkap ada di docs/api/tasks.md.
  *
  * GET    /api/tasks/meta                       → { data: { role, division, default_division, can_create, divisions, statuses, priorities } }
@@ -11,8 +11,8 @@ import { http } from '../http';
  * GET    /api/tasks/{id}                       → { data: TaskDetail }
  * PATCH  /api/tasks/{id}                       → { data: TaskDetail, message }         (kirim version)
  * PATCH  /api/tasks/{id}/status                → { data: TaskDetail, message }         (kirim status, version)
- * PATCH  /api/tasks/{id}/assignee              → { data: TaskDetail, message }         (kirim pic_id, note, version)
- * GET    /api/tasks/assignees?division         → { data: [{ id, fullname, division }] }
+ * GET    /api/tasks/{id}/assignment-options    → { data: { current_division, can_change_division, locked_reason, divisions } }
+ * PATCH  /api/tasks/{id}/assignment            → { data: TaskDetail, message }         (kirim pic_id, version, division_id opsional)
  * GET    /api/tasks/{id}/evidences             → { data: [Evidence] }
  * POST   /api/tasks/{id}/evidences             → { data: Evidence, message }           (multipart: file atau url, note)
  * POST   /api/tasks/{id}/reviews               → { data: TaskDetail, message }         (kirim decision, note, version)
@@ -45,9 +45,9 @@ export const updateTask = (id, body) => http(`/api/tasks/${id}`, { method: 'PATC
 
 export const changeTaskStatus = (id, body) => http(`/api/tasks/${id}/status`, { method: 'PATCH', body });
 
-export const assignTask = (id, body) => request(`/api/tasks/${id}/assignee`, { method: 'PATCH', body });
+export const fetchAssignmentOptions = (id) => http(`/api/tasks/${id}/assignment-options`);
 
-export const fetchAssignees = (division) => request(`/api/tasks/assignees${query({ division })}`);
+export const assignTask = (id, body) => http(`/api/tasks/${id}/assignment`, { method: 'PATCH', body });
 
 export const fetchEvidences = (id) => request(`/api/tasks/${id}/evidences`);
 
