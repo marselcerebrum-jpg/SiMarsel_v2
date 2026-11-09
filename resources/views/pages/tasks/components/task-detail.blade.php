@@ -131,20 +131,25 @@
                         </dl>
 
                         <form x-show="editing" x-cloak class="mt-3 grid gap-4 sm:grid-cols-2" novalidate @submit.prevent="saveEdit()">
+                            <div x-show="editOptionsState === 'loading'" class="h-9 animate-pulse rounded-lg bg-soft sm:col-span-2" aria-label="Memuat pilihan edit"></div>
+                            <div x-show="editOptionsState === 'error'" class="flex items-center justify-between gap-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 sm:col-span-2" role="alert">
+                                <span x-text="editOptionsError"></span>
+                                <button type="button" class="shrink-0 font-semibold underline" @click="startEdit()">Coba lagi</button>
+                            </div>
                             <div class="sm:col-span-2">
                                 <label for="edit-title" class="{{ $labelClass }}">Judul Tugas <span class="text-red-500">*</span></label>
-                                <input id="edit-title" type="text" x-model="editForm.title" maxlength="150" class="{{ $inputClass }}" :class="editErrors.title && 'border-red-500!'" @input="editErrors.title = null">
+                                <input id="edit-title" type="text" x-model="editForm.title" maxlength="150" class="{{ $inputClass }}" :disabled="!isFieldEditable('title')" :class="editErrors.title && 'border-red-500!'" @input="editErrors.title = null">
                                 <p x-show="editErrors.title" x-text="editErrors.title" class="{{ $errorClass }}"></p>
                             </div>
                             <div class="sm:col-span-2">
                                 <label for="edit-description" class="{{ $labelClass }}">Deskripsi</label>
-                                <textarea id="edit-description" x-model="editForm.description" rows="4" class="{{ $textareaClass }}"></textarea>
+                                <textarea id="edit-description" x-model="editForm.description" rows="4" class="{{ $textareaClass }}" :disabled="!isFieldEditable('description')"></textarea>
                             </div>
                             <div>
                                 <label for="edit-category" class="{{ $labelClass }}">Kategori / Jenis Tugas</label>
-                                <select id="edit-category" x-model="editForm.category_id" class="{{ $inputClass }}" :disabled="!categories.length">
+                                <select id="edit-category" x-model="editForm.category_id" class="{{ $inputClass }}" :disabled="editOptionsState !== 'ready' || !isFieldEditable('category_id')">
                                     <option value="">Pilih kategori</option>
-                                    <template x-for="category in categories" :key="category.id">
+                                    <template x-for="category in editCategories" :key="category.id">
                                         <option :value="category.id" x-text="category.name" :selected="String(editForm.category_id) === String(category.id)"></option>
                                     </template>
                                 </select>
@@ -152,16 +157,16 @@
                             </div>
                             <div>
                                 <label for="edit-platform" class="{{ $labelClass }}">Platform</label>
-                                <select id="edit-platform" x-model="editForm.platform" class="{{ $inputClass }}">
+                                <select id="edit-platform" x-model="editForm.platform_id" class="{{ $inputClass }}" :disabled="editOptionsState !== 'ready' || !isFieldEditable('platform_id')">
                                     <option value="">Tidak terkait platform</option>
-                                    <template x-for="platform in platforms" :key="platform.slug">
-                                        <option :value="platform.slug" x-text="platform.name" :selected="editForm.platform === platform.slug"></option>
+                                    <template x-for="platform in editPlatforms" :key="platform.id">
+                                        <option :value="platform.id" x-text="platform.name" :selected="String(editForm.platform_id) === String(platform.id)"></option>
                                     </template>
                                 </select>
                             </div>
                             <div>
                                 <label for="edit-priority" class="{{ $labelClass }}">Prioritas</label>
-                                <select id="edit-priority" x-model="editForm.priority" class="{{ $inputClass }}">
+                                <select id="edit-priority" x-model="editForm.priority" class="{{ $inputClass }}" :disabled="!isFieldEditable('priority')">
                                     <template x-for="priority in priorities" :key="priority.key">
                                         <option :value="priority.key" x-text="priority.label" :selected="editForm.priority === priority.key"></option>
                                     </template>
@@ -170,18 +175,18 @@
                             <div class="grid grid-cols-2 gap-3">
                                 <div>
                                     <label for="edit-start" class="{{ $labelClass }}">Tanggal Mulai</label>
-                                    <input id="edit-start" type="date" x-model="editForm.start_date" class="{{ $inputClass }}">
+                                    <input id="edit-start" type="date" x-model="editForm.start_date" class="{{ $inputClass }}" :disabled="!isFieldEditable('start_date')">
                                 </div>
                                 <div>
                                     <label for="edit-deadline" class="{{ $labelClass }}">Deadline</label>
-                                    <input id="edit-deadline" type="date" x-model="editForm.deadline" class="{{ $inputClass }}" :class="editErrors.deadline && 'border-red-500!'" @input="editErrors.deadline = null">
+                                    <input id="edit-deadline" type="date" x-model="editForm.deadline" class="{{ $inputClass }}" :disabled="!isFieldEditable('deadline')" :class="editErrors.deadline && 'border-red-500!'" @input="editErrors.deadline = null">
                                 </div>
                                 <p x-show="editErrors.deadline" x-text="editErrors.deadline" class="{{ $errorClass }} col-span-2 mt-0"></p>
                             </div>
                             <p class="text-xs text-muted sm:col-span-2">Divisi dan PIC diubah melalui bagian Penanggung Jawab; status melalui tombol workflow.</p>
                             <div class="flex justify-end gap-2 border-t border-line pt-4 sm:col-span-2">
                                 <button type="button" class="{{ $button }}" :disabled="saving" @click="editing = false">Batal</button>
-                                <button type="submit" class="{{ $primaryButton }}" :disabled="saving" x-text="saving ? 'Menyimpan…' : 'Simpan Perubahan'"></button>
+                                <button type="submit" class="{{ $primaryButton }}" :disabled="saving || editOptionsState !== 'ready'" x-text="saving ? 'Menyimpan…' : 'Simpan Perubahan'"></button>
                             </div>
                         </form>
                     </section>
@@ -264,9 +269,6 @@
                         </form>
 
                         <div class="mt-3">
-                            <div x-show="evidenceState === 'loading'" class="h-14 animate-pulse rounded-lg bg-soft"></div>
-                            <div x-show="evidenceState === 'unavailable'">@include('pages.tasks.components.pending', ['text' => 'Daftar dan pengiriman evidence menunggu API evidence.'])</div>
-                            <p x-show="evidenceState === 'error'" class="text-xs text-red-600">Evidence gagal dimuat.</p>
                             <ul x-show="evidenceState === 'ready' && evidences.length" class="flex flex-col gap-2">
                                 <template x-for="evidence in evidences" :key="evidence.id">
                                     <li class="flex items-start gap-3 rounded-lg border border-line p-3">
@@ -290,24 +292,20 @@
                     <section>
                         <h3 class="{{ $sectionTitle }}">Histori Aktivitas</h3>
                         <div class="mt-3">
-                            <div x-show="activityState === 'loading'" class="flex animate-pulse flex-col gap-2">
-                                <div class="h-12 rounded-lg bg-soft"></div><div class="h-12 rounded-lg bg-soft"></div>
-                            </div>
-                            <div x-show="activityState === 'unavailable'">@include('pages.tasks.components.pending', ['text' => 'Histori aktivitas diambil dari API histori tugas.'])</div>
-                            <div x-show="activityState === 'error'" class="flex items-center justify-between rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
-                                Histori gagal dimuat.
-                                <button type="button" class="font-semibold underline" @click="loadActivities()">Coba lagi</button>
-                            </div>
                             <ol x-show="activityState === 'ready' && activities.length" class="relative flex flex-col gap-4 border-l border-line pl-5">
                                 <template x-for="activity in activities" :key="activity.id">
                                     <li class="relative">
                                         <span class="absolute top-1 -left-[25px] size-2.5 rounded-full border-2 border-surface bg-primary"></span>
-                                        <p class="text-sm font-semibold text-ink" x-text="activity.label ?? activity.type"></p>
-                                        <p x-show="activity.description" class="mt-0.5 text-sm text-ink" x-text="activity.description"></p>
-                                        <p x-show="activity.before !== undefined || activity.after !== undefined" class="mt-0.5 text-xs text-muted">
-                                            <span class="line-through" x-text="activity.before ?? '-'"></span> → <span class="font-semibold text-ink" x-text="activity.after ?? '-'"></span>
-                                        </p>
-                                        <p class="mt-0.5 text-xs text-muted"><span x-text="activity.causer?.fullname ?? 'Sistem'"></span> · <span x-text="formatDateTime(activity.created_at)"></span></p>
+                                        <p class="text-sm font-semibold text-ink" x-text="activityLabel(activity.action)"></p>
+                                        <template x-for="[field, change] in Object.entries(activity.changes ?? {})" :key="field">
+                                            <p class="mt-0.5 text-xs text-muted">
+                                                <span x-text="`${activityFieldLabel(field)}: `"></span>
+                                                <span class="line-through" x-text="activityValue(change.old)"></span>
+                                                →
+                                                <span class="font-semibold text-ink" x-text="activityValue(change.new)"></span>
+                                            </p>
+                                        </template>
+                                        <p class="mt-0.5 text-xs text-muted"><span x-text="activity.actor?.fullname ?? 'Sistem'"></span> · <span x-text="formatDateTime(activity.created_at)"></span></p>
                                     </li>
                                 </template>
                             </ol>
