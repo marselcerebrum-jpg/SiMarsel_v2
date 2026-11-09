@@ -44,7 +44,7 @@ class TaskService
         $query = $this->tasks->visible($account, $filters);
         $statusCounts = $this->tasks->countByStatus($query);
 
-        $query = $this->tasks->sort($query, $sort, $direction)->with(['division', 'pic']);
+        $query = $this->tasks->sort($query, $sort, $direction)->with(['division', 'pic'])->withCount('evidences');
 
         return [
             'tasks' => $perPage ? $query->paginate($perPage)->withQueryString() : $query->get(),
@@ -54,7 +54,8 @@ class TaskService
 
     public function detail(Task $task): Task
     {
-        return $task->load(['category', 'division', 'platform', 'pic', 'creator', 'activities.actor', 'evidences.submitter']);
+        return $task->load(['category', 'division', 'platform', 'pic', 'creator', 'activities.actor', 'evidences.submitter', 'reviews.reviewer'])
+            ->loadCount('evidences');
     }
 
     /**
@@ -77,6 +78,7 @@ class TaskService
             'priority' => $data['priority'] ?? TaskPriority::Medium->value,
             'status' => $data['status'] ?? TaskStatus::Backlog->value,
             'requires_review' => $this->requiresReview($data),
+            'evidence_required' => $this->evidenceRequired($data),
         ];
 
         $lock = Cache::lock($this->submissionFingerprint($attributes), self::DUPLICATE_WINDOW_SECONDS);
@@ -135,6 +137,7 @@ class TaskService
             // Report a locked field before the category's QA rule, which may also reject it.
             $this->rejectLockedChanges($locked, $lockedFields);
             $this->applyCategoryReview($locked, $data);
+            $this->applyCategoryEvidence($locked);
 
             if (! $locked->isDirty()) {
                 return;
@@ -164,8 +167,8 @@ class TaskService
     /**
      * Move the task to another status following the transition matrix: the PIC starts the work and hands it
      * to QA (or finishes it when QA is not required), and Admin or the division's Manager moves Back Log to
-     * To Do and runs the review (Ready for QA → On QA → Done, or back to On Process for revision). The change
-     * is appended to the history.
+     * To Do and starts the review (Ready for QA → On QA). The decision that ends it is made through
+     * TaskReviewService. The change is appended to the history.
      *
      * @param  array{version: int|string, status: string}  $data
      *
@@ -198,6 +201,9 @@ class TaskService
                 throw ValidationException::withMessages(['pic_id' => 'Tetapkan PIC sebelum memindahkan tugas dari Back Log.']);
             }
 
+            // A task that already has a review got there through a revision, so handing it to QA again is a resubmission.
+            $resubmitted = $status === TaskStatus::ReadyForQa && $locked->reviews()->exists();
+
             $locked->status = $status;
             $locked->completed_at = $status === TaskStatus::Done ? now() : null;
 
@@ -208,7 +214,7 @@ class TaskService
 
             $locked->activities()->create([
                 'account_id' => $actor->id,
-                'action' => TaskActivity::STATUS_CHANGED,
+                'action' => $resubmitted ? TaskActivity::RESUBMITTED : TaskActivity::STATUS_CHANGED,
                 'changes' => $changes,
             ]);
         });
@@ -306,8 +312,8 @@ class TaskService
             'divisions' => $this->divisionsWithPics($account),
             'categories' => TaskCategory::query()
                 ->orderBy('name')
-                ->get(['id', 'name', 'requires_review'])
-                ->map(fn (TaskCategory $category) => $category->only(['id', 'name', 'requires_review']))
+                ->get(['id', 'name', 'requires_review', 'evidence_required'])
+                ->map(fn (TaskCategory $category) => $category->only(['id', 'name', 'requires_review', 'evidence_required']))
                 ->all(),
             'platforms' => Platform::query()
                 ->orderBy('name')
@@ -378,6 +384,31 @@ class TaskService
             && TaskCategory::whereKey($data['category_id'])->value('requires_review');
 
         return $categoryRequiresReview || (bool) ($data['requires_review'] ?? false);
+    }
+
+    /**
+     * A category that requires evidence always does; otherwise evidence is required only when the creator asks for it.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    private function evidenceRequired(array $data): bool
+    {
+        $categoryRequiresEvidence = isset($data['category_id'])
+            && TaskCategory::whereKey($data['category_id'])->value('evidence_required');
+
+        return $categoryRequiresEvidence || (bool) ($data['evidence_required'] ?? false);
+    }
+
+    /**
+     * Moving the task to a category that requires evidence makes evidence required; leaving such a category
+     * keeps the requirement, since it may already have been communicated to the PIC.
+     */
+    private function applyCategoryEvidence(Task $task): void
+    {
+        if ($task->isDirty('category_id') && $task->category_id !== null
+            && TaskCategory::whereKey($task->category_id)->value('evidence_required')) {
+            $task->evidence_required = true;
+        }
     }
 
     /**

@@ -6,7 +6,7 @@
     class="mt-5 border-t border-line pt-5"
     aria-labelledby="promo-product-type-title"
 >
-    <h3 id="promo-product-type-title" class="text-sm font-semibold text-ink">First-Time vs Renewal Promo Analysis</h3>
+    <h3 id="promo-product-type-title" class="text-sm font-semibold text-ink">Analisis Promo Perdana vs Perpanjangan</h3>
     <p class="mt-1 text-xs text-muted">Dihitung per transaksi unik yang memakai promo, bukan per penggunaan kode; transaksi dengan dua kode promo dihitung satu kali.</p>
 
     <div class="mt-4 overflow-hidden rounded-lg border border-line">
@@ -36,7 +36,7 @@
                     <tr x-show="!loading && loadError" x-cloak>
                         <td colspan="3" class="px-4 py-10 text-center" role="alert">
                             <p class="text-sm font-medium text-red-600" x-text="loadError"></p>
-                            <button type="button" class="mt-2 text-xs font-semibold text-primary hover:text-primary-hover" @click="retry()">Try Again</button>
+                            <button type="button" class="mt-2 text-xs font-semibold text-primary hover:text-primary-hover" @click="retry()">Coba Lagi</button>
                         </td>
                     </tr>
 

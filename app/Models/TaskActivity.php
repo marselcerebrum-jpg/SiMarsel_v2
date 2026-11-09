@@ -22,6 +22,17 @@ class TaskActivity extends Model
 
     public const STATUS_CHANGED = 'status_changed';
 
+    public const EVIDENCE_SUBMITTED = 'evidence_submitted';
+
+    public const APPROVED = 'approved';
+
+    public const REVISION_REQUESTED = 'revision_requested';
+
+    /**
+     * The PIC handed the task back to QA after a revision.
+     */
+    public const RESUBMITTED = 'resubmitted';
+
     public const UPDATED_AT = null;
 
     /**

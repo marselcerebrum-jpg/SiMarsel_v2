@@ -152,9 +152,9 @@ class PromoPageTest extends TestCase
                 'x-data="promoAnalysisSource"',
                 'x-data="promoAnalysisProductType"',
                 'x-data="promoAnalysisCode"',
-                'Promo Code List',
+                'Daftar Kode Promo',
             ], false)
-            ->assertSeeInOrder(['First-Time vs Renewal Promo Analysis', 'Tipe Produk', 'Jumlah Transaksi', 'Revenue'])
+            ->assertSeeInOrder(['Analisis Promo Perdana vs Perpanjangan', 'Tipe Produk', 'Jumlah Transaksi', 'Revenue'])
             ->assertDontSee('Persentase Transaksi (%)')
             ->assertSee('Dihitung per transaksi unik yang memakai promo, bukan per penggunaan kode; transaksi dengan dua kode promo dihitung satu kali.')
             ->assertSee('Memuat rekap tipe produk');
