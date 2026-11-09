@@ -1,4 +1,5 @@
 import { errorMessage, validationErrors } from '../../http';
+import { PRODUCT_TYPE_COLUMNS, copySnapshot } from './analysis-copy';
 import { formatValue } from '../../format';
 import { fetchAnalysisProductTypes } from './api';
 
@@ -71,6 +72,10 @@ export default function promoAnalysisProductType() {
 
         retry() {
             return this.load(this.query);
+        },
+
+        provideCopy(detail) {
+            if (detail.target === 'product-type') detail.snapshot = copySnapshot(this, PRODUCT_TYPE_COLUMNS, this.rows);
         },
     };
 }

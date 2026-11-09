@@ -47,6 +47,24 @@ Backend **wajib** menerapkan cakupan ini di setiap endpoint. Staff yang mengubah
 
 **TaskDetail** = Task ditambah `description`, `category` (`{ id, name }`), `platform` (`{ slug, name }` | null), `creator` (`{ id, fullname }`), `created_at`, `completed_at`, `last_review` (Review terbaru | null), `reviews` (semua Review, terbaru lebih dulu), dan `can_review` (`true` bila user boleh memberi keputusan QA saat ini: tugas `on_qa` dan user Admin/Manajer berwenang).
 
+**Activity** (histori, `GET /api/tasks/{id}/activities`):
+
+```json
+{
+  "id": 42,
+  "action": "reassigned",
+  "action_label": "PIC diganti",
+  "description": "PIC: Budi → Sari",
+  "changes": { "pic": { "old": { "id": 7, "name": "Budi" }, "new": { "id": 9, "name": "Sari" } } },
+  "actor": { "id": 3, "fullname": "Manajer Marketing" },
+  "created_at": "2026-11-06T02:00:00Z"
+}
+```
+
+- `action`: `created` | `updated` | `assigned` | `reassigned` | `status_changed` | `evidence_submitted` | `approved` | `revision_requested` | `resubmitted`.
+- `changes`: nilai sebelum dan sesudah untuk tiap field yang berubah (`{}` untuk `created`).
+- `actor.id` bernilai `null` bila akun pelaku sudah dihapus; `actor.fullname` tetap berisi nama pelaku saat aktivitas terjadi.
+
 ## Endpoint
 
 | Method & path | Body / query | Respons |
@@ -130,6 +148,13 @@ Backend **wajib** menerapkan cakupan ini di setiap endpoint. Staff yang mengubah
 - `approve` → `done` dan menyimpan `completed_at`. `revision` → `in_progress`, `note` wajib (spasi saja dianggap kosong).
 - Setelah revisi, PIC memperbaiki lalu mengirim ulang ke `ready_for_qa`; histori mencatatnya sebagai `resubmitted`. Siklus dapat berulang sampai disetujui; semua review sebelumnya tetap tersimpan.
 - Keputusan dicatat di histori sebagai `approved` atau `revision_requested` dengan `changes.status` dan `changes.review` (`{ id, cycle, note }`).
+
+**Histori aktivitas (TASK-08)**
+- Histori hanya dibuat setelah aktivitas berhasil; aksi yang ditolak tidak meninggalkan catatan.
+- Urutan: terbaru lebih dulu; aktivitas pada detik yang sama diurutkan berdasarkan `id`. Tanpa aktivitas → `{ data: [] }`.
+- Akses mengikuti detail tugas: Admin semua tugas, Manajer tugas divisinya, Staff hanya tugas yang ditugaskan kepadanya (selain itu `403`).
+- Histori tidak dapat diedit atau dihapus, dan tetap tersedia setelah status atau PIC berubah.
+- Nama pelaku disimpan saat aktivitas dicatat, sehingga tetap tampil walaupun akunnya dihapus.
 
 **Data lama (409)**: setiap perubahan membawa `updated_at` terakhir yang dilihat user. Jika berbeda dengan data di database, tolak dengan `409 Conflict`. Frontend lalu memuat ulang data dan meminta user memeriksa kembali.
 
