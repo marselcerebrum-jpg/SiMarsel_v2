@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { test } from 'node:test';
 import vm from 'node:vm';
+import { analysisCopyModule } from './support/analysis-copy-module.mjs';
 
 async function loadModule(path, api) {
     const context = vm.createContext({ Intl, Date, Number, Math, Boolean, Object, String, URLSearchParams });
@@ -13,10 +14,13 @@ async function loadModule(path, api) {
             validationErrors: ({ data }) => Object.fromEntries(Object.entries(data.errors).map(([key, messages]) => [key, messages[0]])),
         },
         './api': api,
+        '../../components/toast': { showToast: () => {} },
     };
     const module = new vm.SourceTextModule(await source(path), { context });
+    const copy = await analysisCopyModule(context);
     await module.link((specifier) => {
         if (specifier === '../../format') return format;
+        if (specifier === './analysis-copy') return copy;
         const mock = mocks[specifier];
         return new vm.SyntheticModule(Object.keys(mock), function () {
             for (const [key, value] of Object.entries(mock)) this.setExport(key, value);

@@ -20,6 +20,7 @@ use App\Http\Controllers\Promo\PromoSourceController;
 use App\Http\Controllers\Promo\PromoTrendController;
 use App\Http\Controllers\Promo\UnregisteredPromoCodeController;
 use App\Http\Controllers\Task\TaskController;
+use App\Http\Controllers\Task\TaskMonitoringController;
 use App\Models\Account;
 use App\Models\Division;
 use App\Models\Funnel;
@@ -167,9 +168,15 @@ Route::middleware('auth')->group(function () {
 
     Route::prefix('tasks')->name('api.tasks.')->group(function () {
         Route::get('/meta', [TaskController::class, 'meta'])->name('meta');
+        Route::get('/monitoring', TaskMonitoringController::class)
+            ->can('viewAny', Task::class)
+            ->name('monitoring');
         Route::get('/', [TaskController::class, 'index'])
             ->can('viewAny', Task::class)
             ->name('index');
+        Route::get('/schedule', [TaskController::class, 'schedule'])
+            ->can('viewAny', Task::class)
+            ->name('schedule');
         Route::get('/create-options', [TaskController::class, 'createOptions'])
             ->can('create', Task::class)
             ->name('create-options');
@@ -188,6 +195,10 @@ Route::middleware('auth')->group(function () {
             ->whereNumber('task')
             ->can('changeStatus', 'task')
             ->name('change-status');
+        Route::get('/{task}/activities', [TaskController::class, 'activities'])
+            ->whereNumber('task')
+            ->can('view', 'task')
+            ->name('activities');
         Route::get('/{task}/evidences', [TaskController::class, 'evidences'])
             ->whereNumber('task')
             ->can('view', 'task')
@@ -200,6 +211,14 @@ Route::middleware('auth')->group(function () {
             ->whereNumber(['task', 'evidence'])
             ->can('view', 'task')
             ->name('evidences.download');
+        Route::get('/{task}/reviews', [TaskController::class, 'reviews'])
+            ->whereNumber('task')
+            ->can('view', 'task')
+            ->name('reviews.index');
+        Route::post('/{task}/reviews', [TaskController::class, 'review'])
+            ->whereNumber('task')
+            ->can('review', 'task')
+            ->name('reviews.store');
         Route::get('/{task}/assignment-options', [TaskController::class, 'assignmentOptions'])
             ->whereNumber('task')
             ->can('assign', 'task')

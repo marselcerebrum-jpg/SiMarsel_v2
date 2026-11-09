@@ -68,6 +68,14 @@ class Task extends Model
         return $this->hasMany(TaskEvidence::class)->latest();
     }
 
+    /**
+     * QA decisions, newest first.
+     */
+    public function reviews(): HasMany
+    {
+        return $this->hasMany(TaskReview::class)->orderByDesc('created_at')->orderByDesc('id');
+    }
+
     public function division(): BelongsTo
     {
         return $this->belongsTo(Division::class);
@@ -155,7 +163,26 @@ class Task extends Model
      */
     public function nextStatusesFor(Account $account): array
     {
-        return $this->movesStatusFor($account) ? $this->status->nextStatuses($this->requires_review) : [];
+        return $this->movesStatusFor($account) && ! $this->status->decidedByReview()
+            ? $this->status->nextStatuses($this->requires_review)
+            : [];
+    }
+
+    /**
+     * Whether the account may run this task's QA: Admin for every division, a Manager for their own, and only
+     * for a task that requires QA. Staff never reviews, not even their own work.
+     */
+    public function reviewableBy(Account $account): bool
+    {
+        return $this->requires_review && $this->managedBy($account);
+    }
+
+    /**
+     * Whether the account may approve the task or request a revision right now.
+     */
+    public function awaitsDecisionFrom(Account $account): bool
+    {
+        return $this->status === TaskStatus::OnQa && $this->reviewableBy($account);
     }
 
     /**
@@ -179,11 +206,23 @@ class Task extends Model
                 : "Hanya Admin atau Manajer divisi yang dapat mengubah status dari {$from->label()} ke {$status->label()}.";
         }
 
+        if ($from->decidedByReview()) {
+            return 'Keputusan QA diberikan melalui review tugas (Approve atau Request Revision).';
+        }
+
         if ($from === TaskStatus::InProgress && $this->evidence_required && ! $this->evidences()->exists()) {
             return "Unggah evidence terlebih dahulu sebelum mengubah status ke {$status->label()}.";
         }
 
         return null;
+    }
+
+    /**
+     * A task that already has a review got there through a revision, so handing it to QA again is a resubmission.
+     */
+    public function resubmitsTo(TaskStatus $status): bool
+    {
+        return $status === TaskStatus::ReadyForQa && $this->reviews()->exists();
     }
 
     private function movesStatusFor(Account $account): bool
