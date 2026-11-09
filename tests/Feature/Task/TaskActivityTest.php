@@ -127,19 +127,56 @@ class TaskActivityTest extends TestCase
             ->assertJsonPath('data.*.id', [$latest->id, $second->id, $first->id]);
     }
 
-    public function test_entry_of_a_deleted_account_is_kept_without_an_actor(): void
+    public function test_actor_name_is_still_shown_after_the_actor_account_is_deleted(): void
     {
-        $task = $this->task();
-        $leaver = $this->account(Role::EMPLOYEE, 'leaver', $this->marketing);
-        $task->activities()->create(['account_id' => $leaver->id, 'action' => TaskActivity::UPDATED, 'changes' => ['title' => ['old' => 'A', 'new' => 'B']]]);
-        $leaver->delete();
+        $task = $this->task(['pic_id' => $this->otherStaff->id]);
+        $this->send('patchJson', "/api/tasks/{$task->id}/assignment", $this->manager, $task, ['pic_id' => $this->staff->id]);
 
-        $this->actingAs($this->manager)
+        $this->actingAs($this->financeManager)->deleteJson("/api/accounts/{$this->manager->id}")->assertSuccessful();
+        $this->assertModelMissing($this->manager);
+
+        $this->actingAs($this->admin)
             ->getJson($this->url($task))
             ->assertOk()
             ->assertJsonCount(1, 'data')
-            ->assertJsonPath('data.0.actor', null)
-            ->assertJsonPath('data.0.description', 'Judul: A → B');
+            ->assertJsonPath('data.0.action', TaskActivity::REASSIGNED)
+            ->assertJsonPath('data.0.actor', ['id' => null, 'fullname' => 'mkt.manager'])
+            ->assertJsonPath('data.0.description', 'PIC: mkt.other → mkt.staff');
+    }
+
+    public function test_actor_name_is_copied_when_the_entry_is_written(): void
+    {
+        $activity = $this->task()->activities()->create(['account_id' => $this->manager->id, 'action' => TaskActivity::CREATED]);
+
+        $this->assertSame('mkt.manager', $activity->fresh()->actor_name_snapshot);
+    }
+
+    public function test_entry_shows_the_current_account_name_while_the_account_exists(): void
+    {
+        $task = $this->task();
+        $task->activities()->create(['account_id' => $this->manager->id, 'action' => TaskActivity::CREATED]);
+        $this->manager->update(['fullname' => 'Manajer Marketing']);
+
+        $this->actingAs($this->admin)
+            ->getJson($this->url($task))
+            ->assertJsonPath('data.0.actor', ['id' => $this->manager->id, 'fullname' => 'Manajer Marketing']);
+    }
+
+    public function test_migration_fills_the_actor_name_of_older_entries_whose_account_still_exists(): void
+    {
+        $task = $this->task();
+        $leaver = $this->account(Role::EMPLOYEE, 'leaver', $this->marketing);
+        $kept = $task->activities()->create(['account_id' => $this->manager->id, 'action' => TaskActivity::CREATED]);
+        $orphan = $task->activities()->create(['account_id' => $leaver->id, 'action' => TaskActivity::UPDATED]);
+        $leaver->delete();
+
+        $migration = require database_path('migrations/2026_11_09_104845_add_actor_name_snapshot_to_task_activities_table.php');
+        $migration->down();
+        $migration->up();
+
+        $this->assertSame('mkt.manager', $kept->fresh()->actor_name_snapshot);
+        $this->assertNull($orphan->fresh()->actor_name_snapshot);
+        $this->assertNull($orphan->fresh()->account_id);
     }
 
     // Pencatatan
