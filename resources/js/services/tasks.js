@@ -48,7 +48,7 @@ export const fetchAssignmentOptions = (id) => http(`/api/tasks/${id}/assignment-
 
 export const assignTask = (id, body) => http(`/api/tasks/${id}/assignment`, { method: 'PATCH', body });
 
-export const fetchEvidences = (id) => request(`/api/tasks/${id}/evidences`);
+export const fetchEvidences = (id) => http(`/api/tasks/${id}/evidences`);
 
 export const fetchSchedule = (params) => request(`/api/tasks/schedule${query(params)}`);
 
@@ -58,8 +58,6 @@ export const fetchCalendar = (params) => request(`/api/tasks/calendar${query(par
  * Evidence dikirim sebagai multipart agar bisa membawa file; helper http() hanya untuk JSON.
  */
 export async function submitEvidence(id, { file, url, note }) {
-    if (!TASK_API_READY) return unavailable();
-
     const form = new FormData();
     if (file) form.append('file', file);
     if (url) form.append('url', url);
@@ -75,7 +73,7 @@ export async function submitEvidence(id, { file, url, note }) {
         body: form,
     });
 
-    const data = await response.json().catch(() => ({}));
+    const data = await response.json();
     if (!response.ok) throw { status: response.status, data };
 
     return data;
