@@ -1,5 +1,5 @@
 {{-- Board Kanban (TASK-01 A) dengan drag-and-drop sesuai transition matrix (TASK-05 D). --}}
-<section class="{{ $card }} min-w-0 p-3 sm:p-4" aria-label="Board tugas">
+<section class="{{ $card }} min-w-0 p-3 sm:p-4" aria-label="Papan tugas">
     <div class="relative" :aria-busy="loading.toString()">
         <div x-show="status === 'ready' && !emptyKind" x-cloak>
             <div class="-mx-1 grid grid-flow-col auto-cols-[minmax(240px,1fr)] gap-3 overflow-x-auto px-1 pb-2">

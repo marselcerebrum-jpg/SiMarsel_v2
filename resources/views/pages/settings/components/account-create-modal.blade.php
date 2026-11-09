@@ -25,12 +25,12 @@
         x-transition
         class="relative max-h-[calc(100vh-2rem)] w-full max-w-2xl overflow-y-auto rounded-panel border border-line bg-surface p-5 shadow-lg"
     >
-        <h2 id="create-user-title" class="text-base font-semibold text-ink">Create Account</h2>
+        <h2 id="create-user-title" class="text-base font-semibold text-ink">Tambah Akun</h2>
         <p class="mt-1 text-sm text-muted">Daftarkan akun baru untuk anggota tim. Hanya manager yang bisa membuat akun.</p>
 
         <form class="mt-5 grid gap-4 sm:grid-cols-2" novalidate @submit.prevent="submitCreate()">
             <div>
-                <label for="create-name" class="{{ $labelClass }}">Full Name {!! $required !!}</label>
+                <label for="create-name" class="{{ $labelClass }}">Nama Lengkap {!! $required !!}</label>
                 <input id="create-name" x-ref="createName" type="text" x-model="draft.fullname" @input="draftErrors.fullname = null"
                     class="{{ $inputClass }}" :class="draftErrors.fullname && 'border-red-500!'" placeholder="Budi Santoso" autocomplete="off">
                 <p x-show="draftErrors.fullname" x-text="draftErrors.fullname" class="{{ $errorClass }}"></p>
@@ -51,11 +51,11 @@
             </div>
 
             <div class="sm:col-span-2">
-                <label for="create-division" class="{{ $labelClass }}">Division</label>
+                <label for="create-division" class="{{ $labelClass }}">Divisi</label>
                 <div class="relative">
                     <select id="create-division" x-model="draft.division_id" @change="draftErrors.division_id = null"
                         class="{{ $selectClass }}" :class="draftErrors.division_id && 'border-red-500!'">
-                        <option value="">— No Division (Cross-Division) —</option>
+                        <option value="">— Tanpa Divisi (Lintas Divisi) —</option>
                         <template x-for="division in divisions" :key="division.id">
                             <option :value="division.id" x-text="division.name" :selected="division.id == draft.division_id"></option>
                         </template>
@@ -80,7 +80,7 @@
                     <input id="create-password" :type="showDraftPassword ? 'text' : 'password'" x-model="draft.password" @input="draftErrors.password = null"
                         class="{{ $inputClass }} pr-16" :class="draftErrors.password && 'border-red-500!'" placeholder="Minimal 8 karakter" autocomplete="new-password">
                     <button type="button" class="absolute top-1/2 right-1.5 -translate-y-1/2 rounded-md px-2 py-1 text-xs font-semibold text-muted hover:text-ink"
-                        @click="showDraftPassword = !showDraftPassword" x-text="showDraftPassword ? 'Hide' : 'Show'" :aria-pressed="showDraftPassword.toString()"></button>
+                        @click="showDraftPassword = !showDraftPassword" x-text="showDraftPassword ? 'Sembunyikan' : 'Tampilkan'" :aria-pressed="showDraftPassword.toString()"></button>
                 </div>
                 <p x-show="draftErrors.password" x-text="draftErrors.password" class="{{ $errorClass }}"></p>
             </div>
@@ -88,9 +88,9 @@
             <p x-show="draftError" x-text="draftError" class="text-xs text-red-600 sm:col-span-2"></p>
 
             <div class="flex flex-col-reverse gap-2 border-t border-line pt-4 sm:col-span-2 sm:flex-row sm:justify-end">
-                <button type="button" class="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-line bg-white px-3 text-sm font-semibold text-ink hover:bg-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:opacity-50" :disabled="creating" @click="closeModal()">Cancel</button>
+                <button type="button" class="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-line bg-white px-3 text-sm font-semibold text-ink hover:bg-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:opacity-50" :disabled="creating" @click="closeModal()">Batal</button>
                 <button type="submit" :disabled="creating" class="inline-flex h-9 items-center justify-center gap-2 rounded-lg bg-primary px-4 text-sm font-semibold text-white hover:bg-primary-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-50">
-                    <span x-text="creating ? 'Saving…' : 'Create Account'">Create Account</span>
+                    <span x-text="creating ? 'Menyimpan…' : 'Tambah Akun'">Tambah Akun</span>
                 </button>
             </div>
         </form>

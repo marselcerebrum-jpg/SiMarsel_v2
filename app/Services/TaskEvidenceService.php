@@ -7,6 +7,7 @@ use App\Models\Account;
 use App\Models\Task;
 use App\Models\TaskActivity;
 use App\Models\TaskEvidence;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
@@ -38,23 +39,25 @@ class TaskEvidenceService
 
     /**
      * Store a file or link as evidence of the task, sent by its PIC, and record it in the task's history.
-     * The status is checked on the locked row, so evidence cannot slip in while the task is being handed to QA.
-     * A stored file is removed again when saving the record fails, so no orphan file is left behind.
+     * The PIC and status are checked again on the locked row, so evidence cannot slip in while the task is being
+     * reassigned or handed to QA. A stored file is removed again when saving the record fails, so no orphan file
+     * is left behind.
      *
      * @param  array{file?: UploadedFile, url?: ?string, note?: ?string}  $data
      *
+     * @throws AuthorizationException When the submitter is no longer the task's PIC.
      * @throws ValidationException When the task is no longer in a status that accepts evidence.
      */
     public function store(Task $task, Account $submitter, array $data): TaskEvidence
     {
-        $this->ensureSubmittable($task);
+        $this->ensureSubmittable($task, $submitter);
 
         $file = $data['file'] ?? null;
         $path = $file instanceof UploadedFile ? $this->storeFile($task, $file) : null;
 
         try {
             return DB::transaction(function () use ($task, $submitter, $data, $file, $path) {
-                $this->ensureSubmittable(Task::query()->whereKey($task->id)->lockForUpdate()->firstOrFail());
+                $this->ensureSubmittable(Task::query()->whereKey($task->id)->lockForUpdate()->firstOrFail(), $submitter);
 
                 $evidence = $task->evidences()->create([
                     'submitter_id' => $submitter->id,
@@ -99,10 +102,15 @@ class TaskEvidenceService
     }
 
     /**
+     * @throws AuthorizationException
      * @throws ValidationException
      */
-    private function ensureSubmittable(Task $task): void
+    private function ensureSubmittable(Task $task, Account $submitter): void
     {
+        if (! $task->assignedTo($submitter)) {
+            throw new AuthorizationException;
+        }
+
         if (! in_array($task->status, self::SUBMITTABLE_STATUSES, true)) {
             throw ValidationException::withMessages([
                 'evidence' => "Evidence hanya dapat dikirim saat tugas berstatus To Do atau On Process, bukan {$task->status->label()}.",

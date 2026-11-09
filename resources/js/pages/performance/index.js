@@ -82,13 +82,13 @@ Alpine.data('performanceSummary', (platforms = [], years = []) => ({
 
     get platformSummary() {
         const selected = this.platforms.filter(({ value }) => this.filter.platforms.includes(value));
-        if (selected.length === 0) return 'All Platforms';
+        if (selected.length === 0) return 'Semua Platform';
 
         return selected.length <= 2 ? selected.map(({ label }) => label).join(', ') : `${selected.length} platforms`;
     },
 
     get yearSummary() {
-        if (this.filter.years.length === 0) return 'Select year';
+        if (this.filter.years.length === 0) return 'Pilih tahun';
 
         return [...this.filter.years].sort().join(', ');
     },

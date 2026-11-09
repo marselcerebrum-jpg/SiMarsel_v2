@@ -22,7 +22,7 @@
 
             <button x-show="canCreate" x-cloak type="button" class="{{ $primaryButton }}" @click="createOpen = true">
                 <x-icon name="plus" class="size-4" />
-                Create Task
+                Buat Tugas
             </button>
         </header>
 

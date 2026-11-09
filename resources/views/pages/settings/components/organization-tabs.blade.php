@@ -1,7 +1,7 @@
 <div class="mt-6 border-b border-line">
     <div
         role="tablist"
-        aria-label="Organization Management"
+        aria-label="Manajemen Organisasi"
         class="-mb-px flex gap-6 overflow-x-auto"
         @keydown.arrow-right.prevent="move(1)"
         @keydown.arrow-left.prevent="move(-1)"

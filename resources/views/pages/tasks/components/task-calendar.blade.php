@@ -64,7 +64,7 @@
 
     <div x-show="state === 'error'" x-cloak class="mt-4 flex flex-col items-center gap-3 rounded-lg border border-red-200 bg-red-50 px-4 py-8 text-center" role="alert">
         <p class="text-sm text-red-700" x-text="message"></p>
-        <button type="button" class="{{ $button }}" @click="loadPeriod()">Try Again</button>
+        <button type="button" class="{{ $button }}" @click="loadPeriod()">Coba Lagi</button>
     </div>
 
     <div x-show="state === 'ready'" x-cloak class="mt-5 grid gap-4 lg:grid-cols-2">
@@ -127,9 +127,9 @@
 
                 <dl class="mt-3 flex flex-col gap-1.5">
                     <div class="{{ $summaryRow }}"><dt class="{{ $summaryLabel }}">Divisi</dt><dd class="text-ink" x-text="picked.item.division?.name ?? 'Lintas divisi'"></dd></div>
-                    <div class="{{ $summaryRow }}"><dt class="{{ $summaryLabel }}">Start Date</dt><dd class="text-ink" x-text="formatDate(picked.item.start_date ?? picked.item.date)"></dd></div>
+                    <div class="{{ $summaryRow }}"><dt class="{{ $summaryLabel }}">Tanggal Mulai</dt><dd class="text-ink" x-text="formatDate(picked.item.start_date ?? picked.item.date)"></dd></div>
                     <div class="{{ $summaryRow }}">
-                        <dt class="{{ $summaryLabel }}" x-text="picked.kind === 'task' ? 'Deadline' : 'End Date'"></dt>
+                        <dt class="{{ $summaryLabel }}" x-text="picked.kind === 'task' ? 'Deadline' : 'Tanggal Akhir'"></dt>
                         <dd :class="picked.kind === 'task' && isOverdue(picked.item) ? 'font-semibold text-red-700' : 'text-ink'"
                             x-text="formatDate(picked.kind === 'task' ? picked.item.deadline : (picked.item.end_date ?? picked.item.start_date ?? picked.item.date))"></dd>
                     </div>
@@ -149,7 +149,7 @@
                 <div class="mt-4" x-show="picked.kind === 'event' && picked.item.task_id">
                     <button type="button" class="{{ $primaryButton }}" @click="focusTask({ id: picked.item.task_id, can_view_detail: picked.item.can_view_detail })">Lihat Detail Tugas Terkait</button>
                 </div>
-                <p x-show="picked.kind === 'event' && !picked.item.task_id" class="mt-3 text-xs text-muted">Agenda bersama ini tidak terhubung ke tugas, sehingga tidak dibuka di Board.</p>
+                <p x-show="picked.kind === 'event' && !picked.item.task_id" class="mt-3 text-xs text-muted">Agenda bersama ini tidak terhubung ke tugas, sehingga tidak dibuka di Papan.</p>
             </div>
         </template>
     </div>

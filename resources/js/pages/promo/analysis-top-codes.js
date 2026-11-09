@@ -64,7 +64,7 @@ export default function promoAnalysisTopCodes() {
                 if (error.status === 422 && error.data?.errors) {
                     this.$dispatch('promo-analysis-errors', validationErrors(error));
                 } else {
-                    this.loadError = errorMessage(error, 'Gagal memuat Top 5 kode promo.');
+                    this.loadError = errorMessage(error, 'Gagal memuat 5 kode promo teratas.');
                 }
             } finally {
                 if (requestId === this.requestId) this.loading = false;

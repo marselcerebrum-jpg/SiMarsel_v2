@@ -38,7 +38,7 @@
                 <x-icon name="alert" class="size-6 text-label" />
                 <p class="text-sm font-semibold text-ink" x-text="{ not_found: 'Tugas tidak ditemukan', forbidden: 'Akses ditolak', error: 'Detail gagal dimuat' }[state]"></p>
                 <p class="text-sm text-muted" x-text="message"></p>
-                <button x-show="state === 'error'" type="button" class="{{ $button }} mt-2" @click="reload()">Try Again</button>
+                <button x-show="state === 'error'" type="button" class="{{ $button }} mt-2" @click="reload()">Coba Lagi</button>
             </div>
 
             <template x-if="state === 'ready' && task">
@@ -83,7 +83,7 @@
                                     <span x-text="acting === transition.to ? 'Menyimpan…' : transition.label"></span>
                                 </button>
                             </template>
-                            <button x-show="canEditThis && !editing" type="button" class="{{ $button }}" @click="startEdit()">Edit Tugas</button>
+                            <button x-show="canEditThis && !editing" type="button" class="{{ $button }}" @click="startEdit()">Ubah Tugas</button>
                             <p x-show="!transitions.length && task.status !== 'done'" class="self-center text-xs text-muted">
                                 Tidak ada perubahan status yang dapat Anda lakukan pada tahap ini.
                             </p>
@@ -92,7 +92,7 @@
 
                     {{-- Keputusan review (TASK-07) --}}
                     <section x-show="reviewMode" x-cloak class="rounded-lg border p-4" :class="reviewMode === 'revision' ? 'border-amber-200 bg-amber-50/60' : 'border-primary/30 bg-primary-soft'">
-                        <h3 class="{{ $sectionTitle }}" x-text="reviewMode === 'revision' ? 'Request Revision' : 'Approve Tugas'"></h3>
+                        <h3 class="{{ $sectionTitle }}" x-text="reviewMode === 'revision' ? 'Minta Revisi' : 'Setujui Tugas'"></h3>
                         <p class="mt-1 text-xs text-muted" x-text="reviewMode === 'revision' ? 'Tugas kembali ke On Process. Jelaskan apa yang perlu diperbaiki PIC.' : 'Tugas akan ditandai Done dan waktu penyelesaian dicatat.'"></p>
                         <label for="review-note" class="{{ $labelClass }} mt-3">Catatan <span x-show="reviewMode === 'revision'" class="text-red-500">*</span><span x-show="reviewMode !== 'revision'">(opsional)</span></label>
                         <textarea id="review-note" x-ref="reviewNote" x-model="reviewNote" rows="3" class="{{ $textareaClass }}" @input="reviewError = ''" maxlength="1000"
@@ -101,7 +101,7 @@
                         <div class="mt-3 flex justify-end gap-2">
                             <button type="button" class="{{ $button }}" :disabled="acting !== null" @click="reviewMode = null">Batal</button>
                             <button type="button" class="{{ $primaryButton }}" :disabled="acting !== null" @click="submitReview()"
-                                x-text="acting ? 'Menyimpan…' : (reviewMode === 'revision' ? 'Kirim Revisi' : 'Approve')"></button>
+                                x-text="acting ? 'Menyimpan…' : (reviewMode === 'revision' ? 'Kirim Revisi' : 'Setujui')"></button>
                         </div>
                     </section>
 
@@ -180,8 +180,8 @@
                             </div>
                             <p class="text-xs text-muted sm:col-span-2">Divisi dan PIC diubah melalui bagian Penanggung Jawab; status melalui tombol workflow.</p>
                             <div class="flex justify-end gap-2 border-t border-line pt-4 sm:col-span-2">
-                                <button type="button" class="{{ $button }}" :disabled="saving" @click="editing = false">Cancel</button>
-                                <button type="submit" class="{{ $primaryButton }}" :disabled="saving" x-text="saving ? 'Saving…' : 'Save Changes'"></button>
+                                <button type="button" class="{{ $button }}" :disabled="saving" @click="editing = false">Batal</button>
+                                <button type="submit" class="{{ $primaryButton }}" :disabled="saving" x-text="saving ? 'Menyimpan…' : 'Simpan Perubahan'"></button>
                             </div>
                         </form>
                     </section>
@@ -222,8 +222,8 @@
                                         </div>
                                         <p class="text-xs text-muted">Mengganti PIC tidak mengubah status tugas. PIC lama dan baru tercatat di histori.</p>
                                         <div class="flex justify-end gap-2">
-                                            <button type="button" class="{{ $button }}" :disabled="assigning" @click="assigneeState = 'idle'">Cancel</button>
-                                            <button type="submit" class="{{ $primaryButton }}" :disabled="!assignForm.pic_id || assigning" x-text="assigning ? 'Saving…' : 'Simpan PIC'"></button>
+                                            <button type="button" class="{{ $button }}" :disabled="assigning" @click="assigneeState = 'idle'">Batal</button>
+                                            <button type="submit" class="{{ $primaryButton }}" :disabled="!assignForm.pic_id || assigning" x-text="assigning ? 'Menyimpan…' : 'Simpan PIC'"></button>
                                         </div>
                                     </form>
                                 </template>

@@ -1,6 +1,6 @@
 @extends('layouts.dashboard')
 
-@section('title', 'Performance Summary')
+@section('title', 'Ringkasan Performa')
 @push('scripts')
     @vite('resources/js/pages/performance/index.js')
 @endpush
@@ -15,18 +15,18 @@
             'grid' => 'sm:grid-cols-2 xl:grid-cols-4',
             'metrics' => [
                 ['key' => 'total_revenue', 'label' => 'Total Revenue', 'format' => 'currency', 'compact' => true, 'hint' => 'Total nilai transaksi berhasil'],
-                ['key' => 'total_transactions', 'label' => 'Total Transactions', 'format' => 'number', 'hint' => 'Jumlah transaksi berhasil'],
+                ['key' => 'total_transactions', 'label' => 'Total Transaksi', 'format' => 'number', 'hint' => 'Jumlah transaksi berhasil'],
                 ['key' => 'total_downloaders', 'label' => 'Total Downloader', 'format' => 'number', 'hint' => 'Jumlah downloader aplikasi'],
-                ['key' => 'new_users', 'label' => 'New Users', 'format' => 'number', 'hint' => 'Transaksi perdana'],
+                ['key' => 'new_users', 'label' => 'Pengguna Baru', 'format' => 'number', 'hint' => 'Transaksi perdana'],
             ],
         ],
         'secondary' => [
             'grid' => 'sm:grid-cols-2 xl:grid-cols-4',
             'metrics' => [
-                ['key' => 'unique_users', 'label' => 'Unique Users', 'format' => 'number', 'hint' => 'Email pembeli unik'],
+                ['key' => 'unique_users', 'label' => 'Pengguna Unik', 'format' => 'number', 'hint' => 'Email pembeli unik'],
                 ['key' => 'average_order_value', 'label' => 'AOV', 'format' => 'currency', 'hint' => 'Total revenue ÷ jumlah transaksi'],
                 ['key' => 'repeat_orders', 'label' => 'Repeat Order', 'format' => 'number', 'hint' => 'Transaksi perpanjangan'],
-                ['key' => 'conversion_rate', 'label' => 'Conversion', 'format' => 'percent', 'hint' => 'Transaksi dibanding downloader', 'progress' => true],
+                ['key' => 'conversion_rate', 'label' => 'Konversi', 'format' => 'percent', 'hint' => 'Transaksi dibanding downloader', 'progress' => true],
             ],
         ],
     ];
@@ -36,42 +36,42 @@
     $trend = [
         'metrics' => [
             ['value' => 'revenue', 'label' => 'Revenue', 'format' => 'currency'],
-            ['value' => 'transactions', 'label' => 'Transactions', 'format' => 'number'],
+            ['value' => 'transactions', 'label' => 'Transaksi', 'format' => 'number'],
             ['value' => 'downloaders', 'label' => 'Downloader', 'format' => 'number'],
-            ['value' => 'conversion', 'label' => 'Conversion', 'format' => 'percent'],
-            ['value' => 'new_users', 'label' => 'New Users', 'format' => 'number'],
+            ['value' => 'conversion', 'label' => 'Konversi', 'format' => 'percent'],
+            ['value' => 'new_users', 'label' => 'Pengguna Baru', 'format' => 'number'],
             ['value' => 'repeat_orders', 'label' => 'Repeat Order', 'format' => 'number'],
         ],
         'charts' => [
-            ['value' => 'bar', 'label' => 'Bar'],
-            ['value' => 'line', 'label' => 'Line'],
+            ['value' => 'bar', 'label' => 'Batang'],
+            ['value' => 'line', 'label' => 'Garis'],
             ['value' => 'area', 'label' => 'Area'],
-            ['value' => 'pie', 'label' => 'Pie'],
-            ['value' => 'table', 'label' => 'Table'],
+            ['value' => 'pie', 'label' => 'Lingkaran'],
+            ['value' => 'table', 'label' => 'Tabel'],
         ],
         'granularities' => [
-            ['value' => 'daily', 'label' => 'Daily'],
-            ['value' => 'weekly', 'label' => 'Weekly'],
-            ['value' => 'monthly', 'label' => 'Monthly'],
+            ['value' => 'daily', 'label' => 'Harian'],
+            ['value' => 'weekly', 'label' => 'Mingguan'],
+            ['value' => 'monthly', 'label' => 'Bulanan'],
         ],
     ];
 
     $paymentMethod = [
         'parameters' => [
             ['value' => 'revenue', 'label' => 'Revenue'],
-            ['value' => 'transactions', 'label' => 'Transactions'],
+            ['value' => 'transactions', 'label' => 'Transaksi'],
         ],
     ];
 
     // English labels for the backend time range keys.
     $purchaseTime = [
         'labels' => [
-            'dawn' => 'Early Morning',
-            'morning' => 'Morning',
-            'midday' => 'Midday',
-            'afternoon' => 'Afternoon',
-            'night' => 'Night',
-            'unknown' => 'Unknown',
+            'dawn' => 'Dini Hari',
+            'morning' => 'Pagi',
+            'midday' => 'Siang',
+            'afternoon' => 'Sore',
+            'night' => 'Malam',
+            'unknown' => 'Tidak Diketahui',
         ],
     ];
 @endphp
@@ -80,7 +80,7 @@
     <div x-data="performanceSummary(@js($platformOptions), @js($years))" class="min-w-0">
         <header class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <div>
-                <h1 class="text-2xl font-bold tracking-tight text-ink">Performance Summary</h1>
+                <h1 class="text-2xl font-bold tracking-tight text-ink">Ringkasan Performa</h1>
                 <p class="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted">
                     <span>Data keseluruhan performa perusahaan</span>
                     <span x-show="loadedLabel" x-cloak aria-hidden="true">·</span>
@@ -89,9 +89,9 @@
             </div>
 
             <div class="flex flex-wrap items-center gap-2">
-                <button type="button" x-show="!loading && loadError" x-cloak class="{{ $exportButton }}" @click="load()">Reload</button>
-                <a :href="exportLink('xlsx')" href="{{ route('api.performance.export', ['format' => 'xlsx']) }}" class="{{ $exportButton }}" :class="filterInvalid && 'pointer-events-none opacity-50'" :aria-disabled="filterInvalid.toString()">Export Excel</a>
-                <a :href="exportLink('csv')" href="{{ route('api.performance.export', ['format' => 'csv']) }}" class="{{ $exportButton }}" :class="filterInvalid && 'pointer-events-none opacity-50'" :aria-disabled="filterInvalid.toString()">Export CSV</a>
+                <button type="button" x-show="!loading && loadError" x-cloak class="{{ $exportButton }}" @click="load()">Muat Ulang</button>
+                <a :href="exportLink('xlsx')" href="{{ route('api.performance.export', ['format' => 'xlsx']) }}" class="{{ $exportButton }}" :class="filterInvalid && 'pointer-events-none opacity-50'" :aria-disabled="filterInvalid.toString()">Ekspor Excel</a>
+                <a :href="exportLink('csv')" href="{{ route('api.performance.export', ['format' => 'csv']) }}" class="{{ $exportButton }}" :class="filterInvalid && 'pointer-events-none opacity-50'" :aria-disabled="filterInvalid.toString()">Ekspor CSV</a>
             </div>
         </header>
 
@@ -103,7 +103,7 @@
 
         <p x-show="emptyMessage" x-cloak x-text="emptyMessage" class="mt-4 rounded-lg border border-line bg-soft px-4 py-2.5 text-sm text-muted" role="status"></p>
 
-        <section aria-label="Key Performance Indicators" :aria-busy="loading.toString()">
+        <section aria-label="Indikator Kinerja Utama" :aria-busy="loading.toString()">
             @foreach ($rows as $size => $row)
                 <div class="mt-4 grid gap-4 {{ $row['grid'] }}">
                     @foreach ($row['metrics'] as $metric)
