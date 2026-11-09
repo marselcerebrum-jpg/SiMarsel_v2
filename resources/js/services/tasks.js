@@ -15,7 +15,7 @@ import { http } from '../http';
  * GET    /api/tasks/assignees?division         → { data: [{ id, fullname, division }] }
  * GET    /api/tasks/{id}/evidences             → { data: [Evidence] }
  * POST   /api/tasks/{id}/evidences             → { data: Evidence, message }           (multipart: file atau url, note)
- * POST   /api/tasks/{id}/reviews               → { data: TaskDetail, message }         (kirim decision, note, updated_at)
+ * POST   /api/tasks/{id}/reviews               → { data: TaskDetail, message }         (kirim decision, note, version)
  * GET    /api/tasks/{id}/activities            → { data: [Activity] }
  * GET    /api/tasks/schedule?from&to&division  → { data: [ScheduleItem] }
  * GET    /api/tasks/calendar?month&division    → { data: { events: [Event], deadlines: [Task] } }
