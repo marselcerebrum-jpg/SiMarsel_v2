@@ -93,10 +93,10 @@ Backend **wajib** menerapkan cakupan ini di setiap endpoint. Staff yang mengubah
 **Status: backend tersedia.** `GET /api/tasks/calendar?month=YYYY-MM&division=KODE` mengembalikan `{ data: { events: [Event], deadlines: [Task] } }`, hanya-baca. Kedua daftar dipisah: agenda bersama di `events`, deadline tugas di `deadlines`.
 
 - **Validasi** (`422`): `month` wajib berformat `YYYY-MM`; `division` harus kode divisi yang ada.
-- **`events`**: agenda (`schedule_events`) yang bersinggungan dengan bulan itu, dengan aturan visibilitas yang sama seperti [Timeline](#timeline-task-10): agenda bersama untuk semua role, agenda internal hanya untuk Admin dan divisinya. Hanya informasi umum (nama, divisi, tanggal, keterangan) yang dikirim. `can_view_detail` mengikuti hak membuka tugas terkait.
+- **`events`**: agenda (`schedule_events`) yang bersinggungan dengan bulan itu, dengan aturan visibilitas yang sama seperti [Timeline](#timeline-task-10): `is_shared = true` untuk semua role, agenda internal hanya untuk Admin dan akun divisi tujuannya (`target_divisions`), agenda internal tanpa divisi tujuan hanya untuk Admin. Hanya informasi umum (nama, divisi pemilik, divisi tujuan, tanggal, keterangan) yang dikirim. `can_view_detail` mengikuti hak membuka tugas terkait.
 - **`deadlines`**: tugas dengan deadline di bulan itu, dalam cakupan user yang sama dengan `GET /api/tasks`: Admin semua divisi, Manajer divisinya, Staff tugas yang PIC-nya dia. Tugas tanpa deadline tidak ikut. Urut berdasarkan deadline.
 - **`is_overdue`**: `true` bila deadline sudah lewat (sebelum hari ini) dan status bukan `done`.
-- **Filter `division`**: deadline divisi itu (tetap di dalam cakupan user, jadi filter tidak pernah memperluas akses) dan agenda divisi itu ditambah agenda semua divisi. Tanpa `division` = Semua Divisi (default Admin).
+- **Filter `division`**: deadline divisi itu (tetap di dalam cakupan user, jadi filter tidak pernah memperluas akses) dan agenda yang dimiliki divisi itu atau menjadikannya divisi tujuan, ditambah agenda bersama tanpa pemilik. Tanpa `division` = Semua Divisi (default Admin).
 
 ## Aturan bisnis yang harus divalidasi backend
 
