@@ -31,6 +31,7 @@ class DatabaseSeeder extends Seeder
                 DownloaderSeeder::class,
                 PromoCodeSeeder::class,
                 TransactionSeeder::class,
+                ScheduleEventSeeder::class,
             ]);
         }
     }
