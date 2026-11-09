@@ -180,3 +180,69 @@ Ringkasan dihitung di frontend dari respons `GET /api/tasks` yang sama dengan Bo
 - **Completion Rate** = Completed / Total × 100%, dan 0% bila Total = 0.
 
 Tugas tanpa deadline tidak dihitung pada Overdue maupun Due Today.
+
+## Monitoring Tugas (agregasi backend)
+
+`GET /api/tasks/monitoring` menghitung KPI ringkasan langsung di database, sehingga angka tidak bergantung pada data yang dimuat frontend. Hanya-baca: melihat tugas di laporan tidak memberi hak edit, dan akses detail/aksi tetap mengikuti cakupan Tasklist.
+
+**Query** (semua opsional):
+
+| Param | Nilai | Keterangan |
+|---|---|---|
+| `scope` | `report` (default) \| `tasklist` | `report` = seluruh divisi, boleh dibaca semua role. `tasklist` = cakupan Tasklist user (Admin semua, Manajer divisinya, Staff tugas PIC-nya), angkanya sama dengan Board/Table untuk filter yang sama. |
+| `division` | `code_division` | Pada `scope=tasklist` filter ini tidak dapat memperluas cakupan. |
+| `status` | nilai status | |
+| `priority` | `low` \| `medium` \| `high` \| `urgent` | |
+| `search` | teks, maks. 150 | Judul tugas, sama seperti Tasklist. |
+| `date_basis` | `deadline` (default) \| `created_at` | Tanggal yang dipakai filter periode. Lihat *Dasar tanggal periode* di bawah. |
+| `date_from`, `date_to` | `YYYY-MM-DD` | Batas periode (inklusif) pada tanggal sesuai `date_basis`. Boleh diisi salah satu. `date_to` ≥ `date_from`. |
+
+Tanpa parameter = konfigurasi default (Reset Filter): cakupan `report`, semua divisi, `date_basis=deadline`, tanpa periode.
+
+**Dasar tanggal periode (`date_basis`):**
+
+| Mode | Periode menyaring | Tugas tanpa deadline |
+|---|---|---|
+| `created_at` (Tanggal dibuat) | tanggal pembuatan tugas | tetap dihitung bila dibuat dalam periode |
+| `deadline` (Deadline) | deadline tugas | tidak dihitung saat periode aktif |
+
+- Mode yang dipilih berlaku untuk **seluruh** angka di respons: semua KPI di `metrics`, `by_priority`, dan `by_division`, bukan hanya Total Tasks.
+- Periode hanya menentukan tugas mana yang dihitung. **Overdue** dan **Due Today** selalu dinilai dari deadline terhadap hari ini (`as_of`), apa pun modenya. Contoh: tugas yang dibuat November dengan deadline 1 Oktober dan belum Done tetap terhitung Overdue pada mode `created_at` periode November.
+- Mode yang dipakai dikirim di `period` agar tampilan dapat memberi label, mis. "Periode (Deadline): 1–30 Nov 2026".
+
+Contoh: hari ini 6 Nov 2026, filter periode 1–30 November 2026.
+
+| Tugas | Dibuat | Deadline | `created_at` | `deadline` |
+|---|---|---|---|---|
+| A | 3 Nov | 10 Des | ✅ dihitung | ❌ tidak |
+| B | 15 Okt | 20 Nov | ❌ tidak | ✅ dihitung |
+| C (On Process) | 6 Nov | – | ✅ dihitung, tidak Overdue/Due Today | ❌ tidak |
+| D (To Do) | 6 Nov | 1 Okt | ✅ dihitung sebagai Overdue | ❌ tidak |
+
+**Respons `200`:**
+
+```json
+{
+  "data": {
+    "scope": { "key": "report", "label": "Seluruh divisi" },
+    "as_of": "2026-11-06",
+    "filters": { "search": null, "division": null, "priority": null, "status": null, "date_basis": "deadline", "date_from": null, "date_to": null },
+    "period": { "basis": "deadline", "label": "Deadline", "from": null, "to": null, "active": false },
+    "metrics": {
+      "total_tasks": 8, "backlog": 1, "todo": 2, "on_process": 1, "ready_for_qa": 1, "on_qa": 1,
+      "completed": 2, "unfinished": 6, "overdue": 3, "due_today": 1, "urgent": 2, "completion_rate": 25
+    },
+    "by_priority": { "low": { "total": 2, "unfinished": 1 }, "medium": { "total": 2, "unfinished": 2 }, "high": { "total": 1, "unfinished": 1 }, "urgent": { "total": 3, "unfinished": 2 } },
+    "by_division": [
+      { "code_division": "FIN", "name": "Finance", "total": 2, "completed": 1, "unfinished": 1, "overdue": 1, "completion_rate": 50 }
+    ]
+  }
+}
+```
+
+- `scope.label` wajib ditampilkan di samping KPI. Untuk `tasklist` labelnya "Tugas divisi Anda" (Manajer) atau "Tugas yang ditugaskan kepada Anda" (Staff).
+- `period` = dasar tanggal yang dipakai (`basis`, `label`: "Tanggal dibuat" atau "Deadline"), batas periode, dan `active` (`true` bila `date_from`/`date_to` diisi).
+- `as_of` = tanggal hari ini menurut zona waktu aplikasi (`APP_TIMEZONE`), acuan Overdue dan Due Today.
+- Rumus metrik sama dengan bagian Ringkasan di atas. `completion_rate` dibulatkan 2 desimal dan bernilai `0` bila `total_tasks` = 0. Tugas aktif = status selain `done`.
+- Tidak ada tugas → semua angka `0`, `by_division` = `[]`, dan `by_priority` tetap berisi keempat prioritas.
+- `422` bila parameter tidak valid (pesan di `errors.<param>`), `401` bila belum login.
