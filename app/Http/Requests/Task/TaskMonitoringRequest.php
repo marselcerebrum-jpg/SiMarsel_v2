@@ -30,6 +30,7 @@ class TaskMonitoringRequest extends FormRequest
             'division' => ['nullable', 'string', Rule::exists('divisions', 'code_division')],
             'priority' => ['nullable', Rule::enum(TaskPriority::class)],
             'status' => ['nullable', Rule::enum(TaskStatus::class)],
+            'date_basis' => ['nullable', Rule::in(TaskMonitoringService::DATE_BASES)],
             'date_from' => ['nullable', 'date_format:Y-m-d'],
             'date_to' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:date_from'],
         ];
@@ -62,6 +63,7 @@ class TaskMonitoringRequest extends FormRequest
             'division' => 'Divisi',
             'priority' => 'Prioritas',
             'status' => 'Status',
+            'date_basis' => 'Dasar tanggal',
             'date_from' => 'Tanggal mulai',
             'date_to' => 'Tanggal akhir',
         ];
@@ -76,7 +78,9 @@ class TaskMonitoringRequest extends FormRequest
     }
 
     /**
-     * @return array{search: ?string, division: ?string, priority: ?string, status: ?string, date_from: ?string, date_to: ?string}
+     * The period is matched on the deadline unless the creation date is asked for.
+     *
+     * @return array{search: ?string, division: ?string, priority: ?string, status: ?string, date_basis: string, date_from: ?string, date_to: ?string}
      */
     public function filters(): array
     {
@@ -85,6 +89,7 @@ class TaskMonitoringRequest extends FormRequest
             'division' => $this->validated('division'),
             'priority' => $this->validated('priority'),
             'status' => $this->validated('status'),
+            'date_basis' => $this->validated('date_basis') ?? TaskMonitoringService::DATE_BASIS_DEADLINE,
             'date_from' => $this->validated('date_from'),
             'date_to' => $this->validated('date_to'),
         ];

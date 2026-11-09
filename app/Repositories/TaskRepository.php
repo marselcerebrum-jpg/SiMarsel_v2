@@ -41,16 +41,20 @@ class TaskRepository
      * Tasks for monitoring. The "tasklist" scope is the account's own Tasklist visibility, so its numbers match
      * the Board; the "report" scope covers every division, which every role may read but not edit.
      *
-     * @param  array{search: ?string, division: ?string, priority: ?string, status: ?string, date_from: ?string, date_to: ?string}  $filters
+     * The period is matched on the column named by date_basis (created_at or deadline). On the deadline basis a
+     * task without a deadline falls outside any period; on the created_at basis every task has a date.
+     *
+     * @param  array{search: ?string, division: ?string, priority: ?string, status: ?string, date_basis: string, date_from: ?string, date_to: ?string}  $filters
      * @return Builder<Task>
      */
     public function monitored(Account $account, string $scope, array $filters): Builder
     {
         $query = Task::query()->when($scope === 'tasklist', fn (Builder $query) => $query->visibleTo($account));
+        $column = $filters['date_basis'] === 'deadline' ? 'deadline' : 'created_at';
 
         return $this->filter($query, $filters)
-            ->when($filters['date_from'], fn (Builder $query, string $date) => $query->whereDate('deadline', '>=', $date))
-            ->when($filters['date_to'], fn (Builder $query, string $date) => $query->whereDate('deadline', '<=', $date));
+            ->when($filters['date_from'], fn (Builder $query, string $date) => $query->whereDate($column, '>=', $date))
+            ->when($filters['date_to'], fn (Builder $query, string $date) => $query->whereDate($column, '<=', $date));
     }
 
     /**

@@ -13,13 +13,20 @@ class TaskMonitoringService
 
     public const SCOPE_TASKLIST = 'tasklist';
 
+    public const DATE_BASIS_CREATED_AT = 'created_at';
+
+    public const DATE_BASIS_DEADLINE = 'deadline';
+
+    public const DATE_BASES = [self::DATE_BASIS_CREATED_AT, self::DATE_BASIS_DEADLINE];
+
     public function __construct(private TaskRepository $tasks) {}
 
     /**
      * Monitoring KPIs, completion rate, and per-division and per-priority breakdowns under the given scope and
-     * filters. Read-only: seeing a task here grants no right to edit it.
+     * filters. Read-only: seeing a task here grants no right to edit it. The period only decides which tasks
+     * are counted; Overdue and Due Today are always judged on the deadline against today.
      *
-     * @param  array{search: ?string, division: ?string, priority: ?string, status: ?string, date_from: ?string, date_to: ?string}  $filters
+     * @param  array{search: ?string, division: ?string, priority: ?string, status: ?string, date_basis: string, date_from: ?string, date_to: ?string}  $filters
      * @return array<string, mixed>
      */
     public function summarize(Account $account, string $scope, array $filters): array
@@ -32,6 +39,7 @@ class TaskMonitoringService
             'scope' => $this->scope($account, $scope),
             'as_of' => $today->toDateString(),
             'filters' => $filters,
+            'period' => $this->period($filters),
             'metrics' => [
                 ...$counts,
                 'completion_rate' => $this->completionRate($counts['completed'], $counts['total_tasks']),
@@ -47,6 +55,23 @@ class TaskMonitoringService
     public function completionRate(int $completed, int $total): float
     {
         return $total === 0 ? 0.0 : round($completed / $total * 100, 2);
+    }
+
+    /**
+     * The date the period was matched on, with a label for the page.
+     *
+     * @param  array{date_basis: string, date_from: ?string, date_to: ?string}  $filters
+     * @return array{basis: string, label: string, from: ?string, to: ?string, active: bool}
+     */
+    private function period(array $filters): array
+    {
+        return [
+            'basis' => $filters['date_basis'],
+            'label' => $filters['date_basis'] === self::DATE_BASIS_DEADLINE ? 'Deadline' : 'Tanggal dibuat',
+            'from' => $filters['date_from'],
+            'to' => $filters['date_to'],
+            'active' => $filters['date_from'] !== null || $filters['date_to'] !== null,
+        ];
     }
 
     /**

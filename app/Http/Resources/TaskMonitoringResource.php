@@ -16,6 +16,7 @@ class TaskMonitoringResource extends JsonResource
             'scope' => $this->resource['scope'],
             'as_of' => $this->resource['as_of'],
             'filters' => $this->resource['filters'],
+            'period' => $this->resource['period'],
             'metrics' => $this->resource['metrics'],
             'by_priority' => $this->resource['by_priority'],
             'by_division' => $this->resource['by_division'],
