@@ -88,6 +88,7 @@ class TaskScheduleTest extends TestCase
             'type' => 'task',
             'title' => 'Update landing page',
             'division' => ['code_division' => 'MKT', 'name' => 'Marketing'],
+            'target_divisions' => [],
             'start_date' => '2026-10-13',
             'end_date' => '2026-10-15',
             'status' => 'in_progress',
@@ -148,18 +149,31 @@ class TaskScheduleTest extends TestCase
 
     // Filter divisi
 
-    public function test_a_division_focuses_the_tasks_and_keeps_the_agendas_of_every_division(): void
+    public function test_a_division_focuses_the_tasks_and_the_agendas_it_owns_or_is_a_target_of(): void
     {
-        $allDivisions = ScheduleEvent::factory()->create(['start_date' => '2026-10-14', 'division_id' => null]);
-        $marketingEvent = ScheduleEvent::factory()->create(['start_date' => '2026-10-15', 'division_id' => $this->marketing->id]);
-        ScheduleEvent::factory()->create(['start_date' => '2026-10-15', 'division_id' => $this->finance->id]);
+        $general = ScheduleEvent::factory()->create(['start_date' => '2026-10-14', 'owner_division_id' => null]);
+        $ownedByMarketing = ScheduleEvent::factory()->create(['start_date' => '2026-10-15', 'owner_division_id' => $this->marketing->id]);
+        $forMarketing = ScheduleEvent::factory()->internalFor([$this->marketing])
+            ->create(['start_date' => '2026-10-16', 'owner_division_id' => $this->finance->id]);
+        ScheduleEvent::factory()->create(['start_date' => '2026-10-15', 'owner_division_id' => $this->finance->id]);
+        ScheduleEvent::factory()->internalFor([$this->finance])->create(['start_date' => '2026-10-15']);
 
         $data = $this->actingAs($this->admin)->getJson(self::PERIOD.'&division=MKT')->assertOk()->json('data');
 
         $this->assertSame(
-            [['task', $this->staffTask->id], ['event', $allDivisions->id], ['event', $marketingEvent->id]],
+            [['task', $this->staffTask->id], ['event', $general->id], ['event', $ownedByMarketing->id], ['event', $forMarketing->id]],
             collect($data)->map(fn (array $item) => [$item['type'], $item['id']])->all(),
         );
+    }
+
+    public function test_a_division_focus_never_widens_the_agendas_an_account_may_see(): void
+    {
+        $forFinance = ScheduleEvent::factory()->internalFor([$this->finance])
+            ->create(['start_date' => '2026-10-15', 'owner_division_id' => $this->marketing->id]);
+
+        $this->assertNotContains($forFinance->id, $this->eventIds($this->staff, '&division=MKT'));
+        $this->assertNotContains($forFinance->id, $this->eventIds($this->staff, '&division=FIN'));
+        $this->assertContains($forFinance->id, $this->eventIds($this->admin, '&division=FIN'));
     }
 
     public function test_without_a_division_the_schedule_covers_every_division(): void
@@ -169,15 +183,74 @@ class TaskScheduleTest extends TestCase
 
     // Agenda bersama
 
-    public function test_a_shared_agenda_is_visible_to_every_role_and_an_internal_one_only_to_its_division_and_admin(): void
+    public function test_a_shared_agenda_is_visible_to_every_role(): void
     {
-        $shared = ScheduleEvent::factory()->create(['start_date' => '2026-10-14', 'division_id' => $this->finance->id, 'is_shared' => true]);
-        $financeInternal = ScheduleEvent::factory()->create(['start_date' => '2026-10-14', 'division_id' => $this->finance->id, 'is_shared' => false]);
-        $marketingInternal = ScheduleEvent::factory()->create(['start_date' => '2026-10-14', 'division_id' => $this->marketing->id, 'is_shared' => false]);
+        $shared = ScheduleEvent::factory()->create(['start_date' => '2026-10-14', 'owner_division_id' => $this->finance->id, 'is_shared' => true]);
 
-        $this->assertEqualsCanonicalizing([$shared->id, $financeInternal->id, $marketingInternal->id], $this->eventIds($this->admin));
-        $this->assertEqualsCanonicalizing([$shared->id, $marketingInternal->id], $this->eventIds($this->manager));
-        $this->assertEqualsCanonicalizing([$shared->id, $marketingInternal->id], $this->eventIds($this->staff));
+        foreach ([$this->admin, $this->manager, $this->staff, $this->financeStaff()] as $account) {
+            $this->assertSame([$shared->id], $this->eventIds($account));
+        }
+    }
+
+    public function test_an_internal_agenda_for_one_division_is_visible_to_that_division_and_admin_only(): void
+    {
+        $internal = ScheduleEvent::factory()->internalFor([$this->marketing])
+            ->create(['start_date' => '2026-10-14', 'owner_division_id' => $this->marketing->id]);
+
+        $this->assertSame([$internal->id], $this->eventIds($this->admin));
+        $this->assertSame([$internal->id], $this->eventIds($this->manager));
+        $this->assertSame([$internal->id], $this->eventIds($this->staff));
+        $this->assertSame([], $this->eventIds($this->financeStaff()));
+    }
+
+    public function test_an_internal_agenda_for_several_divisions_is_visible_to_each_of_them_and_hidden_from_the_others(): void
+    {
+        $sales = Division::create(['code_division' => 'SLS', 'name' => 'Sales']);
+        $internal = ScheduleEvent::factory()->internalFor([$sales, $this->marketing])
+            ->create(['start_date' => '2026-10-14', 'owner_division_id' => $sales->id]);
+
+        $this->assertSame([$internal->id], $this->eventIds($this->account(Role::EMPLOYEE, 'sls.staff', $sales)));
+        $this->assertSame([$internal->id], $this->eventIds($this->staff));
+        $this->assertSame([$internal->id], $this->eventIds($this->manager));
+        $this->assertSame([$internal->id], $this->eventIds($this->admin));
+        $this->assertSame([], $this->eventIds($this->financeStaff()));
+    }
+
+    public function test_the_owner_division_does_not_see_an_internal_agenda_it_is_not_a_target_of(): void
+    {
+        $sales = Division::create(['code_division' => 'SLS', 'name' => 'Sales']);
+        $internal = ScheduleEvent::factory()->internalFor([$sales, $this->marketing])
+            ->create(['start_date' => '2026-10-14', 'owner_division_id' => $this->finance->id]);
+
+        $this->assertSame([], $this->eventIds($this->financeStaff()));
+        $this->assertSame([$internal->id], $this->eventIds($this->staff));
+    }
+
+    public function test_an_internal_agenda_without_a_target_division_is_visible_to_admin_only(): void
+    {
+        $adminOnly = ScheduleEvent::factory()->internalFor([])->create(['start_date' => '2026-10-14', 'owner_division_id' => null]);
+        $ownedAdminOnly = ScheduleEvent::factory()->internalFor([])->create(['start_date' => '2026-10-15', 'owner_division_id' => $this->marketing->id]);
+
+        $this->assertSame([$adminOnly->id, $ownedAdminOnly->id], $this->eventIds($this->admin));
+        $this->assertSame([], $this->eventIds($this->manager));
+        $this->assertSame([], $this->eventIds($this->staff));
+    }
+
+    public function test_an_internal_agenda_lists_its_owner_and_target_divisions(): void
+    {
+        $sales = Division::create(['code_division' => 'SLS', 'name' => 'Sales']);
+        ScheduleEvent::factory()->internalFor([$sales, $this->marketing])
+            ->create(['start_date' => '2026-10-14', 'owner_division_id' => $this->finance->id]);
+        ScheduleEvent::factory()->create(['start_date' => '2026-10-15', 'owner_division_id' => $this->finance->id]);
+
+        $events = collect($this->schedule($this->staff)->json('data'))->where('type', 'event')->values();
+
+        $this->assertSame(['code_division' => 'FIN', 'name' => 'Finance'], $events[0]['division']);
+        $this->assertSame([
+            ['code_division' => 'MKT', 'name' => 'Marketing'],
+            ['code_division' => 'SLS', 'name' => 'Sales'],
+        ], $events[0]['target_divisions']);
+        $this->assertSame([], $events[1]['target_divisions']);
     }
 
     public function test_an_agenda_opens_the_detail_of_its_related_task_only_for_whoever_may_view_that_task(): void
@@ -192,6 +265,7 @@ class TaskScheduleTest extends TestCase
             'type' => 'event',
             'title' => 'Rapat koordinasi',
             'division' => null,
+            'target_divisions' => [],
             'start_date' => '2026-10-14',
             'end_date' => null,
             'status' => null,
@@ -218,11 +292,16 @@ class TaskScheduleTest extends TestCase
         Carbon::setTestNow('2026-10-14 09:00:00');
         $this->seed(ScheduleEventSeeder::class);
 
-        $this->assertSame(count(ScheduleEventSeeder::SHARED_AGENDAS) + 2, ScheduleEvent::count());
-        $this->assertSame(3, collect($this->schedule($this->staff)->json('data'))->where('type', 'event')->count());
+        // Shared agendas, a briefing per division, one for Marketing and Finance together, one for Admin only.
+        $total = count(ScheduleEventSeeder::SHARED_AGENDAS) + 2 + 1 + 1;
+
+        $this->assertSame($total, ScheduleEvent::count());
+        $this->assertSame(6, count($this->eventIds($this->admin)));
+        $this->assertSame(4, count($this->eventIds($this->staff)));
+        $this->assertSame(4, count($this->eventIds($this->financeStaff())));
 
         $this->seed(ScheduleEventSeeder::class);
-        $this->assertSame(count(ScheduleEventSeeder::SHARED_AGENDAS) + 2, ScheduleEvent::count());
+        $this->assertSame($total, ScheduleEvent::count());
     }
 
     // Validasi
@@ -273,9 +352,18 @@ class TaskScheduleTest extends TestCase
     /**
      * @return array<int, int>
      */
-    private function eventIds(Account $account): array
+    private function eventIds(Account $account, string $query = ''): array
     {
-        return collect($this->schedule($account)->json('data'))->where('type', 'event')->pluck('id')->all();
+        return collect($this->actingAs($account)->getJson(self::PERIOD.$query)->assertOk()->json('data'))
+            ->where('type', 'event')
+            ->pluck('id')
+            ->values()
+            ->all();
+    }
+
+    private function financeStaff(): Account
+    {
+        return Account::where('username', 'fin.staff')->first() ?? $this->account(Role::EMPLOYEE, 'fin.staff', $this->finance);
     }
 
     private function account(string $role, string $username, ?Division $division): Account

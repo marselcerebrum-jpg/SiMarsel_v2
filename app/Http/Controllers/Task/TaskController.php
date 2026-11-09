@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Task;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Task\AssignTaskRequest;
 use App\Http\Requests\Task\ChangeTaskStatusRequest;
+use App\Http\Requests\Task\StoreTaskEvidenceRequest;
 use App\Http\Requests\Task\StoreTaskRequest;
 use App\Http\Requests\Task\TaskCalendarRequest;
 use App\Http\Requests\Task\TaskListRequest;
@@ -14,6 +15,7 @@ use App\Http\Resources\CalendarDeadlineResource;
 use App\Http\Resources\CalendarEventResource;
 use App\Http\Resources\ScheduleItemResource;
 use App\Http\Resources\TaskDetailResource;
+use App\Http\Resources\TaskEvidenceResource;
 use App\Http\Resources\TaskResource;
 use App\Models\Task;
 use App\Models\TaskEvidence;
@@ -85,6 +87,21 @@ class TaskController extends Controller
     public function show(Task $task): TaskDetailResource
     {
         return TaskDetailResource::make($this->taskService->detail($task));
+    }
+
+    public function evidences(Task $task, TaskEvidenceService $service): AnonymousResourceCollection
+    {
+        return TaskEvidenceResource::collection($service->list($task));
+    }
+
+    public function storeEvidence(StoreTaskEvidenceRequest $request, Task $task, TaskEvidenceService $service): JsonResponse
+    {
+        $evidence = $service->store($task, $request->user(), $request->validated());
+
+        return TaskEvidenceResource::make($evidence)
+            ->additional(['message' => 'Bukti tugas berhasil dikirim.'])
+            ->response()
+            ->setStatusCode(201);
     }
 
     public function downloadEvidence(Task $task, TaskEvidence $evidence, TaskEvidenceService $service): StreamedResponse

@@ -86,6 +86,10 @@ export function fetchAnalysisSummary(query) {
     return http(`${PROMO_ANALYSIS}/summary${query ? `?${query}` : ''}`);
 }
 
+export function fetchAnalysisProductTypes(query) {
+    return http(`${PROMO_ANALYSIS}/product-types${query ? `?${query}` : ''}`);
+}
+
 export function fetchAnalysisFunnels(query) {
     return http(`${PROMO_ANALYSIS}/funnels${query ? `?${query}` : ''}`);
 }

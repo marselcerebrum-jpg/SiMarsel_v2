@@ -55,4 +55,13 @@ class TaskPolicy
     {
         return $task->isVisibleTo($user);
     }
+
+    /**
+     * Only the task's PIC sends evidence for it; Admin and Managers see it through view(). Whether the task's
+     * status still accepts evidence is checked by TaskEvidenceService so the rejection carries its reason.
+     */
+    public function submitEvidence(Account $user, Task $task): bool
+    {
+        return $task->assignedTo($user);
+    }
 }
