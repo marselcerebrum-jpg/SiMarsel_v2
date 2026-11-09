@@ -7,7 +7,6 @@ use App\Models\ScheduleEvent;
 use App\Models\Task;
 use App\Repositories\TaskRepository;
 use Carbon\CarbonInterface;
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 
 class TaskScheduleService
@@ -19,19 +18,18 @@ class TaskScheduleService
      * may see, ordered by the day they start. Seeing an item on the schedule is not seeing its details; whether
      * the account may open them is decided per item by the task's own access rule.
      *
-     * Focusing on a division keeps its tasks and agendas, plus the agendas of every division.
+     * Focusing on a division keeps its tasks and the agendas it owns or is a target of, plus the shared agendas
+     * without an owner.
      *
      * @return Collection<int, Task|ScheduleEvent>
      */
     public function schedule(Account $account, CarbonInterface $from, CarbonInterface $to, ?string $division): Collection
     {
         $events = ScheduleEvent::query()
-            ->with(['division', 'task'])
+            ->with(['ownerDivision', 'targetDivisions', 'task'])
             ->visibleTo($account)
             ->within($from, $to)
-            ->when($division, fn (Builder $query, string $division) => $query->where(fn (Builder $query) => $query
-                ->whereNull('division_id')
-                ->orWhereHas('division', fn (Builder $query) => $query->where('code_division', $division))))
+            ->forDivision($division)
             ->orderBy('start_date')
             ->orderBy('id')
             ->get();
