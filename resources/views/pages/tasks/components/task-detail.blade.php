@@ -232,7 +232,6 @@
                         </div>
 
                         <form x-show="canSubmitEvidence" class="mt-3 flex flex-col gap-3 rounded-lg border border-line p-4" novalidate @submit.prevent="sendEvidence()">
-                            <p x-show="evidenceErrors.evidence" x-text="evidenceErrors.evidence" class="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700" role="alert"></p>
                             <div class="inline-flex self-start rounded-lg border border-line bg-soft p-1" role="group" aria-label="Jenis evidence">
                                 <button type="button" class="rounded-md px-3 py-1 text-xs font-semibold" :class="evidenceForm.type === 'file' ? 'bg-white text-ink shadow-sm' : 'text-muted'" @click="evidenceForm.type = 'file'; evidenceErrors = {}">File</button>
                                 <button type="button" class="rounded-md px-3 py-1 text-xs font-semibold" :class="evidenceForm.type === 'link' ? 'bg-white text-ink shadow-sm' : 'text-muted'" @click="evidenceForm.type = 'link'; evidenceErrors = {}">Tautan</button>
@@ -246,12 +245,12 @@
                             </div>
                             <div x-show="evidenceForm.type === 'link'">
                                 <label for="evidence-url" class="{{ $labelClass }}">Tautan</label>
-                                <input id="evidence-url" type="url" x-model="evidenceForm.url" maxlength="2048" class="{{ $inputClass }}" :class="evidenceErrors.url && 'border-red-500!'" placeholder="https://" @input="evidenceErrors.url = null">
+                                <input id="evidence-url" type="url" x-model="evidenceForm.url" class="{{ $inputClass }}" :class="evidenceErrors.url && 'border-red-500!'" placeholder="https://" @input="evidenceErrors.url = null">
                                 <p x-show="evidenceErrors.url" x-text="evidenceErrors.url" class="{{ $errorClass }}"></p>
                             </div>
                             <div>
                                 <label for="evidence-note" class="{{ $labelClass }}">Keterangan (opsional)</label>
-                                <input id="evidence-note" type="text" x-model="evidenceForm.note" class="{{ $inputClass }}" maxlength="2000">
+                                <input id="evidence-note" type="text" x-model="evidenceForm.note" class="{{ $inputClass }}" maxlength="255">
                             </div>
                             <button type="submit" class="{{ $primaryButton }} self-end" :disabled="sendingEvidence" x-text="sendingEvidence ? 'Mengirim…' : 'Kirim Evidence'"></button>
                         </form>

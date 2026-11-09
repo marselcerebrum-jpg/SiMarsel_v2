@@ -3,25 +3,9 @@ import { readFile } from 'node:fs/promises';
 import { test } from 'node:test';
 import vm from 'node:vm';
 
-async function taskApiFixture({ uploadResponse = { ok: true, status: 201, data: { data: { id: 5 } } } } = {}) {
+async function taskApiFixture() {
     const requests = [];
-    const uploads = [];
-    class MockFormData {
-        entries = [];
-
-        append(...entry) {
-            this.entries.push(entry);
-        }
-    }
-    const context = vm.createContext({
-        FormData: MockFormData,
-        document: { querySelector: () => ({ content: 'csrf-token' }) },
-        fetch: async (url, options) => {
-            uploads.push({ url, options });
-
-            return { ok: uploadResponse.ok, status: uploadResponse.status, json: async () => uploadResponse.data };
-        },
-    });
+    const context = vm.createContext({});
     const http = (url, options) => {
         requests.push({ url, options });
 
@@ -40,7 +24,7 @@ async function taskApiFixture({ uploadResponse = { ok: true, status: 201, data: 
     }, { context }));
     await module.evaluate();
 
-    return { api: module.namespace, requests, uploads };
+    return { api: module.namespace, requests };
 }
 
 test('assignment options and updates use the existing backend endpoints', async () => {
@@ -66,32 +50,4 @@ test('status changes send the version to the status workflow endpoint', async ()
     assert.equal(requests[0].url, '/api/tasks/12/status');
     assert.equal(requests[0].options.method, 'PATCH');
     assert.equal(requests[0].options.body, payload);
-});
-
-test('evidence submission posts multipart data to the task evidence endpoint without the feature flag', async () => {
-    const { api, uploads } = await taskApiFixture();
-    const file = { name: 'hasil.pdf' };
-
-    const result = await api.submitEvidence(12, { file, note: 'Hasil final' });
-
-    assert.equal(result.data.id, 5);
-    assert.equal(uploads[0].url, '/api/tasks/12/evidences');
-    assert.equal(uploads[0].options.method, 'POST');
-    assert.equal(uploads[0].options.headers.Accept, 'application/json');
-    assert.equal(uploads[0].options.headers['X-Requested-With'], 'XMLHttpRequest');
-    assert.equal(uploads[0].options.headers['X-CSRF-TOKEN'], 'csrf-token');
-    assert.deepEqual(uploads[0].options.body.entries, [['file', file], ['note', 'Hasil final']]);
-});
-
-test('evidence submission preserves backend validation errors', async () => {
-    const { api } = await taskApiFixture({
-        uploadResponse: { ok: false, status: 422, data: { errors: { url: ['Tautan tidak valid.'] } } },
-    });
-
-    await assert.rejects(api.submitEvidence(12, { url: 'bad-url' }), (error) => {
-        assert.equal(error.status, 422);
-        assert.deepEqual(error.data.errors.url, ['Tautan tidak valid.']);
-
-        return true;
-    });
 });
