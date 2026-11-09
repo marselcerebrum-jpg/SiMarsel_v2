@@ -288,7 +288,7 @@ class PerformanceFilterApiTest extends TestCase
             ->getJson('/api/performance/trend?years[]=2025&years[]=2026&metric=revenue')
             ->assertOk()
             ->assertJsonPath('data.period', 'monthly')
-            ->assertJsonPath('data.labels', ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'])
+            ->assertJsonPath('data.labels', ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'])
             ->assertJsonPath('data.datasets', [
                 ['label' => '2025', 'data' => [0, 0, 200000, 0, 0, 0, 50000, 0, 0, 0, 0, 0]],
                 ['label' => '2026', 'data' => [0, 0, 400000, 0, 0, 0, 0, 0, 470000, 30000, null, null]],
@@ -313,7 +313,7 @@ class PerformanceFilterApiTest extends TestCase
 
         // The first selected year has nothing to compare with.
         $this->assertSame([100000, null, null], $rows['Mar 2024']);
-        $this->assertSame([0, null, null], $rows['Dec 2024']);
+        $this->assertSame([0, null, null], $rows['Des 2024']);
 
         // Jan 2026 is compared with Jan 2024, not with Dec 2024.
         $this->assertSame([0, null, 'same'], $rows['Jan 2026']);

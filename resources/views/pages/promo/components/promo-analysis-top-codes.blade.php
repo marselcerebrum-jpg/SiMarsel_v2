@@ -5,7 +5,7 @@
     class="mt-5 border-t border-line pt-5"
     aria-labelledby="promo-top-codes-title"
 >
-    <h3 id="promo-top-codes-title" class="text-sm font-semibold text-ink">Top 5 Promo Codes</h3>
+    <h3 id="promo-top-codes-title" class="text-sm font-semibold text-ink">5 Kode Promo Teratas</h3>
     <p class="mt-1 text-xs text-muted">Jumlah penggunaan dapat melebihi jumlah transaksi unik karena satu transaksi dapat memakai dua kode promo.</p>
 
     <div class="mt-4 overflow-hidden rounded-lg border border-line">
@@ -31,13 +31,13 @@
                     </template>
 
                     <tr x-show="loading && !codes.length" x-cloak>
-                        <td colspan="4" class="px-4 py-10 text-center text-sm text-muted">Memuat Top 5 kode promo…</td>
+                        <td colspan="4" class="px-4 py-10 text-center text-sm text-muted">Memuat 5 kode promo teratas…</td>
                     </tr>
 
                     <tr x-show="!loading && loadError" x-cloak>
                         <td colspan="4" class="px-4 py-10 text-center" role="alert">
                             <p class="text-sm font-medium text-red-600" x-text="loadError"></p>
-                            <button type="button" class="mt-2 text-xs font-semibold text-primary hover:text-primary-hover" @click="retry()">Try Again</button>
+                            <button type="button" class="mt-2 text-xs font-semibold text-primary hover:text-primary-hover" @click="retry()">Coba Lagi</button>
                         </td>
                     </tr>
 

@@ -17,7 +17,7 @@
         x-transition
         class="relative w-full max-w-sm rounded-panel border border-line bg-surface p-5 shadow-lg"
     >
-        <h2 id="promo-code-confirm-title" class="text-base font-semibold text-ink">Confirm Funnel/Source Change</h2>
+        <h2 id="promo-code-confirm-title" class="text-base font-semibold text-ink">Konfirmasi Perubahan Funnel/Source</h2>
         <p id="promo-code-confirm-desc" class="mt-1 text-sm text-muted">
             Perubahan Funnel/Sumber berlaku untuk penggunaan setelah perubahan disimpan.
             Transaksi historis yang sudah terklasifikasi tidak akan berubah. Lanjutkan?
@@ -43,8 +43,8 @@
         </dl>
 
         <div class="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-            <button type="button" x-ref="confirmCancel" class="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-line bg-white px-3 text-sm font-semibold text-ink hover:bg-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary" @click="cancelConfirm()">Cancel</button>
-            <button type="button" class="inline-flex h-9 items-center justify-center gap-2 rounded-lg bg-primary px-4 text-sm font-semibold text-white hover:bg-primary-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary" @click="save()">Continue</button>
+            <button type="button" x-ref="confirmCancel" class="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-line bg-white px-3 text-sm font-semibold text-ink hover:bg-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary" @click="cancelConfirm()">Batal</button>
+            <button type="button" class="inline-flex h-9 items-center justify-center gap-2 rounded-lg bg-primary px-4 text-sm font-semibold text-white hover:bg-primary-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary" @click="save()">Lanjutkan</button>
         </div>
     </div>
 </div>

@@ -23,12 +23,12 @@
         x-transition
         class="relative max-h-[calc(100vh-2rem)] w-full max-w-md overflow-y-auto rounded-panel border border-line bg-surface p-5 shadow-lg"
     >
-        <h2 id="edit-user-title" class="text-base font-semibold text-ink">Edit Account</h2>
+        <h2 id="edit-user-title" class="text-base font-semibold text-ink">Ubah Akun</h2>
         <p class="mt-1 text-sm text-muted">Perbarui data akun. Kosongkan password jika tidak ingin mengubahnya.</p>
 
         <form class="mt-5 flex flex-col gap-4" novalidate @submit.prevent="submitEdit()">
             <div>
-                <label for="edit-name" class="{{ $labelClass }}">Full Name</label>
+                <label for="edit-name" class="{{ $labelClass }}">Nama Lengkap</label>
                 <input id="edit-name" x-ref="editName" type="text" x-model="form.fullname" @input="errors.fullname = null"
                     class="{{ $inputClass }}" :class="errors.fullname && 'border-red-500!'" placeholder="Masukkan nama lengkap" autocomplete="off">
                 <p x-show="errors.fullname" x-text="errors.fullname" class="{{ $errorClass }}"></p>
@@ -47,7 +47,7 @@
                     <input id="edit-password" :type="showPassword ? 'text' : 'password'" x-model="form.password" @input="errors.password = null"
                         class="{{ $inputClass }} pr-16" :class="errors.password && 'border-red-500!'" placeholder="Kosongkan jika tidak diubah" autocomplete="new-password">
                     <button type="button" class="absolute top-1/2 right-1.5 -translate-y-1/2 rounded-md px-2 py-1 text-xs font-semibold text-muted hover:text-ink"
-                        @click="showPassword = !showPassword" x-text="showPassword ? 'Hide' : 'Show'" :aria-pressed="showPassword.toString()"></button>
+                        @click="showPassword = !showPassword" x-text="showPassword ? 'Sembunyikan' : 'Tampilkan'" :aria-pressed="showPassword.toString()"></button>
                 </div>
                 <p x-show="errors.password" x-text="errors.password" class="{{ $errorClass }}"></p>
             </div>
@@ -69,11 +69,11 @@
                 </div>
 
                 <div>
-                    <label for="edit-division" class="{{ $labelClass }}">Division</label>
+                    <label for="edit-division" class="{{ $labelClass }}">Divisi</label>
                     <div class="relative">
                         <select id="edit-division" x-model="form.division_id" @change="errors.division_id = null"
                             class="{{ $selectClass }}" :class="errors.division_id && 'border-red-500!'">
-                            <option value="">No Division</option>
+                            <option value="">Tanpa Divisi</option>
                             <template x-for="division in divisions" :key="division.id">
                                 <option :value="division.id" x-text="division.name" :selected="division.id == form.division_id"></option>
                             </template>
@@ -87,8 +87,8 @@
             <p x-show="formError" x-text="formError" class="text-xs text-red-600"></p>
 
             <div class="flex flex-col-reverse gap-2 border-t border-line pt-4 sm:flex-row sm:justify-end">
-                <button type="button" class="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-line bg-white px-3 text-sm font-semibold text-ink hover:bg-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:opacity-50" @click="closeModal()">Cancel</button>
-                <button type="submit" :disabled="saving" class="inline-flex h-9 items-center justify-center gap-2 rounded-lg bg-primary px-4 text-sm font-semibold text-white hover:bg-primary-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-50" x-text="saving ? 'Saving…' : 'Save Changes'"></button>
+                <button type="button" class="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-line bg-white px-3 text-sm font-semibold text-ink hover:bg-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:opacity-50" @click="closeModal()">Batal</button>
+                <button type="submit" :disabled="saving" class="inline-flex h-9 items-center justify-center gap-2 rounded-lg bg-primary px-4 text-sm font-semibold text-white hover:bg-primary-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-50" x-text="saving ? 'Menyimpan…' : 'Simpan Perubahan'"></button>
             </div>
         </form>
     </div>

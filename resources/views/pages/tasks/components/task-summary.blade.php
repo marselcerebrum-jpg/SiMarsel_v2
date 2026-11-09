@@ -1,12 +1,12 @@
 {{-- Ringkasan TASK-09: empat metrik utama dalam satu baris ringkas + informasi tambahan satu baris.
-     Dihitung dari daftar tugas yang sama dengan Board/Table dan mengikuti filter aktif.
+     Dihitung dari daftar tugas yang sama dengan Papan/Tabel dan mengikuti filter aktif.
      Jumlah per status hanya tampil di kolom Board agar tidak berulang. --}}
 @php
     $primary = [
-        ['key' => 'total', 'label' => 'Total Tasks', 'hint' => 'Semua tugas dalam cakupan & filter', 'tone' => 'text-ink'],
-        ['key' => 'in_progress', 'label' => 'In Progress', 'hint' => 'Tugas berstatus On Process', 'tone' => 'text-amber-700'],
-        ['key' => 'overdue', 'label' => 'Overdue', 'hint' => 'Tugas aktif yang melewati deadline', 'tone' => 'text-red-700'],
-        ['key' => 'due_today', 'label' => 'Due Today', 'hint' => 'Tugas aktif dengan deadline hari ini', 'tone' => 'text-sky-700'],
+        ['key' => 'total', 'label' => 'Total Tugas', 'hint' => 'Semua tugas dalam cakupan & filter', 'tone' => 'text-ink'],
+        ['key' => 'in_progress', 'label' => 'Sedang Berjalan', 'hint' => 'Tugas berstatus On Process', 'tone' => 'text-amber-700'],
+        ['key' => 'overdue', 'label' => 'Terlambat', 'hint' => 'Tugas aktif yang melewati deadline', 'tone' => 'text-red-700'],
+        ['key' => 'due_today', 'label' => 'Jatuh Tempo Hari Ini', 'hint' => 'Tugas aktif dengan deadline hari ini', 'tone' => 'text-sky-700'],
     ];
 @endphp
 
@@ -29,9 +29,9 @@
         </p>
         <p x-show="status === 'ready'" x-cloak>
             Completed <span class="font-semibold text-ink tabular-nums" x-text="summary.completed"></span>
-            <span class="text-line">|</span> Unfinished <span class="font-semibold text-ink tabular-nums" x-text="summary.unfinished"></span>
+            <span class="text-line">|</span> Belum Selesai <span class="font-semibold text-ink tabular-nums" x-text="summary.unfinished"></span>
             <span class="text-line">|</span> Urgent <span class="font-semibold text-red-700 tabular-nums" x-text="summary.urgent"></span>
-            <span class="text-line">|</span> Completion rate <span class="font-semibold text-ink tabular-nums" x-text="`${summary.completion_rate.toLocaleString('id-ID')}%`"></span>
+            <span class="text-line">|</span> Tingkat penyelesaian <span class="font-semibold text-ink tabular-nums" x-text="`${summary.completion_rate.toLocaleString('id-ID')}%`"></span>
         </p>
         <p x-show="status === 'error'" x-cloak class="text-red-600">Ringkasan tidak dapat dihitung karena daftar tugas gagal dimuat.</p>
     </div>

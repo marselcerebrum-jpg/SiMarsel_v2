@@ -1,9 +1,9 @@
 @php
     $columns = [
-        ['label' => 'Time Range', 'class' => ''],
-        ['label' => 'Hours', 'class' => ''],
-        ['label' => 'Transactions', 'class' => 'text-right'],
-        ['label' => 'Share (%)', 'class' => 'text-right'],
+        ['label' => 'Rentang Waktu', 'class' => ''],
+        ['label' => 'Jam', 'class' => ''],
+        ['label' => 'Transaksi', 'class' => 'text-right'],
+        ['label' => 'Porsi (%)', 'class' => 'text-right'],
     ];
 
     $dot = 'size-3 shrink-0 rounded-full';
@@ -16,7 +16,7 @@
 >
     <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
-            <h2 id="performance-purchase-time-title" class="text-base font-semibold text-ink">Purchase Time</h2>
+            <h2 id="performance-purchase-time-title" class="text-base font-semibold text-ink">Waktu Pembelian</h2>
             <p class="mt-1 text-sm text-muted">Distribusi jumlah transaksi berdasarkan rentang waktu pembelian sesuai filter aktif.</p>
         </div>
     </div>
@@ -45,7 +45,7 @@
                 class="inline-flex h-9 items-center justify-center rounded-lg border border-line bg-white px-3 text-sm font-semibold text-ink hover:bg-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
                 @click="retryPurchaseTime()"
             >
-                Reload
+                Muat Ulang
             </button>
         </div>
     </div>
@@ -66,7 +66,7 @@
             {{-- Table: tablet and larger --}}
             <div class="hidden overflow-x-auto md:block">
                 <table class="w-full min-w-[480px] text-left text-sm">
-                    <caption class="sr-only">Purchase time distribution</caption>
+                    <caption class="sr-only">Distribusi waktu pembelian</caption>
                     <thead class="bg-soft text-xs font-semibold text-label">
                         <tr>
                             @foreach ($columns as $column)
@@ -107,7 +107,7 @@
             </div>
 
             {{-- Legend list: phones --}}
-            <ul class="divide-y divide-line md:hidden" aria-label="Purchase time distribution">
+            <ul class="divide-y divide-line md:hidden" aria-label="Distribusi waktu pembelian">
                 <template x-for="(row, index) in purchaseTimeRows" :key="row.key">
                     <li class="flex items-center gap-3 px-4 py-3" @click="highlightPurchaseTime(index)">
                         <span class="{{ $dot }}" :style="{ backgroundColor: row.color }" aria-hidden="true"></span>
@@ -122,7 +122,7 @@
                     </li>
                 </template>
                 <li class="flex items-center justify-between bg-soft/60 px-4 py-3 text-sm font-bold text-ink">
-                    <span>Total Transactions</span>
+                    <span>Total Transaksi</span>
                     <span class="performance-value" x-text="purchaseTimeTotal"></span>
                 </li>
             </ul>

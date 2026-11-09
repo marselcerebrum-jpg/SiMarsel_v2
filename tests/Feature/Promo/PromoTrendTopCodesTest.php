@@ -149,7 +149,7 @@ class PromoTrendTopCodesTest extends TestCase
         $this->assertSame([2, 1], [$this->datasets($daily)['total_transactions'][0], $this->datasets($daily)['promo_transactions'][0]]);
 
         $monthly = $this->trend('?date_from=2026-08-20&date_to=2026-10-05&period=monthly');
-        $this->assertSame(['Aug 2026', 'Sep 2026', 'Oct 2026'], $monthly['labels']);
+        $this->assertSame(['Agu 2026', 'Sep 2026', 'Okt 2026'], $monthly['labels']);
         $this->assertEquals([0, 4, 1], $this->datasets($monthly)['promo_transactions']);
         $this->assertSame('2026-10-05', $monthly['rows'][2]['period_end']);
     }
