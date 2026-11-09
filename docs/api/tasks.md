@@ -2,13 +2,13 @@
 
 Kontrak data untuk halaman **Tasklist** (`/tasks`): Board, Table, ringkasan, Timeline, Calendar, detail tugas, pembuatan tugas, penugasan PIC, workflow status, evidence, review, dan histori (TASK-01 s.d. TASK-11).
 
-**Status: Board/Table terintegrasi dengan backend.** `GET /api/tasks/meta`, `GET /api/tasks`, `GET /api/tasks/{id}`, dan `PATCH /api/tasks/{id}/status` dipanggil langsung. Filter pencarian, divisi, prioritas, dan status dikirim ke API daftar tugas. Endpoint Tasklist tambahan tetap dinonaktifkan sampai tersedia; isi `VITE_TASK_API_READY=true` untuk mengaktifkannya setelah implementasi backend-nya siap.
+**Status: Board/Table dan pembuatan tugas terintegrasi dengan backend.** `GET /api/tasks/meta`, `GET /api/tasks`, `GET /api/tasks/create-options`, `POST /api/tasks`, `GET /api/tasks/{id}`, dan `PATCH /api/tasks/{id}/status` dipanggil langsung. Filter daftar tugas dikirim ke API; endpoint Tasklist tambahan tetap dinonaktifkan sampai tersedia.
 
 Wajib login. Header dan kode error umum mengikuti [authentication.md](authentication.md). Tanggal memakai format `YYYY-MM-DD`; waktu memakai ISO 8601.
 
 ## Role & cakupan data
 
-Role Tasklist berasal dari `GET /api/tasks/meta`. Sebelum endpoint itu ada, frontend memetakan `MGR` → `manager`, `EMP` → `staff`, dan `ADM` → `admin`. Role Admin belum ada di tabel `roles`.
+Role dan kewenangan membuat tugas berasal dari `GET /api/tasks/meta`. Jika pemuatan meta gagal, frontend memakai pemetaan role akun `MGR` → `manager`, `EMP` → `staff`, dan `ADM` → `admin`.
 
 | Role | Melihat | Membuat | Edit & PIC | Review |
 |---|---|---|---|---|
@@ -51,11 +51,12 @@ Backend **wajib** menerapkan cakupan ini di setiap endpoint. Staff yang mengubah
 
 | Method & path | Body / query | Respons |
 |---|---|---|
-| `GET /api/tasks/meta` | – | `{ data: { role, division, can_create, divisions: [{ code_division, name }], categories: [{ id, name, requires_review }], platforms: [{ slug, name }] } }` |
-| `GET /api/tasks` | `division` (opsional) | `{ data: [Task] }`, semua tugas dalam cakupan user. Pencarian, filter prioritas/status, sort, dan pagination dilakukan di frontend. |
-| `POST /api/tasks` | `title`*, `description`, `category_id`, `division`*, `pic_id`, `platform`, `priority`*, `start_date`, `deadline`, `status`* (`backlog`\|`todo`), `requires_review`, `evidence_required`, `client_request_id`* | `201 { data: Task, message }` |
+| `GET /api/tasks/meta` | – | `{ data: { role, division, default_division, can_create, divisions, statuses, priorities } }` |
+| `GET /api/tasks` | `search`, `division`, `priority`, `status` (opsional) | `{ data: [Task] }`, semua tugas dalam cakupan user; tiap filter juga diterapkan backend. |
+| `GET /api/tasks/create-options` | – | Pilihan divisi sesuai kewenangan, PIC per divisi, kategori/aturan QA, platform, prioritas, status awal, dan default form. Admin/Manajer saja. |
+| `POST /api/tasks` | `title`*, `description`, `category_id`, `division_id`*, `pic_id`, `platform_id`, `priority`, `start_date`, `deadline`, `status`, `requires_review`, `evidence_required` | `201 { data: TaskDetail, message }`; Admin/Manajer saja. Field pembuat ditentukan dari akun yang login. |
 | `GET /api/tasks/{id}` | – | `{ data: TaskDetail }` |
-| `PATCH /api/tasks/{id}` | `title`, `description`, `category_id`, `platform`, `priority`, `start_date`, `deadline`, `updated_at`* | `{ data: TaskDetail, message }` |
+| `PATCH /api/tasks/{id}` | `title`, `description`, `category_id`, `platform_id`, `priority`, `start_date`, `deadline`, `version`* | `{ data: TaskDetail, message }` |
 | `PATCH /api/tasks/{id}/status` | `status`*, `version`* | `{ data: TaskDetail, message }`; `422` dengan alasan di `errors.status` bila transisi ditolak; `409 { message, current_version }` bila `version` sudah usang |
 | `PATCH /api/tasks/{id}/assignee` | `pic_id`*, `note`, `updated_at`* | `{ data: TaskDetail, message }` |
 | `GET /api/tasks/assignees` | `division` | `{ data: [{ id, fullname, division }] }`, hanya user yang memenuhi aturan penugasan |

@@ -35,13 +35,13 @@
 
                 <div>
                     <label for="create-task-category" class="{{ $labelClass }}">Kategori / Jenis Tugas</label>
-                    <select id="create-task-category" x-model="form.category_id" class="{{ $inputClass }}" :disabled="!categories.length">
+                    <select id="create-task-category" x-model="form.category_id" class="{{ $inputClass }}" :disabled="optionsState !== 'ready'">
                         <option value="">Pilih kategori</option>
                         <template x-for="category in categories" :key="category.id">
                             <option :value="category.id" x-text="category.name"></option>
                         </template>
                     </select>
-                    <p x-show="!categories.length" class="{{ $helperClass }} text-amber-800">Menunggu Back End: master kategori tugas belum tersedia.</p>
+                    <p x-show="optionsState === 'ready' && !categories.length" class="{{ $helperClass }}">Belum ada kategori tugas.</p>
                 </div>
 
                 <div>
@@ -54,10 +54,10 @@
 
                 <div>
                     <label for="create-task-platform" class="{{ $labelClass }}">Platform</label>
-                    <select id="create-task-platform" x-model="form.platform" class="{{ $inputClass }}">
+                    <select id="create-task-platform" x-model="form.platform_id" class="{{ $inputClass }}" :disabled="optionsState !== 'ready'">
                         <option value="">Tidak terkait platform</option>
-                        <template x-for="platform in platforms" :key="platform.slug">
-                            <option :value="platform.slug" x-text="platform.name"></option>
+                        <template x-for="platform in platforms" :key="platform.id">
+                            <option :value="platform.id" x-text="platform.name"></option>
                         </template>
                     </select>
                     <p class="{{ $helperClass }}">Isi apabila tugas terkait platform tertentu.</p>
@@ -66,7 +66,7 @@
                 <div>
                     <label for="create-task-priority" class="{{ $labelClass }}">Prioritas {!! $required !!}</label>
                     <select id="create-task-priority" x-model="form.priority" class="{{ $inputClass }}">
-                        <template x-for="priority in priorities" :key="priority.key">
+                        <template x-for="priority in taskPriorities" :key="priority.key">
                             <option :value="priority.key" x-text="priority.label" :selected="form.priority === priority.key"></option>
                         </template>
                     </select>
@@ -79,27 +79,26 @@
 
                 <div>
                     <label for="create-task-division" class="{{ $labelClass }}">Target Divisi {!! $required !!}</label>
-                    <select id="create-task-division" x-model="form.division" class="{{ $inputClass }}" :class="errors.division && 'border-red-500!'" :disabled="user.role === 'manager'" @change="errors.division = null">
+                    <select id="create-task-division" x-model="form.division_id" class="{{ $inputClass }}" :class="errors.division_id && 'border-red-500!'" :disabled="optionsState !== 'ready' || user.role === 'manager'" @change="errors.division_id = null">
                         <option value="">Pilih divisi</option>
-                        <template x-for="division in creatableDivisions" :key="division.code_division">
-                            <option :value="division.code_division" x-text="division.name" :selected="form.division === division.code_division"></option>
+                        <template x-for="division in creatableDivisions" :key="division.id">
+                            <option :value="division.id" x-text="division.name"></option>
                         </template>
                     </select>
-                    <p x-show="!errors.division" class="{{ $helperClass }}"
+                    <p x-show="!errors.division_id" class="{{ $helperClass }}"
                         :class="user.role === 'manager' && !creatableDivisions.length && 'text-amber-800'"
                         x-text="user.role === 'admin' ? 'Admin dapat memilih semua divisi.' : (creatableDivisions.length ? 'Manajer hanya membuat tugas untuk divisinya.' : 'Akun Anda belum memiliki divisi. Hubungi Admin untuk menetapkan divisi.')"></p>
-                    <p x-show="errors.division" x-text="errors.division" class="{{ $errorClass }}"></p>
+                    <p x-show="errors.division_id" x-text="errors.division_id" class="{{ $errorClass }}"></p>
                 </div>
 
                 <div>
                     <label for="create-task-pic" class="{{ $labelClass }}">PIC</label>
                     <select id="create-task-pic" x-model="form.pic_id" class="{{ $inputClass }}" :class="errors.pic_id && 'border-red-500!'" :disabled="assigneeState !== 'ready'" @change="errors.pic_id = null">
-                        <option value="" x-text="{ idle: 'Pilih divisi terlebih dahulu', loading: 'Memuat PIC…', unavailable: 'Belum tersedia', error: 'Gagal memuat PIC', ready: 'Pilih PIC' }[assigneeState]"></option>
+                        <option value="" x-text="{ idle: 'Pilih divisi terlebih dahulu', loading: 'Memuat pilihan…', error: 'Pilihan gagal dimuat', ready: 'Pilih PIC', empty: 'Belum ada Staff di divisi ini' }[assigneeState]"></option>
                         <template x-for="person in assignees" :key="person.id">
                             <option :value="person.id" x-text="person.fullname"></option>
                         </template>
                     </select>
-                    <p x-show="assigneeState === 'unavailable' && !errors.pic_id" class="{{ $helperClass }} text-amber-800">Menunggu Back End: daftar PIC sesuai aturan penugasan belum tersedia.</p>
                     <p x-show="errors.pic_id" x-text="errors.pic_id" class="{{ $errorClass }}"></p>
                 </div>
 
@@ -129,12 +128,18 @@
                 </div>
             </fieldset>
 
+            <div x-show="optionsState === 'loading'" class="rounded-lg border border-line bg-soft px-3 py-2 text-xs text-muted" role="status">Memuat pilihan divisi, kategori, dan PIC…</div>
+            <div x-show="optionsState === 'error'" class="flex items-center justify-between gap-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700" role="alert">
+                <span x-text="optionsError"></span>
+                <button type="button" class="shrink-0 font-semibold underline" @click="loadOptions()">Coba Lagi</button>
+            </div>
+
             <p x-show="formError" x-text="formError" class="rounded-lg border px-3 py-2 text-xs" role="alert"
                 :class="formPending ? 'border-amber-200 bg-amber-50 text-amber-900' : 'border-red-200 bg-red-50 text-red-700'"></p>
 
             <div class="flex flex-col-reverse gap-2 border-t border-line pt-4 sm:flex-row sm:justify-end">
                 <button type="button" class="{{ $button }}" :disabled="saving" @click="createOpen = false">Batal</button>
-                <button type="submit" class="{{ $primaryButton }}" :disabled="saving">
+                <button type="submit" class="{{ $primaryButton }}" :disabled="saving || optionsState !== 'ready'">
                     <span x-text="saving ? 'Menyimpan…' : 'Simpan Tugas'">Simpan Tugas</span>
                 </button>
             </div>

@@ -11,6 +11,7 @@ import {
     fetchEvidences,
     fetchSchedule,
     fetchTask,
+    fetchTaskCreateOptions,
     fetchTaskMeta,
     fetchTasks,
     reviewTask,
@@ -501,9 +502,9 @@ const emptyTask = () => ({
     title: '',
     description: '',
     category_id: '',
-    division: '',
+    division_id: '',
     pic_id: '',
-    platform: '',
+    platform_id: '',
     priority: 'medium',
     start_date: '',
     deadline: '',
@@ -516,31 +517,73 @@ Alpine.data('taskCreateForm', () => ({
     formError: '',
     formPending: false,
     saving: false,
-    requestId: null,
 
+    divisions: [],
+    categories: [],
+    platforms: [],
+    taskPriorities: [],
     assignees: [],
-    assigneeState: 'idle',
+    optionsState: 'idle',
+    optionsError: '',
+    optionsRequest: 0,
 
     init() {
-        this.$watch('createOpen', (open) => open && this.reset());
-        this.$watch('form.division', (division) => {
+        this.$watch('createOpen', (open) => {
+            if (!open) return;
+            this.reset();
+            this.loadOptions();
+        });
+        this.$watch('form.division_id', (divisionId) => {
             this.form.pic_id = '';
-            this.loadAssignees(division);
+            this.assignees = this.creatableDivisions.find((division) => String(division.id) === String(divisionId))?.pics ?? [];
         });
     },
 
     reset() {
-        this.form = { ...emptyTask(), division: this.user.role === 'manager' ? (this.user.division ?? '') : '' };
+        this.form = emptyTask();
         this.errors = {};
         this.formError = '';
-        // Satu ID per pengisian form: pengiriman berulang dikenali backend sebagai permintaan yang sama.
-        this.requestId = crypto.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+        this.formPending = false;
+        this.optionsError = '';
         this.$nextTick(() => this.$refs.createTitle?.focus());
+    },
+
+    async loadOptions() {
+        const request = ++this.optionsRequest;
+        this.optionsState = 'loading';
+        this.optionsError = '';
+
+        try {
+            const { data } = await fetchTaskCreateOptions();
+            if (request !== this.optionsRequest || !this.createOpen) return;
+
+            this.divisions = data.divisions;
+            this.categories = data.categories;
+            this.platforms = data.platforms;
+            this.taskPriorities = data.priorities.map(({ value, label }) => ({ key: value, label }));
+            this.optionsState = 'ready';
+
+            if (this.user.role === 'manager') {
+                this.form.division_id = this.creatableDivisions.find((division) => division.code_division === this.user.division)?.id ?? '';
+            }
+        } catch (error) {
+            if (request !== this.optionsRequest) return;
+
+            this.optionsState = 'error';
+            this.optionsError = taskErrorMessage(error, 'Gagal memuat pilihan pembuatan tugas.');
+        }
     },
 
     // Admin: semua divisi. Manajer: hanya divisi yang dikelolanya.
     get creatableDivisions() {
-        return this.divisionOptions;
+        return this.divisions;
+    },
+
+    get assigneeState() {
+        if (this.optionsState !== 'ready') return this.optionsState;
+        if (!this.form.division_id) return 'idle';
+
+        return this.assignees.length ? 'ready' : 'empty';
     },
 
     get selectedCategory() {
@@ -552,31 +595,13 @@ Alpine.data('taskCreateForm', () => ({
         return this.selectedCategory ? Boolean(this.selectedCategory.requires_review) : null;
     },
 
-    async loadAssignees(division) {
-        this.assignees = [];
-        if (!division) {
-            this.assigneeState = 'idle';
-            return;
-        }
-
-        this.assigneeState = 'loading';
-
-        try {
-            const { data } = await fetchAssignees(division);
-            this.assignees = data;
-            this.assigneeState = 'ready';
-        } catch (error) {
-            this.assigneeState = error?.unavailable ? 'unavailable' : 'error';
-        }
-    },
-
     validate() {
         const errors = {};
-        const { title, division, status, pic_id, start_date, deadline } = this.form;
+        const { title, division_id, status, pic_id, start_date, deadline } = this.form;
 
         if (!title.trim()) errors.title = 'Judul tugas wajib diisi.';
         else if (title.trim().length > 150) errors.title = 'Judul tugas maksimal 150 karakter.';
-        if (!division) errors.division = 'Target divisi wajib dipilih.';
+        if (!division_id) errors.division_id = 'Target divisi wajib dipilih.';
         if (status === 'todo' && !pic_id) errors.pic_id = 'Tugas berstatus To Do wajib memiliki PIC.';
         if (start_date && deadline && deadline < start_date) errors.deadline = 'Deadline tidak boleh sebelum tanggal mulai.';
 
@@ -586,7 +611,7 @@ Alpine.data('taskCreateForm', () => ({
     },
 
     async submit() {
-        if (this.saving || !this.validate()) return;
+        if (this.saving || this.optionsState !== 'ready' || !this.validate()) return;
 
         this.saving = true;
         this.formError = '';
@@ -598,7 +623,6 @@ Alpine.data('taskCreateForm', () => ({
                 title: this.form.title.trim(),
                 description: this.form.description.trim(),
                 requires_review: this.requiresReview,
-                client_request_id: this.requestId,
             });
             this.syncTask(data);
             this.createOpen = false;
