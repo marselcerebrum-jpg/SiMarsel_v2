@@ -51,8 +51,8 @@ Backend **wajib** menerapkan cakupan ini di setiap endpoint. Staff yang mengubah
 
 | Method & path | Body / query | Respons |
 |---|---|---|
-| `GET /api/tasks/meta` | – | `{ data: { role, division, can_create, divisions: [{ code_division, name }], categories: [{ id, name, requires_review }], platforms: [{ slug, name }] } }` |
-| `GET /api/tasks` | `division` (opsional) | `{ data: [Task] }`, semua tugas dalam cakupan user. Pencarian, filter prioritas/status, sort, dan pagination dilakukan di frontend. |
+| `GET /api/tasks/meta` | – | `{ data: { role, division, default_division, divisions: [{ code_division, name }], statuses: [{ value, label }], priorities: [{ value, label }] } }` |
+| `GET /api/tasks` | `search`, `division`, `priority`, `status`, `sort`, `direction`, `per_page`, `page` (semua opsional) | `{ data: [Task], meta: { status_counts } }`, tugas dalam cakupan user. Tanpa `per_page` semua tugas dikembalikan sekaligus; Board/Table mengirim filter ke server dan mengurutkan serta mempaginasi di frontend. |
 | `POST /api/tasks` | `title`*, `description`, `category_id`, `division`*, `pic_id`, `platform`, `priority`*, `start_date`, `deadline`, `status`* (`backlog`\|`todo`), `requires_review`, `evidence_required`, `client_request_id`* | `201 { data: Task, message }` |
 | `GET /api/tasks/{id}` | – | `{ data: TaskDetail }` |
 | `PATCH /api/tasks/{id}` | `title`, `description`, `category_id`, `platform`, `priority`, `start_date`, `deadline`, `updated_at`* | `{ data: TaskDetail, message }` |

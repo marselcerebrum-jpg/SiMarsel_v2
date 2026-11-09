@@ -153,7 +153,8 @@ Alpine.data('tasklist', () => ({
             this.user = userContext(Alpine.store('session').user, data);
             this.divisions = data.divisions ?? [];
             this.categories = data.categories ?? [];
-            this.platforms = data.platforms ?? [];
+            if (data.platforms) this.platforms = data.platforms;
+            else await this.loadPlatforms();
             this.filters.division = this.defaultDivision();
         } catch {
             // Meta tugas menunggu backend: pakai master divisi & platform yang sudah tersedia.
@@ -203,7 +204,7 @@ Alpine.data('tasklist', () => ({
     },
 
     get canCreate() {
-        return this.meta ? Boolean(this.meta.can_create) : this.user.role !== 'staff';
+        return this.meta?.can_create ?? this.user.role !== 'staff';
     },
 
     get hasActiveFilter() {
@@ -482,7 +483,7 @@ Alpine.data('tasklist', () => ({
         try {
             const { data, message } = transition.review === 'approve'
                 ? await reviewTask(task.id, { decision: 'approve', updated_at: task.updated_at })
-                : await changeTaskStatus(task.id, { status: transition.to, updated_at: task.updated_at });
+                : await changeTaskStatus(task.id, { status: transition.to, version: task.version });
             this.syncTask(data);
             showToast({ title: 'Status diperbarui', text: message ?? `${task.title} → ${statusOf(transition.to).label}` });
         } catch (error) {
@@ -842,7 +843,7 @@ Alpine.data('taskDetail', () => ({
         this.acting = transition.to;
 
         try {
-            const { data, message } = await changeTaskStatus(this.task.id, { status: transition.to, updated_at: this.task.updated_at });
+            const { data, message } = await changeTaskStatus(this.task.id, { status: transition.to, version: this.task.version });
             this.applyTask(data);
             showToast({ title: 'Status diperbarui', text: message ?? `Status menjadi ${statusOf(transition.to).label}.` });
         } catch (error) {
