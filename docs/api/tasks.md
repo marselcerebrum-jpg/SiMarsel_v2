@@ -2,7 +2,7 @@
 
 Kontrak data untuk halaman **Tasklist** (`/tasks`): Board, Table, ringkasan, Timeline, Calendar, detail tugas, pembuatan tugas, penugasan PIC, workflow status, evidence, review, dan histori (TASK-01 s.d. TASK-11).
 
-**Status: frontend selesai, backend belum dibuat.** Semua panggilan API ada di `resources/js/services/tasks.js`. Selama `VITE_TASK_API_READY` bukan `true`, frontend tidak memanggil server dan menampilkan keterangan "Menunggu Back End". Setelah endpoint di bawah tersedia, isi `VITE_TASK_API_READY=true` di `.env` lalu jalankan `npm run build`.
+**Status: Board/Table terintegrasi dengan backend.** `GET /api/tasks/meta`, `GET /api/tasks`, `GET /api/tasks/{id}`, dan `PATCH /api/tasks/{id}/status` dipanggil langsung. Filter pencarian, divisi, prioritas, dan status dikirim ke API daftar tugas. Endpoint Tasklist tambahan tetap dinonaktifkan sampai tersedia; isi `VITE_TASK_API_READY=true` untuk mengaktifkannya setelah implementasi backend-nya siap.
 
 Wajib login. Header dan kode error umum mengikuti [authentication.md](authentication.md). Tanggal memakai format `YYYY-MM-DD`; waktu memakai ISO 8601.
 
