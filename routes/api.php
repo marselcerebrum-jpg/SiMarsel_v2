@@ -203,6 +203,14 @@ Route::middleware('auth')->group(function () {
             ->whereNumber(['task', 'evidence'])
             ->can('view', 'task')
             ->name('evidences.download');
+        Route::get('/{task}/reviews', [TaskController::class, 'reviews'])
+            ->whereNumber('task')
+            ->can('view', 'task')
+            ->name('reviews.index');
+        Route::post('/{task}/reviews', [TaskController::class, 'review'])
+            ->whereNumber('task')
+            ->can('review', 'task')
+            ->name('reviews.store');
         Route::get('/{task}/assignment-options', [TaskController::class, 'assignmentOptions'])
             ->whereNumber('task')
             ->can('assign', 'task')

@@ -2,9 +2,11 @@
 
 namespace App\Http\Controllers\Task;
 
+use App\Enums\TaskReviewDecision;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Task\AssignTaskRequest;
 use App\Http\Requests\Task\ChangeTaskStatusRequest;
+use App\Http\Requests\Task\ReviewTaskRequest;
 use App\Http\Requests\Task\StoreTaskEvidenceRequest;
 use App\Http\Requests\Task\StoreTaskRequest;
 use App\Http\Requests\Task\TaskListRequest;
@@ -14,9 +16,11 @@ use App\Http\Resources\ScheduleItemResource;
 use App\Http\Resources\TaskDetailResource;
 use App\Http\Resources\TaskEvidenceResource;
 use App\Http\Resources\TaskResource;
+use App\Http\Resources\TaskReviewResource;
 use App\Models\Task;
 use App\Models\TaskEvidence;
 use App\Services\TaskEvidenceService;
+use App\Services\TaskReviewService;
 use App\Services\TaskScheduleService;
 use App\Services\TaskService;
 use Illuminate\Http\JsonResponse;
@@ -107,6 +111,23 @@ class TaskController extends Controller
         $task = $this->taskService->changeStatus($request->user(), $task, $request->validated());
 
         return TaskDetailResource::make($task)->additional(['message' => 'Status tugas berhasil diperbarui.']);
+    }
+
+    public function reviews(Task $task, TaskReviewService $service): AnonymousResourceCollection
+    {
+        return TaskReviewResource::collection($service->list($task));
+    }
+
+    public function review(ReviewTaskRequest $request, Task $task, TaskReviewService $service): TaskDetailResource
+    {
+        $data = $request->validated();
+        $task = $service->decide($request->user(), $task, $data);
+
+        $message = $data['decision'] === TaskReviewDecision::Approve->value
+            ? 'Tugas berhasil disetujui.'
+            : 'Permintaan revisi berhasil dikirim.';
+
+        return TaskDetailResource::make($task)->additional(['message' => $message]);
     }
 
     public function assignmentOptions(Request $request, Task $task): JsonResponse
