@@ -21,6 +21,39 @@ export async function http(url, { method = 'GET', body } = {}) {
     return data;
 }
 
+/**
+ * File name from a Content-Disposition header, e.g. `attachment; filename=report.xlsx`.
+ */
+export function dispositionFileName(disposition) {
+    const encoded = /filename\*=UTF-8''([^;]+)/i.exec(disposition ?? '');
+    if (encoded) return decodeURIComponent(encoded[1]);
+
+    return /filename="?([^";]+)"?/i.exec(disposition ?? '')?.[1]?.trim() || null;
+}
+
+/**
+ * GET a file download. Success resolves { blob, fileName }; failures throw { status, data } like http(),
+ * since the backend answers errors as JSON.
+ */
+export async function httpBlob(url) {
+    const response = await fetch(url, {
+        headers: {
+            'Accept': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
+            'X-CSRF-TOKEN': token,
+        },
+    });
+
+    if (!response.ok) {
+        throw { status: response.status, data: await response.json().catch(() => ({})) };
+    }
+
+    return {
+        blob: await response.blob(),
+        fileName: dispositionFileName(response.headers.get('Content-Disposition')),
+    };
+}
+
 export function errorMessage(error, fallback = 'Terjadi kesalahan. Silakan coba lagi.') {
     // Laravel's default 403/404 messages are English and may name model classes.
     if (error?.status === 403) return 'Anda tidak memiliki akses untuk tindakan ini.';
