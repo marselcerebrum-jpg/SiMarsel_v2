@@ -22,6 +22,8 @@ class TaskActivity extends Model
 
     public const STATUS_CHANGED = 'status_changed';
 
+    public const EVIDENCE_SUBMITTED = 'evidence_submitted';
+
     public const UPDATED_AT = null;
 
     /**
