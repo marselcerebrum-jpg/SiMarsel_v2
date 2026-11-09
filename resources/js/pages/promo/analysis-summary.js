@@ -1,6 +1,7 @@
 import { errorMessage, validationErrors } from '../../http';
 import { formatValue, trendBadge } from '../../format';
 import { fetchAnalysisSummary } from './api';
+import { SUMMARY_COLUMNS, copySnapshot } from './analysis-copy';
 
 /**
  * Up/down change against the previous period, or null when the previous value is 0 or null:
@@ -15,9 +16,10 @@ export function comparison(metric) {
 
 /**
  * KPI cards for the active promo analysis filter, compared with the equivalent previous period.
- * Every value and comparison comes from GET /api/promo-analysis/summary.
+ * Every value and comparison comes from GET /api/promo-analysis/summary. `metrics` are the cards
+ * ({ key, label }) in page order, which Copy also follows.
  */
-export default function promoAnalysisSummary() {
+export default function promoAnalysisSummary(metrics = []) {
     return {
         query: null,
         summary: null,
@@ -75,6 +77,19 @@ export default function promoAnalysisSummary() {
 
         retry() {
             this.load(this.query);
+        },
+
+        provideCopy(detail) {
+            if (detail.target !== 'summary') return;
+
+            const rows = this.summary
+                ? metrics.map(({ key, label }) => ({
+                    label,
+                    value: this.kpis[key]?.value,
+                    change: this.comparison(key) ? this.kpis[key].change_percentage : null,
+                }))
+                : [];
+            detail.snapshot = copySnapshot(this, SUMMARY_COLUMNS, rows);
         },
     };
 }

@@ -1,4 +1,5 @@
 import { errorMessage, validationErrors } from '../../http';
+import { SOURCE_COLUMNS, copySnapshot } from './analysis-copy';
 import { formatValue } from '../../format';
 import { fetchAnalysisSources } from './api';
 
@@ -71,6 +72,10 @@ export default function promoAnalysisSource() {
 
         retry() {
             return this.load(this.query);
+        },
+
+        provideCopy(detail) {
+            if (detail.target === 'source') detail.snapshot = copySnapshot(this, SOURCE_COLUMNS, this.rows);
         },
     };
 }

@@ -40,6 +40,9 @@ class TaskDetailResource extends TaskResource
             ] : null,
             'evidence' => TaskEvidenceResource::collection($this->whenLoaded('evidences', fn () => $this->evidences, [])),
             'history' => TaskActivityResource::collection($this->whenLoaded('activities', fn () => $this->activities, [])),
+            'reviews' => TaskReviewResource::collection($this->whenLoaded('reviews', fn () => $this->reviews, [])),
+            'last_review' => $this->whenLoaded('reviews', fn () => $this->reviews->isEmpty() ? null : TaskReviewResource::make($this->reviews->first()), null),
+            'can_review' => $this->resource->awaitsDecisionFrom($request->user()),
             'editable_fields' => $editableFields,
             'next_statuses' => in_array('status', $editableFields, true)
                 ? collect($this->resource->nextStatusesFor($request->user()))

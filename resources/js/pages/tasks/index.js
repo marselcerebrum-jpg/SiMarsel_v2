@@ -12,6 +12,7 @@ import {
     fetchTaskCreateOptions,
     fetchTaskMeta,
     fetchTasks,
+    reviewTask,
     submitEvidence,
     updateTask,
 } from '../../services/tasks';
@@ -94,8 +95,6 @@ Alpine.data('tasklist', () => ({
     user: userContext(Alpine.store('session').user),
     meta: null,
     divisions: [],
-    platforms: [],
-    categories: [],
 
     tasks: [],
     status: null,
@@ -149,12 +148,10 @@ Alpine.data('tasklist', () => ({
             this.meta = data;
             this.user = userContext(Alpine.store('session').user, data);
             this.divisions = data.divisions ?? [];
-            this.categories = data.categories ?? [];
-            this.platforms = data.platforms ?? [];
             this.filters.division = this.defaultDivision();
         } catch {
-            // Meta tugas menunggu backend: pakai master divisi & platform yang sudah tersedia.
-            await Promise.all([this.loadDivisions(), this.loadPlatforms()]);
+            // Meta tugas gagal dimuat: pakai master divisi agar filter tetap tersedia.
+            await this.loadDivisions();
         }
     },
 
@@ -164,15 +161,6 @@ Alpine.data('tasklist', () => ({
             this.divisions = data.map(({ code_division, name }) => ({ code_division, name }));
         } catch {
             this.divisions = [];
-        }
-    },
-
-    async loadPlatforms() {
-        try {
-            const { data } = await http('/api/products/filters');
-            this.platforms = data.platforms ?? [];
-        } catch {
-            this.platforms = [];
         }
     },
 
@@ -200,7 +188,7 @@ Alpine.data('tasklist', () => ({
     },
 
     get canCreate() {
-        return this.meta ? Boolean(this.meta.can_create) : this.user.role !== 'staff';
+        return this.meta?.can_create ?? this.user.role !== 'staff';
     },
 
     get hasActiveFilter() {
@@ -463,21 +451,29 @@ Alpine.data('tasklist', () => ({
             return;
         }
 
+        // Revisi wajib memiliki catatan alasan: buka form review di panel detail.
+        if (rule.review === 'revision') {
+            this.openTask(task, { focus: 'revision' });
+            return;
+        }
+
         await this.moveTask(task, rule);
     },
 
-    // Semua perpindahan status, termasuk hasil review, memakai endpoint workflow yang sama.
+    // Keputusan QA (On QA → Done) memakai endpoint review; perpindahan lain memakai endpoint status.
     async moveTask(task, transition) {
         this.movingId = task.id;
 
         try {
-            const { data, message } = await changeTaskStatus(task.id, { status: transition.to, version: task.version });
+            const { data, message } = transition.review === 'approve'
+                ? await reviewTask(task.id, { decision: 'approve', version: task.version })
+                : await changeTaskStatus(task.id, { status: transition.to, version: task.version });
             this.syncTask(data);
             showToast({ title: 'Status diperbarui', text: message ?? `${task.title} → ${statusOf(transition.to).label}` });
         } catch (error) {
             if (error?.status === 422) {
                 const errors = validationErrors(error);
-                notifyFailure({ ...error, data: { ...error.data, message: errors.status ?? errors.pic_id } }, 'Status tugas gagal diperbarui.');
+                notifyFailure({ ...error, data: { ...error.data, message: errors.decision ?? errors.status ?? errors.pic_id } }, 'Status tugas gagal diperbarui.');
             } else {
                 notifyFailure(error, 'Status tugas gagal diperbarui.');
             }
@@ -650,6 +646,9 @@ Alpine.data('taskDetail', () => ({
     activityState: 'idle',
 
     editing: false,
+    reviewMode: null,
+    reviewNote: '',
+    reviewError: '',
     editForm: {},
     editErrors: {},
     editCategories: [],
@@ -676,7 +675,7 @@ Alpine.data('taskDetail', () => ({
     },
 
     reset() {
-        Object.assign(this, { task: null, state: 'idle', editing: false, evidences: [], activities: [] });
+        Object.assign(this, { task: null, state: 'idle', editing: false, reviewMode: null, reviewNote: '', reviewError: '', evidences: [], activities: [] });
     },
 
     async open(id) {
@@ -691,6 +690,7 @@ Alpine.data('taskDetail', () => ({
             this.syncDetailCollections(data);
             // Tugas yang belum ada di daftar baru masuk Board setelah detailnya dimuat.
             if (this.highlightId === data.id) this.$nextTick(() => this.revealHighlight());
+            if (this.detailFocus === 'revision' && this.task.can_review) this.startReview('revision');
             if (this.detailFocus === 'edit' && this.canEditThis) this.startEdit();
         } catch (error) {
             if (this.highlightId === id) this.highlightId = null;
@@ -754,6 +754,9 @@ Alpine.data('taskDetail', () => ({
             reassigned: 'PIC diubah',
             status_changed: 'Status tugas diperbarui',
             evidence_submitted: 'Evidence dikirim',
+            approved: 'Tugas disetujui',
+            revision_requested: 'Revisi diminta',
+            resubmitted: 'Dikirim ulang ke QA',
         })[action] ?? action;
     },
 
@@ -770,13 +773,18 @@ Alpine.data('taskDetail', () => ({
             start_date: 'Tanggal mulai',
             deadline: 'Deadline',
             requires_review: 'Kewajiban QA',
+            evidence_required: 'Wajib evidence',
+            review: 'Catatan review',
         })[field] ?? field;
     },
 
-    activityValue(value) {
+    activityValue(value, field) {
         if (value === null || value === undefined || value === '') return '-';
         if (typeof value === 'boolean') return value ? 'Ya' : 'Tidak';
-        if (typeof value === 'object') return value.name ?? JSON.stringify(value);
+        if (field === 'status') return statusOf(value).label;
+        if (field === 'priority') return priorityOf(value).label;
+        if (field === 'review') return value.note || `Review ke-${value.cycle}`;
+        if (typeof value === 'object') return value.name ?? value.fullname ?? JSON.stringify(value);
 
         return String(value);
     },
@@ -917,16 +925,22 @@ Alpine.data('taskDetail', () => ({
 
     // --- Workflow status (TASK-05) ------------------------------------------------------------
 
+    // Status tujuan mengikuti next_statuses dari backend; keputusan QA mengikuti can_review.
     get transitions() {
         if (!this.task) return [];
 
         const backendStatuses = new Set((this.task.next_statuses ?? []).map(({ value }) => value));
 
         return availableTransitions(this.task, this.user)
-            .filter(({ to }) => backendStatuses.has(to));
+            .filter((transition) => (transition.review ? this.task.can_review === true : backendStatuses.has(transition.to)));
     },
 
     async runTransition(transition) {
+        if (transition.review) {
+            this.startReview(transition.review);
+            return;
+        }
+
         this.acting = transition.to;
 
         try {
@@ -940,6 +954,49 @@ Alpine.data('taskDetail', () => ({
                 notifyFailure({ ...error, data: { ...error.data, message: errors.status ?? errors.pic_id } }, 'Status tugas gagal diperbarui.');
             } else {
                 await this.handleFailure(error, 'Status tugas gagal diperbarui.');
+            }
+        } finally {
+            this.acting = null;
+        }
+    },
+
+    // --- Review QA (TASK-07) -------------------------------------------------------------------
+
+    startReview(mode) {
+        this.reviewMode = mode;
+        this.reviewNote = '';
+        this.reviewError = '';
+        this.$nextTick(() => this.$refs.reviewNote?.focus());
+    },
+
+    async submitReview() {
+        if (this.reviewMode === 'revision' && !this.reviewNote.trim()) {
+            this.reviewError = 'Catatan alasan revisi wajib diisi.';
+            return;
+        }
+        if (this.acting) return;
+
+        const decision = this.reviewMode;
+        this.acting = decision;
+
+        try {
+            const { data, message } = await reviewTask(this.task.id, {
+                decision,
+                note: this.reviewNote.trim() || null,
+                version: this.task.version,
+            });
+            this.applyTask(data);
+            this.reviewMode = null;
+            showToast({
+                title: decision === 'revision' ? 'Revisi diminta' : 'Tugas disetujui',
+                text: message ?? `Status menjadi ${statusOf(data.status).label}.`,
+            });
+        } catch (error) {
+            if (error?.status === 422) {
+                const errors = validationErrors(error);
+                this.reviewError = errors.note ?? errors.decision ?? taskErrorMessage(error, 'Keputusan review tidak valid.');
+            } else {
+                await this.handleFailure(error, 'Keputusan review gagal disimpan.');
             }
         } finally {
             this.acting = null;
