@@ -5,7 +5,7 @@ import {
     assignTask,
     changeTaskStatus,
     createTask,
-    fetchAssignees,
+    fetchAssignmentOptions,
     fetchCalendar,
     fetchSchedule,
     fetchTask,
@@ -655,9 +655,11 @@ Alpine.data('taskDetail', () => ({
     editOptionsError: '',
     saving: false,
 
-    assignees: [],
     assigneeState: 'idle',
-    assignForm: { pic_id: '', note: '' },
+    assignmentDivisions: [],
+    canChangeAssignmentDivision: false,
+    assignmentError: '',
+    assignForm: { pic_id: '', division_id: '' },
     assigning: false,
 
     evidenceForm: { type: 'file', file: null, url: '', note: '' },
@@ -761,6 +763,20 @@ Alpine.data('taskDetail', () => ({
         return this.task ? assignmentRule(this.task, this.user) : { ok: false, reason: '' };
     },
 
+    get canAssignThis() {
+        return this.task?.can_assign === true && this.assignment.ok;
+    },
+
+    get eligibleAssignees() {
+        const division = this.assignmentDivisions.find((item) => String(item.id) === String(this.assignForm.division_id));
+
+        return (division?.pics ?? []).filter((person) => person.id !== this.task?.pic?.id);
+    },
+
+    changeAssignmentDivision() {
+        this.assignForm.pic_id = '';
+    },
+
     get canSubmitEvidence() {
         return this.isPicOfTask && ['todo', 'in_progress'].includes(this.task?.status);
     },
@@ -832,31 +848,50 @@ Alpine.data('taskDetail', () => ({
     // --- Penugasan PIC (TASK-04) ----------------------------------------------------------------
 
     async openAssign() {
-        this.assignForm = { pic_id: '', note: '' };
+        this.assignForm = { pic_id: '', division_id: '' };
+        this.assignmentError = '';
         this.assigneeState = 'loading';
 
         try {
-            const { data } = await fetchAssignees(this.task.division?.code_division);
-            this.assignees = data.filter((user) => user.id !== this.task.pic?.id);
+            const { data } = await fetchAssignmentOptions(this.task.id);
+            this.assignmentDivisions = data.divisions ?? [];
+            this.canChangeAssignmentDivision = data.can_change_division === true;
+            this.assignForm.division_id = String(data.current_division.id);
+            if (data.locked_reason) {
+                this.assignmentError = data.locked_reason;
+                this.assigneeState = 'error';
+
+                return;
+            }
             this.assigneeState = 'ready';
         } catch (error) {
-            this.assigneeState = error?.unavailable ? 'unavailable' : 'error';
+            this.assignmentError = taskErrorMessage(error, 'Daftar PIC gagal dimuat.');
+            this.assigneeState = 'error';
         }
     },
 
     async saveAssign() {
-        if (!this.assignForm.pic_id || this.assigning) return;
+        if (!this.assignForm.pic_id || !this.assignForm.division_id || this.assigning) return;
 
         this.assigning = true;
 
         try {
-            const { data, message } = await assignTask(this.task.id, { ...this.assignForm, updated_at: this.task.updated_at });
+            const { data, message } = await assignTask(this.task.id, {
+                pic_id: this.assignForm.pic_id,
+                division_id: this.assignForm.division_id,
+                version: this.task.version,
+            });
             this.applyTask(data);
             this.assigneeState = 'idle';
             showToast({ title: 'PIC diperbarui', text: message ?? `Tugas kini ditangani ${data.pic?.fullname ?? 'PIC baru'}.` });
         } catch (error) {
-            // Penugasan yang ditolak tidak mengubah PIC yang tampil: data tugas tidak disentuh.
-            await this.handleFailure(error, 'PIC gagal diperbarui.');
+            if (error?.status === 422) {
+                const errors = validationErrors(error);
+                this.assignmentError = errors.pic_id ?? errors.division_id ?? taskErrorMessage(error, 'PIC gagal diperbarui.');
+                this.assigneeState = 'error';
+            } else {
+                await this.handleFailure(error, 'PIC gagal diperbarui.');
+            }
         } finally {
             this.assigning = false;
         }
