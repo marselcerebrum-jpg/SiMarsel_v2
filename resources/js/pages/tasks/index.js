@@ -633,6 +633,10 @@ Alpine.data('taskCreateForm', () => ({
             if (error?.status === 422) {
                 this.errors = validationErrors(error);
                 this.formError = 'Periksa kembali isian yang ditandai.';
+            } else if (error?.status === 409) {
+                // Pengiriman ganda: tugas yang sama sudah tersimpan, jadi muat ulang daftar agar terlihat.
+                this.formError = errorMessage(error, 'Tugas yang sama baru saja dikirim. Periksa daftar tugas sebelum mengirim ulang.');
+                this.load();
             } else if (error?.unavailable) {
                 this.formPending = true;
                 this.formError = `${BACKEND_PENDING} Isian sudah valid, tetapi penyimpanan tugas belum tersedia.`;

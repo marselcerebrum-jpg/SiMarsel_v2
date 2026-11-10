@@ -29,7 +29,7 @@
 
                 <div class="sm:col-span-2">
                     <label for="create-task-description" class="{{ $labelClass }}">Deskripsi</label>
-                    <textarea id="create-task-description" x-model="form.description" rows="3" placeholder="Jelaskan kebutuhan dan hasil yang diharapkan"
+                    <textarea id="create-task-description" x-model="form.description" rows="3" maxlength="5000" placeholder="Jelaskan kebutuhan dan hasil yang diharapkan"
                         class="w-full rounded-lg border border-line bg-white px-3 py-2 text-sm text-ink placeholder:text-label focus:border-primary focus:ring-2 focus:ring-primary/20 focus:outline-none"></textarea>
                 </div>
 
