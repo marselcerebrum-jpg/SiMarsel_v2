@@ -3,7 +3,7 @@
     x-data="promoAnalysisSource"
     @promo-analysis-filter.window="load($event.detail)"
     @promo-analysis-copy.window="provideCopy($event.detail)"
-    class="mt-5 border-t border-line pt-5"
+    class="min-w-0"
     aria-labelledby="promo-source-title"
 >
     <h3 id="promo-source-title" class="text-sm font-semibold text-ink">Analisis Promo per Source</h3>

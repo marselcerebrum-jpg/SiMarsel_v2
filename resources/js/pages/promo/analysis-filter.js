@@ -145,3 +145,27 @@ export function selectionSummary(options, selected, allLabel, countLabel) {
 
     return names.length <= 2 ? names.join(', ') : `${names.length} ${countLabel}`;
 }
+
+/**
+ * A copy of the filter that later edits to the form do not change.
+ */
+export function cloneFilter(filter) {
+    return { ...filter, platforms: [...filter.platforms], payment_methods: [...filter.payment_methods] };
+}
+
+function formatDate(value) {
+    const [year, month, day] = value.split('-');
+
+    return `${Number(day)} ${MONTHS[Number(month) - 1]} ${year}`;
+}
+
+/**
+ * The period a filter covers, e.g. "September 2026", "November 2026 (sampai hari ini)" or "1 Oktober 2026 – 15 Oktober 2026".
+ */
+export function periodLabel(filter, now = new Date()) {
+    if (filter.mode === 'date_range') return `${formatDate(filter.date_from)} – ${formatDate(filter.date_to)}`;
+
+    const label = `${MONTHS[Number(filter.month) - 1]} ${filter.year}`;
+
+    return isCurrentMonth(filter, now) ? `${label} (sampai hari ini)` : label;
+}

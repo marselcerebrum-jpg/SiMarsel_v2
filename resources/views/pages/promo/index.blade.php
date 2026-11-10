@@ -7,7 +7,7 @@
 
 @php
     $card = 'rounded-panel border border-line bg-surface shadow-sm';
-    $tabs = ['promo-codes' => 'Kode Promo', 'master-data' => 'Data Master'];
+    $tabs = ['analysis' => 'Analisis', 'promo-codes' => 'Kelola Kode', 'master-data' => 'Data Master'];
 @endphp
 
 @section('page')
@@ -17,13 +17,18 @@
             <p class="mt-1 text-sm text-muted">Analisis dan kelola kode promo beserta master funnel, source, dan platform.</p>
         </header>
 
-        @include('pages.promo.components.promo-tabs')
+        @include('pages.promo.components.promo-tabs', ['id' => 'promo', 'label' => 'Manajemen Promo', 'tabs' => $tabs])
 
-        <div id="panel-promo-codes" role="tabpanel" aria-labelledby="tab-promo-codes" tabindex="0" x-show="tab === 'promo-codes'" x-cloak class="focus-visible:outline-none">
+        {{-- x-show keeps every panel mounted, so switching tabs keeps inputs, filters and loaded data. --}}
+        <div id="panel-promo-analysis" role="tabpanel" aria-labelledby="tab-promo-analysis" tabindex="0" x-show="tab === 'analysis'" x-cloak class="focus-visible:outline-none">
+            @include('pages.promo.components.promo-analysis-panel')
+        </div>
+
+        <div id="panel-promo-promo-codes" role="tabpanel" aria-labelledby="tab-promo-promo-codes" tabindex="0" x-show="tab === 'promo-codes'" x-cloak class="focus-visible:outline-none">
             @include('pages.promo.components.promo-code-panel')
         </div>
 
-        <div id="panel-master-data" role="tabpanel" aria-labelledby="tab-master-data" tabindex="0" x-show="tab === 'master-data'" x-cloak class="focus-visible:outline-none">
+        <div id="panel-promo-master-data" role="tabpanel" aria-labelledby="tab-promo-master-data" tabindex="0" x-show="tab === 'master-data'" x-cloak class="focus-visible:outline-none">
             @include('pages.promo.components.master-data-panel')
         </div>
     </div>

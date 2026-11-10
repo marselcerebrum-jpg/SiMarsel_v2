@@ -17,7 +17,7 @@
     @promo-analysis-filter.window="load($event.detail)"
     @promo-analysis-copy.window="provideCopy($event.detail)"
     @promo-analysis-export-params.window="provideExportParams($event.detail)"
-    class="mt-5 border-t border-line pt-5"
+    class="min-w-0"
     aria-labelledby="promo-code-summary-title"
 >
     <h3 id="promo-code-summary-title" class="text-sm font-semibold text-ink">Rekap per Kode Promo</h3>

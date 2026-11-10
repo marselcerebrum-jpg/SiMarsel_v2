@@ -9,7 +9,8 @@ function formatUsedOn(date) {
 }
 
 /**
- * Alert of promo codes found in Markaz transactions without a master for their platform.
+ * Alert of promo codes found in Markaz transactions without a master for their platform. The alert only
+ * shows while such codes exist; "Lihat kode" opens their review cards.
  */
 export default function promoUnregisteredCodes() {
     return {
@@ -21,6 +22,9 @@ export default function promoUnregisteredCodes() {
         requestId: 0,
         // Whether the loaded result is a search result, so the badge does not change before the response arrives.
         searched: false,
+        // Codes still to review without a search; null until the first unfiltered response.
+        pendingTotal: null,
+        reviewOpen: false,
 
         init() {
             this.fetchItems();
@@ -29,6 +33,13 @@ export default function promoUnregisteredCodes() {
 
         get total() {
             return this.meta?.total ?? 0;
+        },
+
+        /**
+         * A search stays visible while it is in use, even when it hides every code.
+         */
+        get visible() {
+            return this.pendingTotal > 0 || (this.reviewOpen && this.hasFilter);
         },
 
         get hasFilter() {
@@ -69,6 +80,7 @@ export default function promoUnregisteredCodes() {
                 this.items = data;
                 this.meta = meta ?? null;
                 this.searched = searched;
+                if (!searched) this.pendingTotal = meta?.total ?? data.length;
             } catch (error) {
                 if (requestId !== this.requestId) return;
                 this.loadError = errorMessage(error, 'Gagal memuat kode promo yang belum terdaftar.');
@@ -91,6 +103,11 @@ export default function promoUnregisteredCodes() {
 
             this.filter.page = page;
             this.fetchItems();
+        },
+
+        toggleReview() {
+            this.reviewOpen = !this.reviewOpen;
+            if (this.reviewOpen) this.$nextTick(() => this.$refs.review?.focus());
         },
 
         register(item) {

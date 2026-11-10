@@ -94,3 +94,36 @@ test('the badge keeps the loaded status until the search response arrives', asyn
 
     assert.equal(alert.status.text, '5 Belum Terdaftar');
 });
+
+test('the alert stays hidden while loading and when no code needs a review', async () => {
+    const { alert } = await alertFixture([0]);
+    assert.equal(alert.visible, false);
+
+    await alert.fetchItems();
+
+    assert.equal(alert.visible, false);
+});
+
+test('the alert shows for one or more codes and a search does not change the codes to review', async () => {
+    const { alert } = await alertFixture([1, 0]);
+
+    await alert.fetchItems();
+    assert.equal(alert.visible, true);
+
+    alert.reviewOpen = true;
+    await search(alert, 'TIDAKADA');
+
+    assert.equal(alert.pendingTotal, 1);
+    assert.equal(alert.visible, true);
+});
+
+test('the alert hides once the last code is registered', async () => {
+    const { alert } = await alertFixture([1, 0]);
+
+    await alert.fetchItems();
+    // What refresh() runs after a registration.
+    await alert.fetchItems();
+
+    assert.equal(alert.pendingTotal, 0);
+    assert.equal(alert.visible, false);
+});
