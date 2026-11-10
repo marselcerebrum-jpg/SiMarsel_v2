@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { test } from 'node:test';
 import vm from 'node:vm';
+import { analysisCopyModule } from './support/analysis-copy-module.mjs';
 
 // Arrays built inside the vm context have another Array prototype; compare them as plain data.
 const plain = (value) => JSON.parse(JSON.stringify(value));
@@ -53,7 +54,12 @@ async function trendModule(fetchAnalysisTrend, charts = []) {
         './api': { fetchAnalysisTrend },
     };
     const module = new vm.SourceTextModule(await source('pages/promo/analysis-trend.js'), { context });
-    await module.link((specifier) => (specifier === './chart' ? chart : syntheticModule(mocks[specifier], context)));
+    const copy = await analysisCopyModule(context);
+    await module.link((specifier) => {
+        if (specifier === './chart') return chart;
+        if (specifier === './analysis-copy') return copy;
+        return syntheticModule(mocks[specifier], context);
+    });
     await module.evaluate();
 
     return { trend: module.namespace, chart: chart.namespace };

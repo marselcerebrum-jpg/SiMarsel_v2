@@ -228,10 +228,8 @@ class TaskDetailTest extends TestCase
         $this->actingAs($this->manager)
             ->getJson("/api/tasks/{$this->task->id}")
             ->assertJsonPath('data.can_edit', true)
-            ->assertJsonPath('data.next_statuses', [
-                ['value' => 'in_progress', 'label' => 'On Process'],
-                ['value' => 'done', 'label' => 'Done'],
-            ]);
+            ->assertJsonPath('data.can_review', true)
+            ->assertJsonPath('data.next_statuses', []);
 
         $this->task->forceFill(['status' => TaskStatus::Done])->save();
 

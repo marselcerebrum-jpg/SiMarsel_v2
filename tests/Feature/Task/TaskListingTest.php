@@ -114,6 +114,10 @@ class TaskListingTest extends TestCase
         $manager = Account::where('username', 'manager')->first();
 
         $this->actingAs($manager)
+            ->getJson('/api/tasks/meta')
+            ->assertJsonPath('data.can_create', false);
+
+        $this->actingAs($manager)
             ->getJson('/api/tasks')
             ->assertOk()
             ->assertJsonCount(0, 'data');
@@ -344,6 +348,7 @@ class TaskListingTest extends TestCase
             ->getJson('/api/tasks/meta')
             ->assertOk()
             ->assertJsonPath('data.role', 'admin')
+            ->assertJsonPath('data.can_create', true)
             ->assertJsonPath('data.default_division', null)
             ->assertJsonPath('data.divisions', [
                 ['code_division' => 'FIN', 'name' => 'Finance'],
@@ -359,6 +364,7 @@ class TaskListingTest extends TestCase
         $this->actingAs($this->manager)
             ->getJson('/api/tasks/meta')
             ->assertJsonPath('data.role', 'manager')
+            ->assertJsonPath('data.can_create', true)
             ->assertJsonPath('data.division', 'MKT')
             ->assertJsonPath('data.default_division', 'MKT')
             ->assertJsonPath('data.divisions', [['code_division' => 'MKT', 'name' => 'Marketing']]);
@@ -371,6 +377,7 @@ class TaskListingTest extends TestCase
         $this->actingAs($this->staff)
             ->getJson('/api/tasks/meta')
             ->assertJsonPath('data.role', 'staff')
+            ->assertJsonPath('data.can_create', false)
             ->assertJsonPath('data.default_division', null)
             ->assertJsonPath('data.divisions', [
                 ['code_division' => 'FIN', 'name' => 'Finance'],

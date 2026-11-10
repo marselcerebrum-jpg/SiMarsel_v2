@@ -11,6 +11,8 @@
 <section
     x-data="promoAnalysisTrend"
     @promo-analysis-filter.window="load($event.detail)"
+    @promo-analysis-copy.window="provideCopy($event.detail)"
+    @promo-analysis-export-params.window="provideExportParams($event.detail)"
     class="mt-5 border-t border-line pt-5"
     aria-labelledby="promo-trend-title"
 >
