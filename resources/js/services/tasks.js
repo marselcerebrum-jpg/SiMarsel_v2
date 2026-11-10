@@ -1,7 +1,7 @@
 import { http } from '../http';
 
 /**
- * API daftar, meta, detail, status, dan pembuatan tugas sudah tersedia dan dipakai langsung.
+ * API daftar, meta, detail, pembuatan, dan pembaruan tugas sudah tersedia dan dipakai langsung.
  * Endpoint Tasklist tambahan tetap menunggu VITE_TASK_API_READY=true.
  * Kontrak lengkap ada di docs/api/tasks.md.
  *
@@ -9,14 +9,13 @@ import { http } from '../http';
  * GET    /api/tasks?search&division&priority&status → { data: [Task], meta: { status_counts } }
  * POST   /api/tasks                            → { data: Task, message }
  * GET    /api/tasks/{id}                       → { data: TaskDetail }
- * PATCH  /api/tasks/{id}                       → { data: TaskDetail, message }         (kirim updated_at)
+ * PATCH  /api/tasks/{id}                       → { data: TaskDetail, message }         (kirim version)
  * PATCH  /api/tasks/{id}/status                → { data: TaskDetail, message }         (kirim status, version)
- * PATCH  /api/tasks/{id}/assignee              → { data: TaskDetail, message }         (kirim pic_id, note, updated_at)
+ * PATCH  /api/tasks/{id}/assignee              → { data: TaskDetail, message }         (kirim pic_id, note, version)
  * GET    /api/tasks/assignees?division         → { data: [{ id, fullname, division }] }
  * GET    /api/tasks/{id}/evidences             → { data: [Evidence] }
  * POST   /api/tasks/{id}/evidences             → { data: Evidence, message }           (multipart: file atau url, note)
- * POST   /api/tasks/{id}/reviews               → { data: TaskDetail, message }         (kirim decision, note, updated_at)
- * GET    /api/tasks/{id}/activities            → { data: [Activity] }
+ * POST   /api/tasks/{id}/reviews               → { data: TaskDetail, message }         (kirim decision, note, version)
  * GET    /api/tasks/schedule?from&to&division  → { data: [ScheduleItem] }
  * GET    /api/tasks/calendar?month&division    → { data: { events: [Event], deadlines: [Task] } }
  */
@@ -42,7 +41,7 @@ export const createTask = (body) => http('/api/tasks', { method: 'POST', body })
 
 export const fetchTask = (id) => http(`/api/tasks/${id}`);
 
-export const updateTask = (id, body) => request(`/api/tasks/${id}`, { method: 'PATCH', body });
+export const updateTask = (id, body) => http(`/api/tasks/${id}`, { method: 'PATCH', body });
 
 export const changeTaskStatus = (id, body) => http(`/api/tasks/${id}/status`, { method: 'PATCH', body });
 
@@ -53,8 +52,6 @@ export const fetchAssignees = (division) => request(`/api/tasks/assignees${query
 export const fetchEvidences = (id) => request(`/api/tasks/${id}/evidences`);
 
 export const reviewTask = (id, body) => request(`/api/tasks/${id}/reviews`, { method: 'POST', body });
-
-export const fetchActivities = (id) => request(`/api/tasks/${id}/activities`);
 
 export const fetchSchedule = (params) => request(`/api/tasks/schedule${query(params)}`);
 
