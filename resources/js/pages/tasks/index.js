@@ -104,6 +104,7 @@ Alpine.data('tasklist', () => ({
     status: null,
     loading: true,
     error: '',
+    loadSequence: 0,
 
     filters: { search: '', division: '', priority: '', status: '' },
     sort: { key: 'deadline', dir: 'asc' },
@@ -135,8 +136,10 @@ Alpine.data('tasklist', () => ({
         });
 
         this.filters.division = this.defaultDivision();
-        this.$watch('filters.division', () => this.load());
-        this.$watch('filters', () => (this.page = 1));
+        this.$watch('filters', () => {
+            this.page = 1;
+            this.load();
+        });
 
         await this.loadMeta();
         await this.load();
@@ -150,7 +153,8 @@ Alpine.data('tasklist', () => ({
             this.user = userContext(Alpine.store('session').user, data);
             this.divisions = data.divisions ?? [];
             this.categories = data.categories ?? [];
-            this.platforms = data.platforms ?? [];
+            if (data.platforms) this.platforms = data.platforms;
+            else await this.loadPlatforms();
             this.filters.division = this.defaultDivision();
         } catch {
             // Meta tugas menunggu backend: pakai master divisi & platform yang sudah tersedia.
@@ -200,7 +204,8 @@ Alpine.data('tasklist', () => ({
     },
 
     get canCreate() {
-        return this.meta ? Boolean(this.meta.can_create) : this.user.role !== 'staff';
+        // Sama dengan TaskPolicy::create: Admin, atau Manajer yang memiliki divisi.
+        return this.user.role === 'admin' || (this.user.role === 'manager' && Boolean(this.user.division));
     },
 
     get hasActiveFilter() {
@@ -213,32 +218,43 @@ Alpine.data('tasklist', () => ({
     },
 
     async load() {
+        const sequence = ++this.loadSequence;
         this.loading = true;
         this.error = '';
 
         try {
-            const { data } = await fetchTasks({ division: this.filters.division });
+            const { data } = await fetchTasks({
+                search: this.filters.search.trim(),
+                division: this.filters.division,
+                priority: this.filters.priority,
+                status: this.filters.status,
+            });
+            if (sequence !== this.loadSequence) return;
+
             this.tasks = data;
             this.status = 'ready';
         } catch (error) {
+            if (sequence !== this.loadSequence) return;
+
             this.tasks = [];
             this.status = error?.unavailable ? 'unavailable' : 'error';
             this.error = taskErrorMessage(error, 'Gagal memuat daftar tugas.');
         } finally {
-            this.loading = false;
-            if (this.highlightId) this.$nextTick(() => this.revealHighlight());
+            if (sequence === this.loadSequence) {
+                this.loading = false;
+                if (this.highlightId) this.$nextTick(() => this.revealHighlight());
+            }
         }
     },
 
     /**
-     * Pencarian, prioritas, dan status difilter di browser. Fungsi yang sama dipakai Board, Table,
-     * ringkasan, Timeline, dan daftar deadline Calendar agar data selalu konsisten. Atribut yang tidak
-     * dimiliki item (mis. agenda tanpa prioritas) tidak menyaring item tersebut.
+     * Filter tambahan untuk item Timeline/Calendar yang tidak diambil oleh daftar Task.
      */
     matchesFilters(item) {
         const keyword = this.filters.search.trim().toLowerCase();
 
         return (!keyword || (item.title ?? '').toLowerCase().includes(keyword))
+            && (!this.filters.division || item.division?.code_division === this.filters.division)
             && (!this.filters.priority || !item.priority || item.priority === this.filters.priority)
             && (!this.filters.status || !item.status || item.status === this.filters.status);
     },
@@ -254,7 +270,7 @@ Alpine.data('tasklist', () => ({
     // 'none' = belum ada tugas sama sekali, 'filtered' = filter tidak menemukan tugas.
     get emptyKind() {
         if (this.status !== 'ready') return null;
-        if (!this.tasks.length) return 'none';
+        if (!this.tasks.length) return this.hasActiveFilter ? 'filtered' : 'none';
 
         return this.filteredTasks.length ? null : 'filtered';
     },
@@ -468,7 +484,7 @@ Alpine.data('tasklist', () => ({
         try {
             const { data, message } = transition.review === 'approve'
                 ? await reviewTask(task.id, { decision: 'approve', updated_at: task.updated_at })
-                : await changeTaskStatus(task.id, { status: transition.to, updated_at: task.updated_at });
+                : await changeTaskStatus(task.id, { status: transition.to, version: task.version });
             this.syncTask(data);
             showToast({ title: 'Status diperbarui', text: message ?? `${task.title} → ${statusOf(transition.to).label}` });
         } catch (error) {
@@ -828,7 +844,7 @@ Alpine.data('taskDetail', () => ({
         this.acting = transition.to;
 
         try {
-            const { data, message } = await changeTaskStatus(this.task.id, { status: transition.to, updated_at: this.task.updated_at });
+            const { data, message } = await changeTaskStatus(this.task.id, { status: transition.to, version: this.task.version });
             this.applyTask(data);
             showToast({ title: 'Status diperbarui', text: message ?? `Status menjadi ${statusOf(transition.to).label}.` });
         } catch (error) {

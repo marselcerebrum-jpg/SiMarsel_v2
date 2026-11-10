@@ -1,16 +1,16 @@
 import { http } from '../http';
 
 /**
- * Semua panggilan API Tasklist. Backend belum tersedia: selama VITE_TASK_API_READY bukan "true",
- * setiap pemanggilan langsung ditolak dengan { unavailable: true } tanpa memanggil server, dan
- * halaman menampilkan keterangan "Menunggu Back End". Kontrak lengkap ada di docs/api/tasks.md.
+ * API daftar, meta, detail, dan perubahan status sudah tersedia dan dipakai langsung.
+ * Endpoint Tasklist tambahan tetap menunggu VITE_TASK_API_READY=true.
+ * Kontrak lengkap ada di docs/api/tasks.md.
  *
- * GET    /api/tasks/meta                       → { data: { role, scope, can_create, divisions, categories, platforms } }
- * GET    /api/tasks?division&priority&status   → { data: [Task] }
+ * GET    /api/tasks/meta                       → { data: { role, division, default_division, divisions, statuses, priorities } }
+ * GET    /api/tasks?search&division&priority&status → { data: [Task], meta: { status_counts } }
  * POST   /api/tasks                            → { data: Task, message }
  * GET    /api/tasks/{id}                       → { data: TaskDetail }
  * PATCH  /api/tasks/{id}                       → { data: TaskDetail, message }         (kirim updated_at)
- * PATCH  /api/tasks/{id}/status                → { data: TaskDetail, message }         (kirim status, updated_at)
+ * PATCH  /api/tasks/{id}/status                → { data: TaskDetail, message }         (kirim status, version)
  * PATCH  /api/tasks/{id}/assignee              → { data: TaskDetail, message }         (kirim pic_id, note, updated_at)
  * GET    /api/tasks/assignees?division         → { data: [{ id, fullname, division }] }
  * GET    /api/tasks/{id}/evidences             → { data: [Evidence] }
@@ -32,17 +32,17 @@ function query(params = {}) {
 
 const request = (url, options) => (TASK_API_READY ? http(url, options) : unavailable());
 
-export const fetchTaskMeta = () => request('/api/tasks/meta');
+export const fetchTaskMeta = () => http('/api/tasks/meta');
 
-export const fetchTasks = (filters) => request(`/api/tasks${query(filters)}`);
+export const fetchTasks = (filters) => http(`/api/tasks${query(filters)}`);
 
 export const createTask = (body) => request('/api/tasks', { method: 'POST', body });
 
-export const fetchTask = (id) => request(`/api/tasks/${id}`);
+export const fetchTask = (id) => http(`/api/tasks/${id}`);
 
 export const updateTask = (id, body) => request(`/api/tasks/${id}`, { method: 'PATCH', body });
 
-export const changeTaskStatus = (id, body) => request(`/api/tasks/${id}/status`, { method: 'PATCH', body });
+export const changeTaskStatus = (id, body) => http(`/api/tasks/${id}/status`, { method: 'PATCH', body });
 
 export const assignTask = (id, body) => request(`/api/tasks/${id}/assignee`, { method: 'PATCH', body });
 

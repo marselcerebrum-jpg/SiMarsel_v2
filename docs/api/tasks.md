@@ -2,7 +2,7 @@
 
 Kontrak data untuk halaman **Tasklist** (`/tasks`): Board, Table, ringkasan, Timeline, Calendar, detail tugas, pembuatan tugas, penugasan PIC, workflow status, evidence, review, dan histori (TASK-01 s.d. TASK-11).
 
-**Status: frontend selesai, backend belum dibuat.** Semua panggilan API ada di `resources/js/services/tasks.js`. Selama `VITE_TASK_API_READY` bukan `true`, frontend tidak memanggil server dan menampilkan keterangan "Menunggu Back End". Setelah endpoint di bawah tersedia, isi `VITE_TASK_API_READY=true` di `.env` lalu jalankan `npm run build`.
+**Status: Board/Table terintegrasi dengan backend.** `GET /api/tasks/meta`, `GET /api/tasks`, `GET /api/tasks/{id}`, dan `PATCH /api/tasks/{id}/status` dipanggil langsung. Filter pencarian, divisi, prioritas, dan status dikirim ke API daftar tugas. Endpoint Tasklist tambahan tetap dinonaktifkan sampai tersedia; isi `VITE_TASK_API_READY=true` untuk mengaktifkannya setelah implementasi backend-nya siap.
 
 Wajib login. Header dan kode error umum mengikuti [authentication.md](authentication.md). Tanggal memakai format `YYYY-MM-DD`; waktu memakai ISO 8601.
 
@@ -69,8 +69,8 @@ Backend **wajib** menerapkan cakupan ini di setiap endpoint. Staff yang mengubah
 
 | Method & path | Body / query | Respons |
 |---|---|---|
-| `GET /api/tasks/meta` | – | `{ data: { role, division, can_create, divisions: [{ code_division, name }], categories: [{ id, name, requires_review }], platforms: [{ slug, name }] } }` |
-| `GET /api/tasks` | `division` (opsional) | `{ data: [Task] }`, semua tugas dalam cakupan user. Pencarian, filter prioritas/status, sort, dan pagination dilakukan di frontend. |
+| `GET /api/tasks/meta` | – | `{ data: { role, division, default_division, divisions: [{ code_division, name }], statuses: [{ value, label }], priorities: [{ value, label }] } }` |
+| `GET /api/tasks` | `search`, `division`, `priority`, `status`, `sort`, `direction`, `per_page`, `page` (semua opsional) | `{ data: [Task], meta: { status_counts } }`, tugas dalam cakupan user. Tanpa `per_page` semua tugas dikembalikan sekaligus; Board/Table mengirim filter ke server dan mengurutkan serta mempaginasi di frontend. |
 | `POST /api/tasks` | `title`*, `description`, `category_id`, `division`*, `pic_id`, `platform`, `priority`*, `start_date`, `deadline`, `status`* (`backlog`\|`todo`), `requires_review`, `evidence_required`, `client_request_id`* | `201 { data: Task, message }` |
 | `GET /api/tasks/{id}` | – | `{ data: TaskDetail }` |
 | `PATCH /api/tasks/{id}` | `title`, `description`, `category_id`, `platform`, `priority`, `start_date`, `deadline`, `updated_at`* | `{ data: TaskDetail, message }` |
