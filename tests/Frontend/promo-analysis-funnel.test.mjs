@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { test } from 'node:test';
 import vm from 'node:vm';
+import { analysisCopyModule } from './support/analysis-copy-module.mjs';
 
 async function funnelModule(fetchAnalysisFunnels) {
     const context = vm.createContext({ Intl, Date, Number, Math, Boolean, Object, String });
@@ -15,8 +16,10 @@ async function funnelModule(fetchAnalysisFunnels) {
         './api': { fetchAnalysisFunnels },
     };
     const module = new vm.SourceTextModule(await source('pages/promo/analysis-funnel.js'), { context });
+    const copy = await analysisCopyModule(context);
     await module.link((specifier) => {
         if (specifier === '../../format') return format;
+        if (specifier === './analysis-copy') return copy;
         const mock = mocks[specifier];
         return new vm.SyntheticModule(Object.keys(mock), function () {
             for (const [key, value] of Object.entries(mock)) this.setExport(key, value);

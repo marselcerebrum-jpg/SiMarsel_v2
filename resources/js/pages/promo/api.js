@@ -1,4 +1,4 @@
-import { http } from '../../http';
+import { http, httpBlob } from '../../http';
 
 /**
  * Funnel and Source share one API shape (docs/api/promo-master-data.md).
@@ -121,4 +121,12 @@ export function fetchAnalysisTrend(query) {
 
 export function fetchAnalysisTopCodes(query) {
     return http(`${PROMO_ANALYSIS}/top-codes${query ? `?${query}` : ''}`);
+}
+
+/**
+ * Excel file of every analysis component, complete (no pagination). Takes the shared filter query plus
+ * the trend period and the code summary sort, so the file matches the page. Resolves { blob, fileName }.
+ */
+export function exportAnalysis(query) {
+    return httpBlob(`${PROMO_ANALYSIS}/export${query ? `?${query}` : ''}`);
 }

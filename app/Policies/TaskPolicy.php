@@ -57,6 +57,16 @@ class TaskPolicy
     }
 
     /**
+     * Only Admin, or the Manager of the task's division, may approve a task that requires QA or request its
+     * revision; Staff only sees the result. Whether the task is in On QA is checked by TaskReviewService so the
+     * rejection carries its reason.
+     */
+    public function review(Account $user, Task $task): bool
+    {
+        return $task->reviewableBy($user);
+    }
+
+    /**
      * Only the task's PIC sends evidence for it; Admin and Managers see it through view(). Whether the task's
      * status still accepts evidence is checked by TaskEvidenceService so the rejection carries its reason.
      */

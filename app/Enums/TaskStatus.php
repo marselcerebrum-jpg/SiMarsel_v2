@@ -54,6 +54,15 @@ enum TaskStatus: string
         return $this === self::Todo || $this === self::InProgress;
     }
 
+    /**
+     * Whether leaving this status is a QA decision, which is made through a review (Approve or Request
+     * Revision) so it is recorded with its reason, not through a plain status change.
+     */
+    public function decidedByReview(): bool
+    {
+        return $this === self::OnQa;
+    }
+
     public function inQa(): bool
     {
         return $this === self::ReadyForQa || $this === self::OnQa;

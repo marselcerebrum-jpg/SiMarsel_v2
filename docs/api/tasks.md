@@ -46,7 +46,25 @@ Backend **wajib** menerapkan cakupan ini di setiap endpoint. Staff yang mengubah
 - `pic`, `start_date`, dan `deadline` boleh `null`.
 - `version` dipakai untuk mencegah perubahan berbasis data lama (lihat 409).
 
-**TaskDetail** = Task ditambah `description`, `category` (`{ id, name, requires_review, evidence_required }` | null), `platform` (`{ id, name }` | null), `creator` (`{ id, fullname }` | null), `evidence` (array Evidence), `history` (array Activity), `editable_fields`, `next_statuses`, `created_at`, dan `completed_at`.
+**TaskDetail** = Task ditambah `description`, `category` (`{ id, name, requires_review, evidence_required }` | null), `platform` (`{ id, name }` | null), `creator` (`{ id, fullname }` | null), `evidence` (array Evidence), `history` (array Activity), `reviews` (semua Review, terbaru lebih dulu), `last_review` (Review terbaru | null), `can_review` (`true` bila user boleh memberi keputusan QA saat ini: tugas `on_qa` dan user Admin/Manajer berwenang), `editable_fields`, `next_statuses`, `created_at`, dan `completed_at`.
+
+**Activity** (histori, `GET /api/tasks/{id}/activities`):
+
+```json
+{
+  "id": 42,
+  "action": "reassigned",
+  "action_label": "PIC diganti",
+  "description": "PIC: Budi → Sari",
+  "changes": { "pic": { "old": { "id": 7, "name": "Budi" }, "new": { "id": 9, "name": "Sari" } } },
+  "actor": { "id": 3, "fullname": "Manajer Marketing" },
+  "created_at": "2026-11-06T02:00:00Z"
+}
+```
+
+- `action`: `created` | `updated` | `assigned` | `reassigned` | `status_changed` | `evidence_submitted` | `approved` | `revision_requested` | `resubmitted`.
+- `changes`: nilai sebelum dan sesudah untuk tiap field yang berubah (`{}` untuk `created`).
+- `actor.id` bernilai `null` bila akun pelaku sudah dihapus; `actor.fullname` tetap berisi nama pelaku saat aktivitas terjadi.
 
 ## Endpoint
 
@@ -64,18 +82,43 @@ Backend **wajib** menerapkan cakupan ini di setiap endpoint. Staff yang mengubah
 | `GET /api/tasks/{id}/evidences` | – | `{ data: [Evidence] }` |
 | `GET /api/tasks/{id}/evidences/{evidence}/download` | – | File evidence (hanya untuk yang dapat melihat tugas; `404` bila bukan evidence tugas itu atau berupa tautan) |
 | `POST /api/tasks/{id}/evidences` | multipart: `file` **atau** `url`, `note` | `201 { data: Evidence, message }`; hanya PIC (`403` untuk yang lain); `422` dengan pesan di `errors.file`/`errors.url`, atau di `errors.evidence` bila status tugas tidak menerima evidence |
-| `POST /api/tasks/{id}/reviews` | `decision`* (`approve`\|`revision`), `note` (wajib untuk `revision`), `updated_at`* | `{ data: TaskDetail, message }` |
+| `GET /api/tasks/{id}/reviews` | – | `{ data: [Review] }`, terbaru lebih dulu; dapat dilihat siapa pun yang dapat melihat tugas (termasuk PIC) |
+| `POST /api/tasks/{id}/reviews` | `decision`* (`approve`\|`revision`), `note` (wajib untuk `revision`, maks. 2000), `version`* | `{ data: TaskDetail, message }`; `403` bila bukan Admin/Manajer berwenang atau tugas tidak wajib QA; `422` di `errors.note` bila revisi tanpa alasan, di `errors.decision` bila tugas tidak berstatus `on_qa`; `409 { message, current_version }` bila `version` usang |
+| `GET /api/tasks/{id}/activities` | – | `{ data: [Activity] }` |
 | `GET /api/tasks/schedule` | `from`*, `to`*, `division` | `{ data: [ScheduleItem] }` |
 | `GET /api/tasks/calendar` | `month`* (`YYYY-MM`), `division` | `{ data: { events: [Event], deadlines: [Task] } }` |
 
 `*` = wajib.
 
 - **Evidence**: `{ id, task_id, type, file_name, file_url, url, note, submitter: { id, fullname }, created_at }`. `type` = `file` (isi `file_name`/`file_url`) atau `link` (isi `url`). Detail tugas mengirimnya di `evidence`, terbaru lebih dulu; `[]` bila tugas belum punya evidence.
-- **Activity**: `{ id, action, changes, actor: { id, fullname } | null, created_at }`. `action` dapat berupa `created`, `updated`, `assigned`, `reassigned`, `status_changed`, atau `evidence_submitted`. `changes` memetakan field yang berubah ke `{ old, new }`. Histori hanya ditambahkan oleh sistem, tidak bisa diedit.
-- **ScheduleItem**: `{ id, type: "task"|"event", title, division, start_date, end_date, status, priority, can_view_detail }`. `status` dan `priority` dipakai agar filter Tasklist ikut berlaku di Timeline (agenda bersama tidak disaring). Agenda bersama (`event`) dan tugas lintas divisi boleh tampil untuk semua role, tetapi `can_view_detail` hanya `true` bila user berhak membuka detailnya.
-- **Event** (Calendar): `{ id, title, division, start_date, end_date, description, task_id, can_view_detail }`. `task_id` diisi bila agenda terkait sebuah tugas (tombol "Lihat Detail Tugas Terkait"); `null` untuk agenda murni yang tidak dibuka di Board. `deadlines` hanya berisi tugas dalam cakupan user dan yang memiliki deadline; sertakan `description` (boleh `null`) agar ringkasan Calendar dapat menampilkan deskripsi singkat.
+- **Review**: `{ id, task_id, cycle, decision, decision_label, note, reviewer: { id, fullname }, created_at }`. `decision` = `approve` (label Approve) atau `revision` (label Request Revision). `cycle` = urutan pemeriksaan tugas itu (1, 2, ...). Review tidak dapat diubah atau dihapus.
+- **Activity**: lihat bentuk JSON di atas (`action`, `action_label`, `description`, `changes`, `actor`). Histori hanya ditambahkan oleh sistem, tidak bisa diedit.
+- **ScheduleItem**: `{ id, type: "task"|"event", title, division, target_divisions, start_date, end_date, status, priority, task_id, can_view_detail }`. `status` dan `priority` dipakai agar filter Tasklist ikut berlaku di Timeline (agenda bersama tidak disaring), dan bernilai `null` untuk `event`. Agenda bersama (`event`) dan tugas lintas divisi boleh tampil untuk semua role, tetapi `can_view_detail` hanya `true` bila user berhak membuka detailnya. Lihat [Timeline](#timeline-task-10).
+- **Event** (Calendar): `{ id, title, division, target_divisions, start_date, end_date, description, task_id, can_view_detail }`. `task_id` diisi bila agenda terkait sebuah tugas (tombol "Lihat Detail Tugas Terkait"); `null` untuk agenda murni yang tidak dibuka di Board. `deadlines` hanya berisi tugas dalam cakupan user dan yang memiliki deadline, berupa objek Task ditambah `description` (boleh `null`) dan `is_overdue`. Lihat [Calendar](#calendar-task-11).
 - **Lihat Detail dari Calendar**: frontend berpindah ke Board dan membuka detail lewat `GET /api/tasks/{id}`. Bila tugas tersembunyi oleh filter, filter cari/prioritas/status dikosongkan; Admin juga dipindah ke Semua Divisi. Akses tetap diputuskan backend (`403`/`404`).
 - **Tautan langsung**: `/tasks?task={id}` membuka Board dengan detail tugas tersebut memakai alur yang sama. Parameter `task` diperbarui saat panel detail dibuka dan dihapus saat ditutup.
+
+## Timeline (TASK-10)
+
+**Status: backend tersedia.** `GET /api/tasks/schedule?from=YYYY-MM-DD&to=YYYY-MM-DD&division=KODE` mengembalikan `{ data: [ScheduleItem] }`, hanya-baca (tidak ada endpoint untuk mengubah jadwal).
+
+- **Validasi** (`422`): `from` dan `to` wajib berformat `YYYY-MM-DD`, `to` tidak boleh sebelum `from`, periode maksimal 62 hari, dan `division` harus kode divisi yang ada.
+- **Tugas**: tugas semua divisi yang rentang tanggalnya bersinggungan dengan periode, untuk semua role. `start_date` = tanggal mulai, `end_date` = deadline. Tugas yang hanya punya salah satu tanggal dihitung satu hari pada tanggal itu (tanggal lainnya `null`); tugas tanpa tanggal tidak dikirim.
+- **Detail internal tidak dikirim**: PIC, deskripsi, evidence, dan histori tidak ada di ScheduleItem. `can_view_detail` mengikuti aturan `GET /api/tasks/{id}` (Admin semua, Manajer divisinya, Staff tugas yang PIC-nya dia), sehingga tugas divisi lain tampil di jadwal tetapi detailnya tetap `403`.
+- **Agenda (`event`)** dari tabel `schedule_events`. `division` = divisi pemilik/penyelenggara agenda (`null` bila tanpa pemilik); hanya informasi, tidak menentukan siapa yang melihat. `target_divisions` = divisi tujuan agenda internal (tabel `schedule_event_divisions`, bisa lebih dari satu; `[]` untuk agenda bersama). `is_shared` adalah penentu utama visibilitas: `true` = semua pengguna; `false` dengan divisi tujuan = Admin dan akun divisi tujuan saja; `false` tanpa divisi tujuan = hanya Admin. Divisi pemilik yang bukan divisi tujuan tidak melihat agenda internalnya. `task_id` diisi bila agenda terkait tugas, dan `can_view_detail` agenda mengikuti hak membuka tugas itu (`false` untuk agenda tanpa tugas). Agenda tanpa `end_date` berlangsung satu hari.
+- **Filter `division`**: tugas divisi itu, agenda yang dimiliki divisi itu atau menjadikannya divisi tujuan, ditambah agenda bersama tanpa pemilik. Filter tidak pernah memperluas visibilitas agenda. Tanpa `division` = Semua Divisi (default Admin).
+- **Urutan**: berdasarkan hari mulai (tugas tanpa tanggal mulai memakai deadline), tugas sebelum agenda pada hari yang sama.
+- Agenda belum punya endpoint kelola; data contoh lokal berasal dari `ScheduleEventSeeder`.
+
+## Calendar (TASK-11)
+
+**Status: backend tersedia.** `GET /api/tasks/calendar?month=YYYY-MM&division=KODE` mengembalikan `{ data: { events: [Event], deadlines: [Task] } }`, hanya-baca. Kedua daftar dipisah: agenda bersama di `events`, deadline tugas di `deadlines`.
+
+- **Validasi** (`422`): `month` wajib berformat `YYYY-MM`; `division` harus kode divisi yang ada.
+- **`events`**: agenda (`schedule_events`) yang bersinggungan dengan bulan itu, dengan aturan visibilitas yang sama seperti [Timeline](#timeline-task-10): `is_shared = true` untuk semua role, agenda internal hanya untuk Admin dan akun divisi tujuannya (`target_divisions`), agenda internal tanpa divisi tujuan hanya untuk Admin. Hanya informasi umum (nama, divisi pemilik, divisi tujuan, tanggal, keterangan) yang dikirim. `can_view_detail` mengikuti hak membuka tugas terkait.
+- **`deadlines`**: tugas dengan deadline di bulan itu, dalam cakupan user yang sama dengan `GET /api/tasks`: Admin semua divisi, Manajer divisinya, Staff tugas yang PIC-nya dia. Tugas tanpa deadline tidak ikut. Urut berdasarkan deadline.
+- **`is_overdue`**: `true` bila deadline sudah lewat (sebelum hari ini) dan status bukan `done`.
+- **Filter `division`**: deadline divisi itu (tetap di dalam cakupan user, jadi filter tidak pernah memperluas akses) dan agenda yang dimiliki divisi itu atau menjadikannya divisi tujuan, ditambah agenda bersama tanpa pemilik. Tanpa `division` = Semua Divisi (default Admin).
 
 ## Aturan bisnis yang harus divalidasi backend
 
@@ -100,6 +143,8 @@ Backend **wajib** menerapkan cakupan ini di setiap endpoint. Staff yang mengubah
 | `on_qa` | `done` | Admin/Manajer berwenang (via `reviews`, `decision=approve`) |
 | `on_qa` | `in_progress` | Admin/Manajer berwenang (via `reviews`, `decision=revision`, `note` wajib) |
 
+- Keluar dari `on_qa` hanya lewat `POST /api/tasks/{id}/reviews`. `PATCH /status` dan `PATCH /api/tasks/{id}` ke `done`/`in_progress` dari `on_qa` ditolak `422`, dan `next_statuses` untuk `on_qa` selalu `[]` (pakai `can_review`).
+
 - Jika `evidence_required = true`, PIC tidak boleh ke `ready_for_qa` atau `done` sebelum ada evidence.
 - `done` menyimpan `completed_at`.
 
@@ -120,6 +165,20 @@ Backend **wajib** menerapkan cakupan ini di setiap endpoint. Staff yang mengubah
 - Submission tetap lewat `PATCH /api/tasks/{id}/status` (`ready_for_qa` bila wajib QA, `done` bila tidak); ditolak `422` bila evidence wajib tapi belum ada.
 - Setelah revisi (`on_qa` → `in_progress`), PIC dapat mengirim evidence baru dan submit ulang. Evidence lama tetap tersimpan dan tampil di detail (terbaru lebih dulu).
 - Setiap evidence yang dikirim dicatat di histori dengan action `evidence_submitted`.
+
+**Review & revisi (TASK-07)**
+- Hanya tugas `requires_review = true` yang direview. Mulai pemeriksaan = `PATCH /status` dari `ready_for_qa` ke `on_qa` oleh Admin/Manajer berwenang.
+- Keputusan hanya untuk tugas `on_qa`. Admin untuk semua divisi, Manajer untuk divisinya; Staff (termasuk PIC) selalu `403`.
+- `approve` → `done` dan menyimpan `completed_at`. `revision` → `in_progress`, `note` wajib (spasi saja dianggap kosong).
+- Setelah revisi, PIC memperbaiki lalu mengirim ulang ke `ready_for_qa`; histori mencatatnya sebagai `resubmitted`. Siklus dapat berulang sampai disetujui; semua review sebelumnya tetap tersimpan.
+- Keputusan dicatat di histori sebagai `approved` atau `revision_requested` dengan `changes.status` dan `changes.review` (`{ id, cycle, note }`).
+
+**Histori aktivitas (TASK-08)**
+- Histori hanya dibuat setelah aktivitas berhasil; aksi yang ditolak tidak meninggalkan catatan.
+- Urutan: terbaru lebih dulu; aktivitas pada detik yang sama diurutkan berdasarkan `id`. Tanpa aktivitas → `{ data: [] }`.
+- Akses mengikuti detail tugas: Admin semua tugas, Manajer tugas divisinya, Staff hanya tugas yang ditugaskan kepadanya (selain itu `403`).
+- Histori tidak dapat diedit atau dihapus, dan tetap tersedia setelah status atau PIC berubah.
+- Nama pelaku disimpan saat aktivitas dicatat, sehingga tetap tampil walaupun akunnya dihapus.
 
 **Data lama (409)**: setiap perubahan membawa `version` terakhir yang dilihat user. Jika berbeda dengan data di database, tolak dengan `409 Conflict`. Frontend lalu memuat ulang data dan meminta user memeriksa kembali.
 
@@ -145,3 +204,69 @@ Ringkasan dihitung di frontend dari respons `GET /api/tasks` yang sama dengan Bo
 - **Completion Rate** = Completed / Total × 100%, dan 0% bila Total = 0.
 
 Tugas tanpa deadline tidak dihitung pada Overdue maupun Due Today.
+
+## Monitoring Tugas (agregasi backend)
+
+`GET /api/tasks/monitoring` menghitung KPI ringkasan langsung di database, sehingga angka tidak bergantung pada data yang dimuat frontend. Hanya-baca: melihat tugas di laporan tidak memberi hak edit, dan akses detail/aksi tetap mengikuti cakupan Tasklist.
+
+**Query** (semua opsional):
+
+| Param | Nilai | Keterangan |
+|---|---|---|
+| `scope` | `report` (default) \| `tasklist` | `report` = seluruh divisi, boleh dibaca semua role. `tasklist` = cakupan Tasklist user (Admin semua, Manajer divisinya, Staff tugas PIC-nya), angkanya sama dengan Board/Table untuk filter yang sama. |
+| `division` | `code_division` | Pada `scope=tasklist` filter ini tidak dapat memperluas cakupan. |
+| `status` | nilai status | |
+| `priority` | `low` \| `medium` \| `high` \| `urgent` | |
+| `search` | teks, maks. 150 | Judul tugas, sama seperti Tasklist. |
+| `date_basis` | `deadline` (default) \| `created_at` | Tanggal yang dipakai filter periode. Lihat *Dasar tanggal periode* di bawah. |
+| `date_from`, `date_to` | `YYYY-MM-DD` | Batas periode (inklusif) pada tanggal sesuai `date_basis`. Boleh diisi salah satu. `date_to` ≥ `date_from`. |
+
+Tanpa parameter = konfigurasi default (Reset Filter): cakupan `report`, semua divisi, `date_basis=deadline`, tanpa periode.
+
+**Dasar tanggal periode (`date_basis`):**
+
+| Mode | Periode menyaring | Tugas tanpa deadline |
+|---|---|---|
+| `created_at` (Tanggal dibuat) | tanggal pembuatan tugas | tetap dihitung bila dibuat dalam periode |
+| `deadline` (Deadline) | deadline tugas | tidak dihitung saat periode aktif |
+
+- Mode yang dipilih berlaku untuk **seluruh** angka di respons: semua KPI di `metrics`, `by_priority`, dan `by_division`, bukan hanya Total Tasks.
+- Periode hanya menentukan tugas mana yang dihitung. **Overdue** dan **Due Today** selalu dinilai dari deadline terhadap hari ini (`as_of`), apa pun modenya. Contoh: tugas yang dibuat November dengan deadline 1 Oktober dan belum Done tetap terhitung Overdue pada mode `created_at` periode November.
+- Mode yang dipakai dikirim di `period` agar tampilan dapat memberi label, mis. "Periode (Deadline): 1–30 Nov 2026".
+
+Contoh: hari ini 6 Nov 2026, filter periode 1–30 November 2026.
+
+| Tugas | Dibuat | Deadline | `created_at` | `deadline` |
+|---|---|---|---|---|
+| A | 3 Nov | 10 Des | ✅ dihitung | ❌ tidak |
+| B | 15 Okt | 20 Nov | ❌ tidak | ✅ dihitung |
+| C (On Process) | 6 Nov | – | ✅ dihitung, tidak Overdue/Due Today | ❌ tidak |
+| D (To Do) | 6 Nov | 1 Okt | ✅ dihitung sebagai Overdue | ❌ tidak |
+
+**Respons `200`:**
+
+```json
+{
+  "data": {
+    "scope": { "key": "report", "label": "Seluruh divisi" },
+    "as_of": "2026-11-06",
+    "filters": { "search": null, "division": null, "priority": null, "status": null, "date_basis": "deadline", "date_from": null, "date_to": null },
+    "period": { "basis": "deadline", "label": "Deadline", "from": null, "to": null, "active": false },
+    "metrics": {
+      "total_tasks": 8, "backlog": 1, "todo": 2, "on_process": 1, "ready_for_qa": 1, "on_qa": 1,
+      "completed": 2, "unfinished": 6, "overdue": 3, "due_today": 1, "urgent": 2, "completion_rate": 25
+    },
+    "by_priority": { "low": { "total": 2, "unfinished": 1 }, "medium": { "total": 2, "unfinished": 2 }, "high": { "total": 1, "unfinished": 1 }, "urgent": { "total": 3, "unfinished": 2 } },
+    "by_division": [
+      { "code_division": "FIN", "name": "Finance", "total": 2, "completed": 1, "unfinished": 1, "overdue": 1, "completion_rate": 50 }
+    ]
+  }
+}
+```
+
+- `scope.label` wajib ditampilkan di samping KPI. Untuk `tasklist` labelnya "Tugas divisi Anda" (Manajer) atau "Tugas yang ditugaskan kepada Anda" (Staff).
+- `period` = dasar tanggal yang dipakai (`basis`, `label`: "Tanggal dibuat" atau "Deadline"), batas periode, dan `active` (`true` bila `date_from`/`date_to` diisi).
+- `as_of` = tanggal hari ini menurut zona waktu aplikasi (`APP_TIMEZONE`), acuan Overdue dan Due Today.
+- Rumus metrik sama dengan bagian Ringkasan di atas. `completion_rate` dibulatkan 2 desimal dan bernilai `0` bila `total_tasks` = 0. Tugas aktif = status selain `done`.
+- Tidak ada tugas → semua angka `0`, `by_division` = `[]`, dan `by_priority` tetap berisi keempat prioritas.
+- `422` bila parameter tidak valid (pesan di `errors.<param>`), `401` bila belum login.
