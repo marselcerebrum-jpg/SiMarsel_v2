@@ -263,13 +263,21 @@ test('Dragging On QA back to On Process opens the revision note form instead of 
     assert.equal(statusRequests(requests).length, 0);
 });
 
-test('Create button follows TaskPolicy::create: Admin, or a Manager with a division', async () => {
+test('Create button follows meta.can_create, falling back to TaskPolicy::create: Admin, or a Manager with a division', async () => {
     const create = async (user) => (await tasklistPage({}, user)).board.canCreate;
 
     assert.equal(await create(ADMIN), true);
     assert.equal(await create({ id: 2, role: { code_role: 'MGR' }, division: { code_division: 'MKT' } }), true);
     assert.equal(await create({ id: 3, role: { code_role: 'MGR' }, division: null }), false);
     assert.equal(await create(PIC), false);
+
+    // Once meta is loaded, the backend's can_create decides.
+    const { board } = await tasklistPage({
+        'GET /api/tasks/meta': () => ({ json: { data: { role: 'admin', division: null, default_division: null, divisions: [], can_create: false } } }),
+        'GET /api/products/filters': () => ({ json: { data: { platforms: [] } } }),
+    }, ADMIN);
+    await board.loadMeta();
+    assert.equal(board.canCreate, false);
 });
 
 const createOptions = {

@@ -205,8 +205,8 @@ Alpine.data('tasklist', () => ({
     },
 
     get canCreate() {
-        // Sama dengan TaskPolicy::create: Admin, atau Manajer yang memiliki divisi.
-        return this.user.role === 'admin' || (this.user.role === 'manager' && Boolean(this.user.division));
+        // Diputuskan backend lewat meta; bila meta gagal dimuat, pakai aturan TaskPolicy::create yang sama.
+        return this.meta?.can_create ?? (this.user.role === 'admin' || (this.user.role === 'manager' && Boolean(this.user.division)));
     },
 
     get hasActiveFilter() {
