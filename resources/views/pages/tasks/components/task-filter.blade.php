@@ -23,7 +23,7 @@
         <label class="relative block min-w-0 basis-full sm:min-w-48 sm:flex-1 sm:basis-auto">
             <span class="sr-only">Cari judul tugas</span>
             <x-icon name="search" class="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-label" />
-            <input id="task-search" type="search" x-model.debounce.200ms="filters.search" placeholder="Cari judul tugas…"
+            <input id="task-search" type="search" x-model.debounce.200ms="filters.search" maxlength="150" placeholder="Cari judul tugas…"
                 class="h-9 w-full rounded-lg border border-line bg-white pr-3 pl-9 text-sm text-ink placeholder:text-label focus:border-primary focus:ring-2 focus:ring-primary/20 focus:outline-none">
         </label>
 
