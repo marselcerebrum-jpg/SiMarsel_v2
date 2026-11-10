@@ -749,39 +749,12 @@ Alpine.data('taskDetail', () => ({
         return this.task?.editable_fields?.includes(field) ?? false;
     },
 
-    activityLabel(action) {
-        return ({
-            created: 'Tugas dibuat',
-            updated: 'Informasi tugas diperbarui',
-            assigned: 'PIC ditetapkan',
-            reassigned: 'PIC diubah',
-            status_changed: 'Status tugas diperbarui',
-            evidence_submitted: 'Evidence dikirim',
-        })[action] ?? action;
-    },
+    // Kalimat histori disusun backend (action_label + description) agar label status, catatan review,
+    // dan nama evidence selalu sama dengan data yang tersimpan. Rincian disembunyikan bila hanya mengulang judul.
+    activityDetail(activity) {
+        const detail = activity.description ?? '';
 
-    activityFieldLabel(field) {
-        return ({
-            title: 'Judul',
-            description: 'Deskripsi',
-            category: 'Kategori',
-            division: 'Divisi',
-            platform: 'Platform',
-            pic: 'PIC',
-            priority: 'Prioritas',
-            status: 'Status',
-            start_date: 'Tanggal mulai',
-            deadline: 'Deadline',
-            requires_review: 'Kewajiban QA',
-        })[field] ?? field;
-    },
-
-    activityValue(value) {
-        if (value === null || value === undefined || value === '') return '-';
-        if (typeof value === 'boolean') return value ? 'Ya' : 'Tidak';
-        if (typeof value === 'object') return value.name ?? JSON.stringify(value);
-
-        return String(value);
+        return detail === 'Membuat tugas.' || detail === `${activity.action_label}.` ? '' : detail;
     },
 
     get assignment() {

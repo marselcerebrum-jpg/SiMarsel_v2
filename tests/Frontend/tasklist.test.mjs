@@ -377,3 +377,28 @@ test('Create Task shows 422 errors on the fields and the duplicate-submission me
     assert.equal(duplicate.form.formError, 'Tugas yang sama baru saja dikirim. Periksa daftar tugas sebelum mengirim ulang.');
     assert.equal(listCalls(), listCallsBefore + 1);
 });
+
+test('History shows the backend sentence for approval, revision request, and resubmission, never raw codes', async () => {
+    const activity = (id, action, action_label, description) => ({ id, action, action_label, description, changes: {}, actor: { id: 1, fullname: 'Admin' }, created_at: '2026-11-10T02:00:00Z' });
+    const history = [
+        activity(4, 'approved', 'Tugas disetujui', 'Status: On QA → Done'),
+        activity(3, 'resubmitted', 'Hasil revisi dikirim ulang', 'Status: On Process → Ready for QA'),
+        activity(2, 'revision_requested', 'Revisi diminta', 'Status: On QA → On Process; Catatan: Perbaiki warna; ukuran banner.'),
+        activity(1, 'created', 'Tugas dibuat', 'Membuat tugas.'),
+    ];
+    const { board, detail: createDetail } = await tasklistPage({
+        'GET /api/tasks': () => ({ json: { data: [task()], meta: { status_counts: {} } } }),
+        'GET /api/tasks/7': () => ({ json: { data: task({ status: 'done', history, evidence: [] }) } }),
+    }, ADMIN);
+    await board.load();
+    board.detailId = 7;
+    const detail = createDetail();
+    await detail.open(7);
+
+    assert.deepEqual([...detail.activities].map((item) => [item.action_label, detail.activityDetail(item)]), [
+        ['Tugas disetujui', 'Status: On QA → Done'],
+        ['Hasil revisi dikirim ulang', 'Status: On Process → Ready for QA'],
+        ['Revisi diminta', 'Status: On QA → On Process; Catatan: Perbaiki warna; ukuran banner.'],
+        ['Tugas dibuat', ''],
+    ]);
+});
