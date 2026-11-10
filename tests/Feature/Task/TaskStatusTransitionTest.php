@@ -224,22 +224,20 @@ class TaskStatusTransitionTest extends TestCase
             ->assertOk()
             ->assertJsonPath('data.status', 'on_qa');
 
-        $this->actingAs($this->admin)
-            ->patchJson($this->url($task), $this->payload('done', 2))
-            ->assertOk()
-            ->assertJsonPath('data.status', 'done')
-            ->assertJsonPath('data.completed_at', now()->toIso8601ZuluString());
     }
 
-    public function test_review_sends_the_task_back_for_revision(): void
+    public function test_qa_decisions_are_not_made_through_a_status_change(): void
     {
-        $task = $this->task(TaskStatus::OnQa);
+        foreach (['done', 'in_progress'] as $status) {
+            $task = $this->task(TaskStatus::OnQa);
 
-        $this->actingAs($this->manager)
-            ->patchJson($this->url($task), $this->payload('in_progress'))
-            ->assertOk()
-            ->assertJsonPath('data.status', 'in_progress')
-            ->assertJsonPath('data.completed_at', null);
+            $this->actingAs($this->manager)
+                ->patchJson($this->url($task), $this->payload($status))
+                ->assertUnprocessable()
+                ->assertJsonValidationErrors(['status' => 'Keputusan QA diberikan melalui review tugas (Approve atau Request Revision).']);
+
+            $this->assertSame(TaskStatus::OnQa, $task->fresh()->status);
+        }
     }
 
     public function test_moves_outside_the_matrix_are_rejected(): void
@@ -338,10 +336,8 @@ class TaskStatusTransitionTest extends TestCase
 
         $this->actingAs($this->manager)
             ->getJson("/api/tasks/{$onQa->id}")
-            ->assertJsonPath('data.next_statuses', [
-                ['value' => 'in_progress', 'label' => 'On Process'],
-                ['value' => 'done', 'label' => 'Done'],
-            ]);
+            ->assertJsonPath('data.next_statuses', [])
+            ->assertJsonPath('data.can_review', true);
     }
 
     /**
