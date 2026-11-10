@@ -9,7 +9,8 @@ import vm from 'node:vm';
  * backend's responses:
  * - PATCH /api/tasks/{id}/status (ChangeTaskStatusRequest: status + version) from the Board and the detail;
  * - POST /api/tasks/{id}/reviews (ReviewTaskRequest: decision, note, version) for QA decisions;
- * - POST /api/tasks (StoreTaskRequest) from the Create Task form, until the task shows on the Board and Table.
+ * - POST /api/tasks (StoreTaskRequest) from the Create Task form, until the task shows on the Board and Table;
+ * - PATCH /api/tasks/{id}/assignment (AssignTaskRequest: pic_id, division_id, version) from the detail.
  */
 const PIC = { id: 10, role: { code_role: 'EMP' }, division: { code_division: 'MKT' } };
 const ADMIN = { id: 1, role: { code_role: 'ADM' }, division: null };
@@ -401,4 +402,80 @@ test('History shows the backend sentence for approval, revision request, and res
         ['Revisi diminta', 'Status: On QA → On Process; Catatan: Perbaiki warna; ukuran banner.'],
         ['Tugas dibuat', ''],
     ]);
+});
+
+const MANAGER = { id: 2, role: { code_role: 'MGR' }, division: { code_division: 'MKT' } };
+const assignmentOptions = {
+    current_pic: { id: PIC.id, fullname: 'Staff Marketing' },
+    current_division: { id: 3, code_division: 'MKT', name: 'Marketing' },
+    can_change_division: false,
+    locked_reason: null,
+    divisions: [{ id: 3, code_division: 'MKT', name: 'Marketing', pics: [{ id: PIC.id, fullname: 'Staff Marketing' }, { id: 11, fullname: 'Staff Baru' }] }],
+};
+
+test('Changing the PIC sends { pic_id, division_id, version } to the assignment endpoint and updates the detail and the Board', async () => {
+    const { board, detail: createDetail, requests, toasts } = await tasklistPage({
+        'GET /api/tasks': () => ({ json: { data: [task({ can_assign: true })], meta: { status_counts: {} } } }),
+        'GET /api/tasks/7': () => ({ json: { data: task({ can_assign: true, history: [] }) } }),
+        'GET /api/tasks/7/assignment-options': () => ({ json: { data: assignmentOptions } }),
+        'PATCH /api/tasks/7/assignment': () => ({ json: { data: task({ can_assign: true, pic: { id: 11, fullname: 'Staff Baru' }, version: 5 }), message: 'PIC berhasil diperbarui.' } }),
+    }, MANAGER);
+    await board.load();
+    board.detailId = 7;
+    const detail = createDetail();
+    await detail.open(7);
+
+    assert.equal(detail.canAssignThis, true);
+    await detail.openAssign();
+    assert.equal(detail.assigneeState, 'ready');
+    assert.deepEqual([...detail.eligibleAssignees].map(({ id }) => id), [11], 'the current PIC is not offered again');
+
+    detail.assignForm.pic_id = '11';
+    await detail.saveAssign();
+
+    const sent = requests.find((request) => request.method === 'PATCH');
+    assert.equal(sent.url, '/api/tasks/7/assignment');
+    assert.deepEqual(sent.body, { pic_id: '11', division_id: '3', version: 4 });
+    assert.equal(detail.task.pic.fullname, 'Staff Baru');
+    assert.equal(detail.task.version, 5);
+    assert.equal(board.tasks[0].pic.fullname, 'Staff Baru');
+    assert.equal(board.tasks[0].version, 5);
+    assert.equal(detail.assigneeState, 'idle');
+    assert.equal(toasts.at(-1).text, 'PIC berhasil diperbarui.');
+});
+
+test('Assignment conflicts reload both views and a rejected PIC shows the server reason without changing the shown PIC', async () => {
+    let detailCalls = 0;
+    let assignStatus = 409;
+    const { board, detail: createDetail, toasts } = await tasklistPage({
+        'GET /api/tasks': () => ({ json: { data: [task({ can_assign: true, version: detailCalls > 1 ? 6 : 4 })], meta: { status_counts: {} } } }),
+        'GET /api/tasks/7': () => {
+            detailCalls += 1;
+            return { json: { data: task({ can_assign: true, version: detailCalls > 1 ? 6 : 4 }) } };
+        },
+        'GET /api/tasks/7/assignment-options': () => ({ json: { data: assignmentOptions } }),
+        'PATCH /api/tasks/7/assignment': () => (assignStatus === 409
+            ? { status: 409, json: { message: 'Tugas telah diubah oleh pengguna lain.', current_version: 6 } }
+            : { status: 422, json: { message: 'PIC tidak valid.', errors: { pic_id: ['PIC harus Staff aktif dari divisi tugas.'] } } }),
+    }, MANAGER);
+    await board.load();
+    board.detailId = 7;
+    const detail = createDetail();
+    await detail.open(7);
+
+    await detail.openAssign();
+    detail.assignForm.pic_id = '11';
+    await detail.saveAssign();
+    await new Promise((resolve) => setTimeout(resolve));
+    assert.match(toasts.at(-1).text, /sudah diperbarui oleh pengguna lain/);
+    assert.equal(detail.task.version, 6);
+    assert.equal(board.tasks[0].version, 6);
+
+    assignStatus = 422;
+    await detail.openAssign();
+    detail.assignForm.pic_id = '11';
+    await detail.saveAssign();
+    assert.equal(detail.assigneeState, 'error');
+    assert.equal(detail.assignmentError, 'PIC harus Staff aktif dari divisi tugas.');
+    assert.equal(detail.task.pic.id, PIC.id, 'a rejected assignment leaves the shown PIC unchanged');
 });
