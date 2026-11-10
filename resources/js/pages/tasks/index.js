@@ -189,7 +189,8 @@ Alpine.data('tasklist', () => ({
     },
 
     get canCreate() {
-        return this.meta?.can_create ?? this.user.role !== 'staff';
+        // Diputuskan backend lewat meta; bila meta gagal dimuat, pakai aturan TaskPolicy::create yang sama.
+        return this.meta?.can_create ?? (this.user.role === 'admin' || (this.user.role === 'manager' && Boolean(this.user.division)));
     },
 
     get hasActiveFilter() {
@@ -467,7 +468,7 @@ Alpine.data('tasklist', () => ({
 
         try {
             const { data, message } = transition.review === 'approve'
-                ? await reviewTask(task.id, { decision: 'approve', updated_at: task.updated_at })
+                ? await reviewTask(task.id, { decision: 'approve', version: task.version })
                 : await changeTaskStatus(task.id, { status: transition.to, version: task.version });
             this.syncTask(data);
             showToast({ title: 'Status diperbarui', text: message ?? `${task.title} → ${statusOf(transition.to).label}` });
@@ -616,6 +617,10 @@ Alpine.data('taskCreateForm', () => ({
             if (error?.status === 422) {
                 this.errors = validationErrors(error);
                 this.formError = 'Periksa kembali isian yang ditandai.';
+            } else if (error?.status === 409) {
+                // Pengiriman ganda: tugas yang sama sudah tersimpan, jadi muat ulang daftar agar terlihat.
+                this.formError = errorMessage(error, 'Tugas yang sama baru saja dikirim. Periksa daftar tugas sebelum mengirim ulang.');
+                this.load();
             } else if (error?.unavailable) {
                 this.formPending = true;
                 this.formError = `${BACKEND_PENDING} Isian sudah valid, tetapi penyimpanan tugas belum tersedia.`;
@@ -746,39 +751,12 @@ Alpine.data('taskDetail', () => ({
         return this.task?.editable_fields?.includes(field) ?? false;
     },
 
-    activityLabel(action) {
-        return ({
-            created: 'Tugas dibuat',
-            updated: 'Informasi tugas diperbarui',
-            assigned: 'PIC ditetapkan',
-            reassigned: 'PIC diubah',
-            status_changed: 'Status tugas diperbarui',
-            evidence_submitted: 'Evidence dikirim',
-        })[action] ?? action;
-    },
+    // Kalimat histori disusun backend (action_label + description) agar label status, catatan review,
+    // dan nama evidence selalu sama dengan data yang tersimpan. Rincian disembunyikan bila hanya mengulang judul.
+    activityDetail(activity) {
+        const detail = activity.description ?? '';
 
-    activityFieldLabel(field) {
-        return ({
-            title: 'Judul',
-            description: 'Deskripsi',
-            category: 'Kategori',
-            division: 'Divisi',
-            platform: 'Platform',
-            pic: 'PIC',
-            priority: 'Prioritas',
-            status: 'Status',
-            start_date: 'Tanggal mulai',
-            deadline: 'Deadline',
-            requires_review: 'Kewajiban QA',
-        })[field] ?? field;
-    },
-
-    activityValue(value) {
-        if (value === null || value === undefined || value === '') return '-';
-        if (typeof value === 'boolean') return value ? 'Ya' : 'Tidak';
-        if (typeof value === 'object') return value.name ?? JSON.stringify(value);
-
-        return String(value);
+        return detail === 'Membuat tugas.' || detail === `${activity.action_label}.` ? '' : detail;
     },
 
     get assignment() {
@@ -965,7 +943,7 @@ Alpine.data('taskDetail', () => ({
             const { data, message } = await reviewTask(this.task.id, {
                 decision,
                 note: this.reviewNote.trim(),
-                updated_at: this.task.updated_at,
+                version: this.task.version,
             });
             this.applyTask(data);
             this.reviewMode = null;
