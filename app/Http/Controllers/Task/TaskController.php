@@ -9,9 +9,12 @@ use App\Http\Requests\Task\ChangeTaskStatusRequest;
 use App\Http\Requests\Task\ReviewTaskRequest;
 use App\Http\Requests\Task\StoreTaskEvidenceRequest;
 use App\Http\Requests\Task\StoreTaskRequest;
+use App\Http\Requests\Task\TaskCalendarRequest;
 use App\Http\Requests\Task\TaskListRequest;
 use App\Http\Requests\Task\TaskScheduleRequest;
 use App\Http\Requests\Task\UpdateTaskRequest;
+use App\Http\Resources\CalendarDeadlineResource;
+use App\Http\Resources\CalendarEventResource;
 use App\Http\Resources\ScheduleItemResource;
 use App\Http\Resources\TaskActivityResource;
 use App\Http\Resources\TaskDetailResource;
@@ -21,6 +24,7 @@ use App\Http\Resources\TaskReviewResource;
 use App\Models\Task;
 use App\Models\TaskEvidence;
 use App\Services\TaskActivityService;
+use App\Services\TaskCalendarService;
 use App\Services\TaskEvidenceService;
 use App\Services\TaskReviewService;
 use App\Services\TaskScheduleService;
@@ -59,6 +63,16 @@ class TaskController extends Controller
         return ScheduleItemResource::collection(
             $service->schedule($request->user(), $request->from(), $request->to(), $request->division()),
         );
+    }
+
+    public function calendar(TaskCalendarRequest $request, TaskCalendarService $service): JsonResponse
+    {
+        $calendar = $service->calendar($request->user(), $request->month(), $request->division());
+
+        return response()->json(['data' => [
+            'events' => CalendarEventResource::collection($calendar['events'])->resolve($request),
+            'deadlines' => CalendarDeadlineResource::collection($calendar['deadlines'])->resolve($request),
+        ]]);
     }
 
     public function createOptions(Request $request): JsonResponse
