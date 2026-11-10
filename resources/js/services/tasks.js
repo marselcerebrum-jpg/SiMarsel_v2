@@ -1,11 +1,11 @@
 import { http } from '../http';
 
 /**
- * API daftar, meta, detail, dan perubahan status sudah tersedia dan dipakai langsung.
+ * API daftar, meta, detail, status, dan pembuatan tugas sudah tersedia dan dipakai langsung.
  * Endpoint Tasklist tambahan tetap menunggu VITE_TASK_API_READY=true.
  * Kontrak lengkap ada di docs/api/tasks.md.
  *
- * GET    /api/tasks/meta                       → { data: { role, division, default_division, divisions, statuses, priorities } }
+ * GET    /api/tasks/meta                       → { data: { role, division, default_division, can_create, divisions, statuses, priorities } }
  * GET    /api/tasks?search&division&priority&status → { data: [Task], meta: { status_counts } }
  * POST   /api/tasks                            → { data: Task, message }
  * GET    /api/tasks/{id}                       → { data: TaskDetail }
@@ -36,7 +36,9 @@ export const fetchTaskMeta = () => http('/api/tasks/meta');
 
 export const fetchTasks = (filters) => http(`/api/tasks${query(filters)}`);
 
-export const createTask = (body) => request('/api/tasks', { method: 'POST', body });
+export const fetchTaskCreateOptions = () => http('/api/tasks/create-options');
+
+export const createTask = (body) => http('/api/tasks', { method: 'POST', body });
 
 export const fetchTask = (id) => http(`/api/tasks/${id}`);
 
