@@ -8,12 +8,13 @@ import vm from 'node:vm';
  * so the assertions are about the HTTP request the browser actually sends and how the page reacts to the
  * backend's responses:
  * - PATCH /api/tasks/{id}/status (ChangeTaskStatusRequest: status + version) from the Board and the detail;
+ * - POST /api/tasks/{id}/reviews (ReviewTaskRequest: decision, note, version) for QA decisions;
  * - POST /api/tasks (StoreTaskRequest) from the Create Task form, until the task shows on the Board and Table.
  */
 const PIC = { id: 10, role: { code_role: 'EMP' }, division: { code_division: 'MKT' } };
 const ADMIN = { id: 1, role: { code_role: 'ADM' }, division: null };
 
-async function tasklistPage(routes, sessionUser = PIC) {
+async function tasklistPage(routes, sessionUser = PIC, apiReady = 'false') {
     const requests = [];
     const toasts = [];
     const components = {};
@@ -54,7 +55,7 @@ async function tasklistPage(routes, sessionUser = PIC) {
 
     const http = await load('http.js');
     const workflow = await load('pages/tasks/workflow.js');
-    const services = await load('services/tasks.js', { env: { VITE_TASK_API_READY: 'false' } });
+    const services = await load('services/tasks.js', { env: { VITE_TASK_API_READY: apiReady } });
     const page = await load('pages/tasks/index.js');
     const alpine = synthetic({
         default: {
@@ -278,6 +279,33 @@ test('Create button follows meta.can_create, falling back to TaskPolicy::create:
     }, ADMIN);
     await board.loadMeta();
     assert.equal(board.canCreate, false);
+});
+
+test('QA decisions send { decision, note, version } to the review endpoint, from the Board and from the detail', async () => {
+    const reviewed = task({ status: 'on_qa', requires_review: true, version: 8 });
+    const { board, detail: createDetail, requests } = await tasklistPage({
+        'GET /api/tasks': () => ({ json: { data: [reviewed], meta: { status_counts: {} } } }),
+        'GET /api/tasks/7': () => ({ json: { data: reviewed } }),
+        'GET /api/tasks/7/evidences': () => ({ json: { data: [] } }),
+        'GET /api/tasks/7/activities': () => ({ json: { data: [] } }),
+        'POST /api/tasks/7/reviews': (body) => ({ json: { data: task({ ...reviewed, status: body.decision === 'approve' ? 'done' : 'in_progress', version: body.version + 1 }), message: 'ok' } }),
+    }, ADMIN, 'true');
+    await board.load();
+
+    board.draggingId = 7;
+    await board.drop('done');
+    const reviews = () => requests.filter(({ url }) => url === '/api/tasks/7/reviews');
+    assert.deepEqual(reviews()[0].body, { decision: 'approve', version: 8 });
+    assert.equal(board.tasks[0].version, 9);
+
+    board.detailId = 7;
+    const detail = createDetail();
+    await detail.open(7);
+    detail.startReview('revision');
+    detail.reviewNote = '  Lampirkan versi final.  ';
+    await detail.submitReview();
+    assert.deepEqual(reviews()[1].body, { decision: 'revision', note: 'Lampirkan versi final.', version: 8 });
+    assert.equal(requests.some(({ body }) => body && 'updated_at' in body), false);
 });
 
 const createOptions = {
