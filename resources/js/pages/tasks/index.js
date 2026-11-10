@@ -468,7 +468,7 @@ Alpine.data('tasklist', () => ({
 
         try {
             const { data, message } = transition.review === 'approve'
-                ? await reviewTask(task.id, { decision: 'approve', updated_at: task.updated_at })
+                ? await reviewTask(task.id, { decision: 'approve', version: task.version })
                 : await changeTaskStatus(task.id, { status: transition.to, version: task.version });
             this.syncTask(data);
             showToast({ title: 'Status diperbarui', text: message ?? `${task.title} → ${statusOf(transition.to).label}` });
@@ -935,7 +935,7 @@ Alpine.data('taskDetail', () => ({
             const { data, message } = await reviewTask(this.task.id, {
                 decision,
                 note: this.reviewNote.trim(),
-                updated_at: this.task.updated_at,
+                version: this.task.version,
             });
             this.applyTask(data);
             this.reviewMode = null;
