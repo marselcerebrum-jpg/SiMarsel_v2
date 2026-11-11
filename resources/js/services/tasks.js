@@ -1,7 +1,7 @@
 import { http } from '../http';
 
 /**
- * API daftar, meta, detail, pembuatan, pembaruan, penugasan, status, dan evidence tugas sudah tersedia dan dipakai langsung.
+ * API daftar, meta, detail, pembuatan, pembaruan, penugasan, status, evidence, dan review tugas sudah tersedia dan dipakai langsung.
  * Endpoint Tasklist lain yang belum terintegrasi tetap menunggu VITE_TASK_API_READY=true.
  * Kontrak lengkap ada di docs/api/tasks.md.
  *
@@ -52,7 +52,8 @@ export const assignTask = (id, body) => http(`/api/tasks/${id}/assignment`, { me
 // Evidence tidak bergantung pada VITE_TASK_API_READY: API-nya sudah tersedia.
 export const fetchEvidences = (id) => http(`/api/tasks/${id}/evidences`);
 
-export const reviewTask = (id, body) => request(`/api/tasks/${id}/reviews`, { method: 'POST', body });
+// Keputusan QA (approve/revisi) tidak bergantung pada VITE_TASK_API_READY: API-nya sudah tersedia.
+export const reviewTask = (id, body) => http(`/api/tasks/${id}/reviews`, { method: 'POST', body });
 
 export const fetchSchedule = (params) => request(`/api/tasks/schedule${query(params)}`);
 
