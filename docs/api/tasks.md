@@ -2,7 +2,7 @@
 
 Kontrak data untuk halaman **Tasklist** (`/tasks`): Board, Table, ringkasan, Timeline, Calendar, detail tugas, pembuatan tugas, penugasan PIC, workflow status, evidence, review, dan histori (TASK-01 s.d. TASK-11).
 
-**Status: Board/Table, pembuatan, detail, edit, dan penugasan tugas terintegrasi dengan backend.** `GET /api/tasks/meta`, `GET /api/tasks`, `GET /api/tasks/create-options`, `POST /api/tasks`, `GET /api/tasks/{id}`, `PATCH /api/tasks/{id}`, `GET /api/tasks/{id}/assignment-options`, `PATCH /api/tasks/{id}/assignment`, dan `PATCH /api/tasks/{id}/status` dipanggil langsung. Filter daftar tugas dikirim ke API; endpoint Tasklist tambahan tetap dinonaktifkan sampai tersedia.
+**Status: Board/Table, pembuatan, detail, edit, penugasan, dan workflow status tugas terintegrasi dengan backend.** `GET /api/tasks/meta`, `GET /api/tasks`, `GET /api/tasks/create-options`, `POST /api/tasks`, `GET /api/tasks/{id}`, `PATCH /api/tasks/{id}`, `GET /api/tasks/{id}/assignment-options`, `PATCH /api/tasks/{id}/assignment`, dan `PATCH /api/tasks/{id}/status` dipanggil langsung. Keputusan QA (`POST /api/tasks/{id}/reviews`) diintegrasikan di TASK-07. Filter daftar tugas dikirim ke API; endpoint Tasklist tambahan tetap dinonaktifkan sampai tersedia.
 
 Wajib login. Header dan kode error umum mengikuti [authentication.md](authentication.md). Tanggal memakai format `YYYY-MM-DD`; waktu memakai ISO 8601.
 
@@ -46,7 +46,7 @@ Backend **wajib** menerapkan cakupan ini di setiap endpoint. Staff yang mengubah
 - `pic`, `start_date`, dan `deadline` boleh `null`.
 - `version` dipakai untuk mencegah perubahan berbasis data lama (lihat 409).
 
-**TaskDetail** = Task ditambah `description`, `category` (`{ id, name, requires_review, evidence_required }` | null), `platform` (`{ id, name }` | null), `creator` (`{ id, fullname }` | null), `evidence` (array Evidence), `history` (array Activity), `reviews` (semua Review, terbaru lebih dulu), `last_review` (Review terbaru | null), `can_review` (`true` bila user boleh memberi keputusan QA saat ini: tugas `on_qa` dan user Admin/Manajer berwenang), `editable_fields`, `next_statuses`, `created_at`, dan `completed_at`.
+**TaskDetail** = Task ditambah `description`, `category` (`{ id, name, requires_review, evidence_required }` | null), `platform` (`{ id, name }` | null), `creator` (`{ id, fullname }` | null), `evidence` (array Evidence), `history` (array Activity), `reviews` (semua Review, terbaru lebih dulu), `last_review` (Review terbaru | null), `can_review` (`true` bila user boleh memberi keputusan QA saat ini: tugas `on_qa` dan user Admin/Manajer berwenang), `editable_fields`, `next_statuses`, `created_at`, dan `completed_at`. `next_statuses` tidak memuat status tujuan dari `on_qa`, karena keputusan QA memakai endpoint review.
 
 **Activity** (histori, `GET /api/tasks/{id}/activities`):
 
@@ -76,7 +76,7 @@ Backend **wajib** menerapkan cakupan ini di setiap endpoint. Staff yang mengubah
 | `POST /api/tasks` | `title`*, `description`, `category_id`, `division_id`*, `pic_id`, `platform_id`, `priority`, `start_date`, `deadline`, `status`, `requires_review`, `evidence_required` | `201 { data: TaskDetail, message }`; Admin/Manajer saja. Field pembuat ditentukan dari akun yang login. |
 | `GET /api/tasks/{id}` | – | `{ data: TaskDetail }` |
 | `PATCH /api/tasks/{id}` | `title`, `description`, `category_id`, `platform_id`, `priority`, `start_date`, `deadline`, `version`* | `{ data: TaskDetail, message }` |
-| `PATCH /api/tasks/{id}/status` | `status`*, `version`* | `{ data: TaskDetail, message }`; `422` dengan alasan di `errors.status` bila transisi ditolak; `409 { message, current_version }` bila `version` sudah usang |
+| `PATCH /api/tasks/{id}/status` | `status`*, `version`* | `{ data: TaskDetail, message }`; semua transisi kecuali keluar dari `on_qa` (approve/revisi memakai `POST /api/tasks/{id}/reviews`). `422` dengan alasan di `errors.status` bila transisi ditolak; `409 { message, current_version }` bila `version` sudah usang |
 | `GET /api/tasks/{id}/assignment-options` | – | Pilihan divisi sesuai kewenangan, Staff yang dapat ditugaskan per divisi, PIC/divisi saat ini, serta alasan jika penugasan terkunci. Admin dapat memilih lintas divisi; Manajer hanya mendapat divisinya. |
 | `PATCH /api/tasks/{id}/assignment` | `pic_id`*, `version`*, `division_id` (opsional; Admin saja) | `{ data: TaskDetail, message }`; menetapkan atau mengganti PIC dan, untuk Admin, dapat meneruskan tugas lintas divisi. Perubahan versi lama ditolak dengan `409`; PIC/divisi yang tidak valid ditolak dengan `422`. |
 | `GET /api/tasks/{id}/evidences` | – | `{ data: [Evidence] }` |

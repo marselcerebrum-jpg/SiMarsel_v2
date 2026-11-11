@@ -40,3 +40,14 @@ test('assignment options and updates use the existing backend endpoints', async 
     assert.equal(requests[1].options.method, 'PATCH');
     assert.equal(requests[1].options.body, payload);
 });
+
+test('status changes send the version to the status workflow endpoint', async () => {
+    const { api, requests } = await taskApiFixture();
+    const payload = { status: 'in_progress', version: 7 };
+
+    await api.changeTaskStatus(12, payload);
+
+    assert.equal(requests[0].url, '/api/tasks/12/status');
+    assert.equal(requests[0].options.method, 'PATCH');
+    assert.equal(requests[0].options.body, payload);
+});

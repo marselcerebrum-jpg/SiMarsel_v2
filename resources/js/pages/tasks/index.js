@@ -26,7 +26,6 @@ import {
     formatDate,
     formatDateTime,
     isOverdue,
-    managesTask,
     parseISODate,
     priorityOf,
     statusOf,
@@ -473,7 +472,12 @@ Alpine.data('tasklist', () => ({
             this.syncTask(data);
             showToast({ title: 'Status diperbarui', text: message ?? `${task.title} → ${statusOf(transition.to).label}` });
         } catch (error) {
-            notifyFailure(error, 'Status tugas gagal diperbarui.');
+            if (error?.status === 422) {
+                const errors = validationErrors(error);
+                notifyFailure({ ...error, data: { ...error.data, message: errors.status ?? errors.pic_id } }, 'Status tugas gagal diperbarui.');
+            } else {
+                notifyFailure(error, 'Status tugas gagal diperbarui.');
+            }
             if (error?.status === 409) this.load();
         } finally {
             this.movingId = null;
@@ -734,10 +738,6 @@ Alpine.data('taskDetail', () => ({
 
     // --- Hak akses pada tugas yang dibuka -----------------------------------------------------
 
-    get transitions() {
-        return this.task ? availableTransitions(this.task, this.user) : [];
-    },
-
     get isPicOfTask() {
         return this.task?.pic?.id !== undefined && this.task?.pic?.id === this.user.id;
     },
@@ -779,10 +779,6 @@ Alpine.data('taskDetail', () => ({
 
     get canSubmitEvidence() {
         return this.isPicOfTask && ['todo', 'in_progress'].includes(this.task?.status);
-    },
-
-    get canReview() {
-        return this.task ? managesTask(this.task, this.user) : false;
     },
 
     // --- Edit informasi utama (TASK-03 C) -----------------------------------------------------
@@ -897,7 +893,18 @@ Alpine.data('taskDetail', () => ({
         }
     },
 
-    // --- Workflow status (TASK-05) & review (TASK-07) -----------------------------------------
+    // --- Workflow status (TASK-05) ------------------------------------------------------------
+
+    // Status tujuan mengikuti next_statuses dari backend. Approve/Revisi tidak pernah lewat endpoint status:
+    // tombolnya membuka form review (TASK-07) dan hanya tampil bila backend mengirim can_review.
+    get transitions() {
+        if (!this.task) return [];
+
+        const backendStatuses = new Set((this.task.next_statuses ?? []).map(({ value }) => value));
+
+        return availableTransitions(this.task, this.user)
+            .filter((transition) => (transition.review ? this.task.can_review === true : backendStatuses.has(transition.to)));
+    },
 
     async runTransition(transition) {
         if (transition.review === 'revision') {
@@ -914,9 +921,15 @@ Alpine.data('taskDetail', () => ({
         try {
             const { data, message } = await changeTaskStatus(this.task.id, { status: transition.to, version: this.task.version });
             this.applyTask(data);
+            this.load();
             showToast({ title: 'Status diperbarui', text: message ?? `Status menjadi ${statusOf(transition.to).label}.` });
         } catch (error) {
-            await this.handleFailure(error, 'Status tugas gagal diperbarui.');
+            if (error?.status === 422) {
+                const errors = validationErrors(error);
+                notifyFailure({ ...error, data: { ...error.data, message: errors.status ?? errors.pic_id } }, 'Status tugas gagal diperbarui.');
+            } else {
+                await this.handleFailure(error, 'Status tugas gagal diperbarui.');
+            }
         } finally {
             this.acting = null;
         }
