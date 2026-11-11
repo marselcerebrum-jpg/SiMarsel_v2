@@ -40,13 +40,15 @@ import {
 const VIEWS = ['board', 'table', 'timeline', 'calendar'];
 
 // Field yang memengaruhi angka ringkasan atau cakupan/filter tugas: perubahannya memuat ulang ringkasan.
+// Field yang tidak dikirim (undefined) diabaikan; PIC atau divisi yang dilepas (null) tetap dihitung sebagai perubahan.
+const nested = (value, key) => (value === undefined ? undefined : (value?.[key] ?? null));
 const SUMMARY_FIELDS = [
     (task) => task.status,
     (task) => task.deadline,
     (task) => task.priority,
     (task) => task.title,
-    (task) => task.division?.code_division,
-    (task) => task.pic?.id,
+    (task) => nested(task.division, 'code_division'),
+    (task) => nested(task.pic, 'id'),
 ];
 
 const affectsSummary = (before, after) => !before || SUMMARY_FIELDS.some((field) => field(after) !== undefined && field(after) !== field(before));
@@ -388,8 +390,9 @@ Alpine.data('tasklist', () => ({
     formatDate,
     formatDateTime,
 
+    // Acuan hari ini sama dengan KPI Terlambat: as_of dari backend (zona waktu aplikasi), tanggal browser bila belum ada.
     isOverdue(task) {
-        return isOverdue(task);
+        return isOverdue(task, this.monitoring?.as_of ?? today());
     },
 
     canOpen(task) {
@@ -1242,7 +1245,7 @@ Alpine.data('taskTimeline', () => ({
                 return {
                     ...item,
                     partial: !item.start_date || !item.end_date,
-                    overdue: item.type === 'task' && Boolean(item.end_date) && item.status !== 'done' && item.end_date.slice(0, 10) < today(),
+                    overdue: item.type === 'task' && Boolean(item.end_date) && item.status !== 'done' && item.end_date.slice(0, 10) < (this.monitoring?.as_of ?? today()),
                     left: `${(startIndex / total) * 100}%`,
                     width: `${((endIndex - startIndex + 1) / total) * 100}%`,
                 };
@@ -1310,7 +1313,7 @@ Alpine.data('taskCalendar', () => ({
                 today: iso === today(),
                 events: this.eventsOn(iso).length,
                 deadlines: this.deadlinesOn(iso).length,
-                overdue: this.deadlinesOn(iso).some((task) => isOverdue(task)),
+                overdue: this.deadlinesOn(iso).some((task) => this.isOverdue(task)),
             };
         });
     },
