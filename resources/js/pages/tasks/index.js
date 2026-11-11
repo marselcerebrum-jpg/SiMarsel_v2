@@ -765,14 +765,20 @@ Alpine.data('taskDetail', () => ({
 
     // Ambil ulang detail tanpa mengosongkan panel, agar daftar evidence dan histori sama dengan yang tersimpan.
     // Bila gagal, data yang sudah tampil dipertahankan; panel tetap bisa dimuat ulang saat dibuka kembali.
+    // Bila gagal, evidence tetap tampil dari respons POST, tetapi histori belum memuat aktivitasnya: bagian histori
+    // menampilkan pesan dan tombol Coba lagi (memuat ulang dari API histori).
     async refreshDetail() {
         const id = this.task?.id;
+        // Permintaan histori yang masih berjalan dimulai sebelum aktivitas ini tercatat.
+        const request = ++this.activityRequest;
 
         try {
             const { data } = await fetchTask(id);
             if (this.task?.id === id) this.applyTask(data);
         } catch {
-            // Evidence sudah tersimpan dan ditampilkan dari respons POST.
+            if (this.task?.id !== id || request !== this.activityRequest) return;
+            this.activityState = 'error';
+            this.activityError = 'Evidence tersimpan, tetapi histori aktivitas gagal diperbarui.';
         }
     },
 
