@@ -26,7 +26,6 @@ import {
     formatDate,
     formatDateTime,
     isOverdue,
-    managesTask,
     parseISODate,
     priorityOf,
     statusOf,
@@ -473,8 +472,14 @@ Alpine.data('tasklist', () => ({
             this.syncTask(data);
             showToast({ title: 'Status diperbarui', text: message ?? `${task.title} → ${statusOf(transition.to).label}` });
         } catch (error) {
-            notifyFailure(error, 'Status tugas gagal diperbarui.');
-            if (error?.status === 409) this.load();
+            if (error?.status === 422) {
+                const errors = validationErrors(error);
+                notifyFailure({ ...error, data: { ...error.data, message: errors.status ?? errors.decision ?? errors.pic_id } }, 'Status tugas gagal diperbarui.');
+            } else {
+                notifyFailure(error, 'Status tugas gagal diperbarui.');
+            }
+            // Data lama, atau tugas sudah diputuskan reviewer lain: muat ulang agar kartu berada di kolom yang benar.
+            if (error?.status === 409 || (error?.status === 422 && transition.review)) this.load();
         } finally {
             this.movingId = null;
         }
@@ -691,7 +696,11 @@ Alpine.data('taskDetail', () => ({
             this.syncDetailCollections(data);
             // Tugas yang belum ada di daftar baru masuk Board setelah detailnya dimuat.
             if (this.highlightId === data.id) this.$nextTick(() => this.revealHighlight());
-            if (this.detailFocus === 'revision') this.startReview('revision');
+            // Form revisi dari Board hanya dibuka bila backend mengizinkan user memberi keputusan QA saat ini.
+            if (this.detailFocus === 'revision') {
+                if (data.can_review === true) this.startReview('revision');
+                else showToast({ type: 'info', title: 'Revisi tidak dapat diminta', text: 'Anda tidak dapat memberi keputusan QA untuk tugas ini saat ini.', duration: 5000 });
+            }
             if (this.detailFocus === 'edit' && this.canEditThis) this.startEdit();
         } catch (error) {
             if (this.highlightId === id) this.highlightId = null;
@@ -724,6 +733,19 @@ Alpine.data('taskDetail', () => ({
         }
     },
 
+    // Ambil ulang detail tanpa mengosongkan panel, agar daftar evidence dan histori sama dengan yang tersimpan.
+    // Bila gagal, data yang sudah tampil dipertahankan; panel tetap bisa dimuat ulang saat dibuka kembali.
+    async refreshDetail() {
+        const id = this.task?.id;
+
+        try {
+            const { data } = await fetchTask(id);
+            if (this.task?.id === id) this.applyTask(data);
+        } catch {
+            // Evidence sudah tersimpan dan ditampilkan dari respons POST.
+        }
+    },
+
     async handleFailure(error, fallback) {
         notifyFailure(error, fallback);
         if (error?.status === 409) {
@@ -733,10 +755,6 @@ Alpine.data('taskDetail', () => ({
     },
 
     // --- Hak akses pada tugas yang dibuka -----------------------------------------------------
-
-    get transitions() {
-        return this.task ? availableTransitions(this.task, this.user) : [];
-    },
 
     get isPicOfTask() {
         return this.task?.pic?.id !== undefined && this.task?.pic?.id === this.user.id;
@@ -779,10 +797,6 @@ Alpine.data('taskDetail', () => ({
 
     get canSubmitEvidence() {
         return this.isPicOfTask && ['todo', 'in_progress'].includes(this.task?.status);
-    },
-
-    get canReview() {
-        return this.task ? managesTask(this.task, this.user) : false;
     },
 
     // --- Edit informasi utama (TASK-03 C) -----------------------------------------------------
@@ -897,7 +911,18 @@ Alpine.data('taskDetail', () => ({
         }
     },
 
-    // --- Workflow status (TASK-05) & review (TASK-07) -----------------------------------------
+    // --- Workflow status (TASK-05) ------------------------------------------------------------
+
+    // Status tujuan mengikuti next_statuses dari backend. Approve/Revisi tidak pernah lewat endpoint status:
+    // tombolnya membuka form review (TASK-07) dan hanya tampil bila backend mengirim can_review.
+    get transitions() {
+        if (!this.task) return [];
+
+        const backendStatuses = new Set((this.task.next_statuses ?? []).map(({ value }) => value));
+
+        return availableTransitions(this.task, this.user)
+            .filter((transition) => (transition.review ? this.task.can_review === true : backendStatuses.has(transition.to)));
+    },
 
     async runTransition(transition) {
         if (transition.review === 'revision') {
@@ -914,9 +939,15 @@ Alpine.data('taskDetail', () => ({
         try {
             const { data, message } = await changeTaskStatus(this.task.id, { status: transition.to, version: this.task.version });
             this.applyTask(data);
+            this.load();
             showToast({ title: 'Status diperbarui', text: message ?? `Status menjadi ${statusOf(transition.to).label}.` });
         } catch (error) {
-            await this.handleFailure(error, 'Status tugas gagal diperbarui.');
+            if (error?.status === 422) {
+                const errors = validationErrors(error);
+                notifyFailure({ ...error, data: { ...error.data, message: errors.status ?? errors.pic_id } }, 'Status tugas gagal diperbarui.');
+            } else {
+                await this.handleFailure(error, 'Status tugas gagal diperbarui.');
+            }
         } finally {
             this.acting = null;
         }
@@ -942,18 +973,32 @@ Alpine.data('taskDetail', () => ({
         try {
             const { data, message } = await reviewTask(this.task.id, {
                 decision,
-                note: this.reviewNote.trim(),
+                note: this.reviewNote.trim() || null,
                 version: this.task.version,
             });
             this.applyTask(data);
+            this.load();
             this.reviewMode = null;
             showToast({
                 title: decision === 'revision' ? 'Revisi diminta' : 'Tugas disetujui',
                 text: message ?? `Status menjadi ${statusOf(data.status).label}.`,
             });
         } catch (error) {
-            if (error?.status === 422) this.reviewError = validationErrors(error).note ?? taskErrorMessage(error, 'Keputusan review tidak valid.');
-            else await this.handleFailure(error, 'Keputusan review gagal disimpan.');
+            if (error?.status === 422) {
+                const errors = validationErrors(error);
+                if (errors.note) {
+                    this.reviewError = errors.note;
+                } else {
+                    // Tugas sudah tidak di On QA (misalnya diputuskan reviewer lain): tutup form dan muat data terbaru.
+                    notifyFailure({ ...error, data: { ...error.data, message: errors.decision ?? errors.version } }, 'Keputusan review gagal disimpan.');
+                    this.reviewMode = null;
+                    await this.reload();
+                    this.load();
+                }
+            } else {
+                if (error?.status === 409) this.reviewMode = null;
+                await this.handleFailure(error, 'Keputusan review gagal disimpan.');
+            }
         } finally {
             this.acting = null;
         }
@@ -995,11 +1040,12 @@ Alpine.data('taskDetail', () => ({
 
         try {
             const { data, message } = await submitEvidence(this.task.id, { file: type === 'file' ? file : null, url: type === 'link' ? url.trim() : '', note: note.trim() });
-            this.evidences = [data, ...this.evidences];
+            this.evidences = [data, ...this.evidences.filter(({ id }) => id !== data.id)];
             this.applyTask({ evidence_count: (this.task.evidence_count ?? 0) + 1 });
             this.evidenceForm = { type, file: null, url: '', note: '' };
             if (this.$refs.evidenceFile) this.$refs.evidenceFile.value = '';
             showToast({ title: 'Evidence terkirim', text: message ?? 'Bukti pekerjaan berhasil disimpan.' });
+            await this.refreshDetail();
         } catch (error) {
             if (error?.status === 422) this.evidenceErrors = validationErrors(error);
             else notifyFailure(error, 'Evidence gagal dikirim.');

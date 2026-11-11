@@ -8,9 +8,10 @@ import vm from 'node:vm';
  * so the assertions are about the HTTP request the browser actually sends and how the page reacts to the
  * backend's responses:
  * - PATCH /api/tasks/{id}/status (ChangeTaskStatusRequest: status + version) from the Board and the detail;
- * - POST /api/tasks/{id}/reviews (ReviewTaskRequest: decision, note, version) for QA decisions;
+ * - POST /api/tasks/{id}/reviews (ReviewTaskRequest: decision, note, version) for QA decisions, with the default VITE_TASK_API_READY=false;
  * - POST /api/tasks (StoreTaskRequest) from the Create Task form, until the task shows on the Board and Table;
- * - PATCH /api/tasks/{id}/assignment (AssignTaskRequest: pic_id, division_id, version) from the detail.
+ * - PATCH /api/tasks/{id}/assignment (AssignTaskRequest: pic_id, division_id, version) from the detail;
+ * - POST /api/tasks/{id}/evidences (StoreTaskEvidenceRequest: file or url, note) with the default VITE_TASK_API_READY=false.
  */
 const PIC = { id: 10, role: { code_role: 'EMP' }, division: { code_division: 'MKT' } };
 const ADMIN = { id: 1, role: { code_role: 'ADM' }, division: null };
@@ -22,7 +23,7 @@ async function tasklistPage(routes, sessionUser = PIC, apiReady = 'false') {
 
     const fetch = async (url, options = {}) => {
         const method = options.method ?? 'GET';
-        const body = options.body ? JSON.parse(options.body) : undefined;
+        const body = typeof options.body === 'string' ? JSON.parse(options.body) : options.body;
         requests.push({ method, url, body, headers: options.headers });
 
         const handler = routes[`${method} ${url.split('?')[0]}`];
@@ -32,8 +33,18 @@ async function tasklistPage(routes, sessionUser = PIC, apiReady = 'false') {
         return { ok: status >= 200 && status < 300, status, json: async () => json };
     };
 
+    // Evidence is sent as multipart; the mock keeps the appended fields so the test can read them.
+    class FormData {
+        fields = {};
+
+        append(key, value) {
+            this.fields[key] = value;
+        }
+    }
+
     const context = vm.createContext({
         fetch,
+        FormData,
         URL,
         URLSearchParams,
         setTimeout,
@@ -197,7 +208,7 @@ test('Board drag rejected by a backend business rule shows the server reason and
 test('Detail status button sends the displayed version and updates the panel and the Board', async () => {
     const { board, detail: createDetail, requests, toasts } = await tasklistPage({
         'GET /api/tasks': () => ({ json: { data: [task({ version: 2 })], meta: { status_counts: {} } } }),
-        'GET /api/tasks/7': () => ({ json: { data: task({ version: 2, description: null, history: [] }) } }),
+        'GET /api/tasks/7': () => ({ json: { data: task({ version: 2, description: null, history: [], next_statuses: [{ value: 'in_progress', label: 'On Process' }] }) } }),
         'PATCH /api/tasks/7/status': (body) => ({ json: { data: task({ status: body.status, version: 3 }), message: 'Status tugas berhasil diperbarui.' } }),
     });
     await board.load();
@@ -227,7 +238,7 @@ test('Detail status change based on an outdated version is rejected with a clear
         },
         'GET /api/tasks/7': () => {
             detailCalls += 1;
-            return { json: { data: detailCalls === 1 ? task() : task({ status: 'in_progress', version: 5 }) } };
+            return { json: { data: detailCalls === 1 ? task({ next_statuses: [{ value: 'in_progress', label: 'On Process' }] }) : task({ status: 'in_progress', version: 5 }) } };
         },
         'PATCH /api/tasks/7/status': () => ({
             status: 409,
@@ -478,4 +489,292 @@ test('Assignment conflicts reload both views and a rejected PIC shows the server
     assert.equal(detail.assigneeState, 'error');
     assert.equal(detail.assignmentError, 'PIC harus Staff aktif dari divisi tugas.');
     assert.equal(detail.task.pic.id, PIC.id, 'a rejected assignment leaves the shown PIC unchanged');
+});
+
+test('Detail buttons follow next_statuses, and Approve/Revision only show when the backend sends can_review', async () => {
+    let detail = task({ next_statuses: [{ value: 'in_progress', label: 'On Process' }] });
+    const { board, detail: createDetail } = await tasklistPage({
+        'GET /api/tasks': () => ({ json: { data: [task()], meta: { status_counts: {} } } }),
+        'GET /api/tasks/7': () => ({ json: { data: detail } }),
+    }, ADMIN);
+    await board.load();
+    board.detailId = 7;
+
+    detail = task({ next_statuses: [] });
+    const blocked = createDetail();
+    await blocked.open(7);
+    assert.deepEqual([...blocked.transitions], [], 'no button when the backend offers no next status');
+
+    detail = task({ status: 'on_qa', requires_review: true, can_review: false, next_statuses: [] });
+    const notReviewer = createDetail();
+    await notReviewer.open(7);
+    assert.deepEqual([...notReviewer.transitions], [], 'QA buttons need can_review');
+
+    detail = task({ status: 'on_qa', requires_review: true, can_review: true, next_statuses: [] });
+    const reviewer = createDetail();
+    await reviewer.open(7);
+    assert.deepEqual([...reviewer.transitions].map(({ review }) => review).sort(), ['approve', 'revision']);
+});
+
+test('A status move rejected in the detail shows the server reason and keeps the task where it was', async () => {
+    const working = task({ status: 'in_progress', next_statuses: [{ value: 'done', label: 'Done' }] });
+    const { board, detail: createDetail, toasts, requests } = await tasklistPage({
+        'GET /api/tasks': () => ({ json: { data: [working], meta: { status_counts: {} } } }),
+        'GET /api/tasks/7': () => ({ json: { data: working } }),
+        'PATCH /api/tasks/7/status': () => ({ status: 422, json: { message: 'Data tidak valid.', errors: { status: ['Unggah evidence terlebih dahulu sebelum mengubah status ke Done.'] } } }),
+    });
+    await board.load();
+    board.detailId = 7;
+    const detail = createDetail();
+    await detail.open(7);
+
+    assert.deepEqual([...detail.transitions].map(({ to }) => to), ['done']);
+    await detail.runTransition(detail.transitions[0]);
+
+    assert.deepEqual(statusRequests(requests)[0].body, { status: 'done', version: 4 });
+    assert.equal(toasts.at(-1).title, 'Gagal');
+    assert.equal(toasts.at(-1).text, 'Unggah evidence terlebih dahulu sebelum mengubah status ke Done.');
+    assert.equal(detail.task.status, 'in_progress');
+    assert.deepEqual(board.tasksIn('in_progress').map(({ id }) => id), [7]);
+    assert.equal(detail.acting, null);
+});
+
+test('With the default config, Approve and Request Revision go to the review endpoint, never the status endpoint, from the Board and the detail', async () => {
+    let current = task({ status: 'on_qa', requires_review: true, can_review: true, next_statuses: [], version: 8 });
+    const decided = (body) => {
+        const approved = body.decision === 'approve';
+        const review = { id: 1, task_id: 7, cycle: 1, decision: body.decision, decision_label: approved ? 'Approve' : 'Request Revision', note: body.note, reviewer: { id: ADMIN.id, fullname: 'Admin' }, created_at: '2026-11-11T03:00:00Z' };
+        const history = [{ id: 9, action: approved ? 'approved' : 'revision_requested', action_label: review.decision_label, description: body.note ?? '', changes: {}, actor: null, created_at: review.created_at }];
+        current = { ...current, status: approved ? 'done' : 'in_progress', version: body.version + 1, can_review: false, last_review: review, history };
+        return current;
+    };
+    const { board, detail: createDetail, requests, toasts } = await tasklistPage({
+        'GET /api/tasks': () => ({ json: { data: [current], meta: { status_counts: {} } } }),
+        'GET /api/tasks/7': () => ({ json: { data: current } }),
+        'POST /api/tasks/7/reviews': (body) => ({ json: { data: decided(body), message: body.decision === 'approve' ? 'Tugas berhasil disetujui.' : 'Permintaan revisi berhasil dikirim.' } }),
+    }, ADMIN);
+    await board.load();
+    const reviews = () => requests.filter(({ url }) => url === '/api/tasks/7/reviews');
+
+    // Board: On QA → On Process opens the revision form in the detail; the card stays until the note is sent.
+    board.draggingId = 7;
+    await board.drop('in_progress');
+    assert.equal(board.detailId, 7);
+    assert.deepEqual(board.tasksIn('on_qa').map(({ id }) => id), [7]);
+    const detail = createDetail();
+    await detail.open(7);
+    assert.equal(detail.reviewMode, 'revision', 'the form opens because the backend sent can_review');
+    detail.reviewNote = '  Perbaiki ukuran banner.  ';
+    await detail.submitReview();
+    assert.deepEqual(reviews()[0].body, { decision: 'revision', note: 'Perbaiki ukuran banner.', version: 8 });
+    assert.equal(reviews()[0].headers['X-CSRF-TOKEN'], 'csrf-test');
+    assert.equal(detail.task.status, 'in_progress');
+    assert.equal(detail.task.last_review.note, 'Perbaiki ukuran banner.');
+    assert.deepEqual(detail.activities.map(({ action }) => action), ['revision_requested']);
+    assert.equal(detail.reviewMode, null);
+    assert.equal(toasts.at(-1).title, 'Revisi diminta');
+    assert.equal(toasts.at(-1).text, 'Permintaan revisi berhasil dikirim.');
+    assert.deepEqual(board.tasksIn('in_progress').map(({ id }) => id), [7]);
+    assert.equal(board.tasks[0].version, 9);
+
+    // Board: On QA → Done approves through the review endpoint and moves the card with the new version.
+    current = { ...current, status: 'on_qa', can_review: true };
+    await board.load();
+    board.draggingId = 7;
+    await board.drop('done');
+    assert.deepEqual(reviews()[1].body, { decision: 'approve', version: 9 });
+    assert.deepEqual(board.tasksIn('done').map(({ id }) => id), [7]);
+    assert.equal(board.tasks[0].version, 10);
+    assert.equal(toasts.at(-1).text, 'Tugas berhasil disetujui.');
+
+    // Detail: the Approve button opens the form; without a note it sends note null.
+    current = { ...current, status: 'on_qa', can_review: true };
+    await detail.open(7);
+    const approve = detail.transitions.find(({ review }) => review === 'approve');
+    await detail.runTransition(approve);
+    assert.equal(detail.reviewMode, 'approve');
+    await detail.submitReview();
+    assert.deepEqual(reviews()[2].body, { decision: 'approve', note: null, version: 10 });
+    assert.equal(detail.task.status, 'done');
+    assert.deepEqual(board.tasksIn('done').map(({ id }) => id), [7]);
+
+    assert.equal(requests.some(({ url }) => url.endsWith('/status')), false);
+    assert.equal(toasts.some(({ title }) => title === 'Menunggu Back End'), false);
+});
+
+test('Review rejections show a clear message: a missing note stays in the form, a decided task or a stale version reloads and the card goes back', async () => {
+    let current = task({ status: 'on_qa', requires_review: true, can_review: true, next_statuses: [], version: 8 });
+    let reply;
+    const { board, detail: createDetail, requests, toasts } = await tasklistPage({
+        'GET /api/tasks': () => ({ json: { data: [current], meta: { status_counts: {} } } }),
+        'GET /api/tasks/7': () => ({ json: { data: current } }),
+        'POST /api/tasks/7/reviews': () => reply(),
+    }, ADMIN);
+    await board.load();
+    board.detailId = 7;
+    const detail = createDetail();
+    await detail.open(7);
+
+    // 422 on the note: the form stays open with the reason next to the field.
+    reply = () => ({ status: 422, json: { message: 'Data tidak valid.', errors: { note: ['Catatan review maksimal 2000 karakter.'] } } });
+    detail.startReview('revision');
+    detail.reviewNote = 'x';
+    await detail.submitReview();
+    assert.equal(detail.reviewMode, 'revision');
+    assert.equal(detail.reviewError, 'Catatan review maksimal 2000 karakter.');
+    assert.equal(detail.task.status, 'on_qa');
+
+    // A revision without a note is stopped before any request.
+    const sent = requests.length;
+    detail.reviewNote = '   ';
+    await detail.submitReview();
+    assert.equal(requests.length, sent);
+    assert.equal(detail.reviewError, 'Catatan alasan revisi wajib diisi.');
+
+    // 422 on the decision: another reviewer already decided. The reason is shown and both views reload.
+    reply = () => {
+        current = { ...current, status: 'done', can_review: false, version: 9 };
+        return { status: 422, json: { message: 'Data tidak valid.', errors: { decision: ['Keputusan review hanya dapat diberikan pada tugas berstatus On QA, bukan Done.'] } } };
+    };
+    detail.startReview('approve');
+    await detail.submitReview();
+    await new Promise((resolve) => setTimeout(resolve));
+    assert.equal(toasts.at(-1).title, 'Gagal');
+    assert.equal(toasts.at(-1).text, 'Keputusan review hanya dapat diberikan pada tugas berstatus On QA, bukan Done.');
+    assert.equal(detail.reviewMode, null);
+    assert.equal(detail.task.status, 'done');
+    assert.deepEqual(board.tasksIn('done').map(({ id }) => id), [7]);
+
+    // 409 from the Board: the card stays in On QA, the latest data is loaded and the message is clear.
+    current = { ...current, status: 'on_qa', can_review: true, version: 9 };
+    await board.load();
+    board.tasks[0].version = 8;
+    reply = () => {
+        current = { ...current, version: 10 };
+        return { status: 409, json: { message: 'Tugas telah diubah oleh pengguna lain.', current_version: 10 } };
+    };
+    board.draggingId = 7;
+    await board.drop('done');
+    await new Promise((resolve) => setTimeout(resolve));
+    assert.match(toasts.at(-1).text, /sudah diperbarui oleh pengguna lain/);
+    assert.deepEqual(board.tasksIn('on_qa').map(({ id }) => id), [7]);
+    assert.equal(board.tasks[0].version, 10);
+
+    // 403 from the Board: the backend message is shown and the card stays in On QA.
+    reply = () => ({ status: 403, json: { message: 'This action is unauthorized.' } });
+    board.draggingId = 7;
+    await board.drop('done');
+    assert.equal(toasts.at(-1).title, 'Gagal');
+    assert.deepEqual(board.tasksIn('on_qa').map(({ id }) => id), [7]);
+
+    assert.equal(requests.some(({ url }) => url.endsWith('/status')), false);
+});
+
+test('Dragging On QA to On Process does not open the revision form when the backend does not send can_review', async () => {
+    const reviewed = task({ status: 'on_qa', requires_review: true, can_review: false, next_statuses: [] });
+    const { board, detail: createDetail, requests, toasts } = await tasklistPage({
+        'GET /api/tasks': () => ({ json: { data: [reviewed], meta: { status_counts: {} } } }),
+        'GET /api/tasks/7': () => ({ json: { data: reviewed } }),
+    }, ADMIN);
+    await board.load();
+
+    board.draggingId = 7;
+    await board.drop('in_progress');
+    const detail = createDetail();
+    await detail.open(7);
+
+    assert.equal(detail.reviewMode, null);
+    assert.equal(toasts.at(-1).title, 'Revisi tidak dapat diminta');
+    assert.deepEqual(board.tasksIn('on_qa').map(({ id }) => id), [7]);
+    assert.equal(requests.some(({ method }) => method !== 'GET'), false);
+});
+
+test('With the default config, the PIC sends a file and a link as evidence and the saved evidence shows again in the detail', async () => {
+    const saved = [];
+    const evidence = (id, fields) => ({
+        id,
+        task_id: 7,
+        type: fields.file ? 'file' : 'link',
+        file_name: fields.file?.name ?? null,
+        file_url: fields.file ? `/api/tasks/7/evidences/${id}/download` : null,
+        url: fields.url ?? null,
+        note: fields.note ?? null,
+        submitter: { id: PIC.id, fullname: 'Staff Marketing' },
+        created_at: '2026-11-11T02:00:00Z',
+    });
+    const detail = () => task({
+        status: 'in_progress',
+        evidence_required: true,
+        evidence_count: saved.length,
+        evidence: [...saved].reverse(),
+        history: saved.map((item) => ({ id: item.id, action: 'evidence_submitted', action_label: 'Evidence dikirim', description: `Evidence: ${item.file_name ?? item.url}`, changes: {}, actor: null, created_at: item.created_at })),
+    });
+    const { board, detail: createDetail, requests, toasts } = await tasklistPage({
+        'GET /api/tasks': () => ({ json: { data: [task({ status: 'in_progress', evidence_required: true })], meta: { status_counts: {} } } }),
+        'GET /api/tasks/7': () => ({ json: { data: detail() } }),
+        'POST /api/tasks/7/evidences': (form) => {
+            const created = evidence(saved.length + 1, form.fields);
+            saved.push(created);
+            return { status: 201, json: { data: created, message: 'Bukti tugas berhasil dikirim.' } };
+        },
+    });
+    await board.load();
+    board.detailId = 7;
+    const panel = createDetail();
+    await panel.open(7);
+    assert.equal(panel.canSubmitEvidence, true);
+    assert.equal(panel.evidences.length, 0);
+
+    const file = { name: 'desain-final.pdf', size: 1024 };
+    panel.evidenceForm = { type: 'file', file, url: '', note: 'Versi final' };
+    await panel.sendEvidence();
+
+    panel.evidenceForm = { type: 'link', file: null, url: ' https://drive.example.com/banner ', note: '' };
+    await panel.sendEvidence();
+
+    const posts = requests.filter(({ method, url }) => method === 'POST' && url === '/api/tasks/7/evidences');
+    assert.equal(posts.length, 2, 'evidence is sent although VITE_TASK_API_READY is false');
+    assert.deepEqual({ ...posts[0].body.fields }, { file, note: 'Versi final' });
+    assert.deepEqual({ ...posts[1].body.fields }, { url: 'https://drive.example.com/banner' });
+    assert.equal(posts[0].headers['X-CSRF-TOKEN'], 'csrf-test');
+    assert.equal(toasts.at(-1).title, 'Evidence terkirim');
+
+    // After each submission the detail is fetched again: evidence and history come from the backend.
+    assert.deepEqual([...panel.evidences].map(({ id, type }) => [id, type]), [[2, 'link'], [1, 'file']]);
+    assert.deepEqual([...panel.activities].map(({ description }) => description), ['Evidence: desain-final.pdf', 'Evidence: https://drive.example.com/banner']);
+    assert.equal(board.tasks[0].evidence_count, 2);
+
+    // Opening the detail again shows the saved evidence.
+    const reopened = createDetail();
+    await reopened.open(7);
+    assert.deepEqual([...reopened.evidences].map((item) => item.file_name ?? item.url), ['https://drive.example.com/banner', 'desain-final.pdf']);
+    assert.equal(reopened.evidences[1].file_url, '/api/tasks/7/evidences/1/download');
+});
+
+test('Evidence rejected by the backend shows the reason in the form and keeps the list unchanged', async () => {
+    let reply = { status: 422, json: { message: 'Data tidak valid.', errors: { url: ['Tautan harus berupa URL yang valid dan diawali http:// atau https://.'] } } };
+    const { board, detail: createDetail, toasts } = await tasklistPage({
+        'GET /api/tasks': () => ({ json: { data: [task()], meta: { status_counts: {} } } }),
+        'GET /api/tasks/7': () => ({ json: { data: task({ evidence: [], history: [] }) } }),
+        'POST /api/tasks/7/evidences': () => reply,
+    });
+    await board.load();
+    board.detailId = 7;
+    const panel = createDetail();
+    await panel.open(7);
+
+    panel.evidenceForm = { type: 'link', file: null, url: 'https://contoh.test/a', note: '' };
+    await panel.sendEvidence();
+    assert.equal(panel.evidenceErrors.url, 'Tautan harus berupa URL yang valid dan diawali http:// atau https://.');
+
+    reply = { status: 422, json: { message: 'Data tidak valid.', errors: { evidence: ['Evidence hanya dapat dikirim saat tugas berstatus To Do atau On Process, bukan Done.'] } } };
+    await panel.sendEvidence();
+    assert.equal(panel.evidenceErrors.evidence, 'Evidence hanya dapat dikirim saat tugas berstatus To Do atau On Process, bukan Done.');
+
+    reply = { status: 403, json: { message: 'This action is unauthorized.' } };
+    await panel.sendEvidence();
+    assert.equal(toasts.at(-1).text, 'Anda tidak memiliki akses untuk tindakan ini.');
+
+    assert.equal(panel.evidences.length, 0);
+    assert.equal(panel.sendingEvidence, false);
 });

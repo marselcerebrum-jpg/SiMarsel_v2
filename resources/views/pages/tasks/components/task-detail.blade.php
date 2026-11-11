@@ -95,7 +95,7 @@
                         <h3 class="{{ $sectionTitle }}" x-text="reviewMode === 'revision' ? 'Minta Revisi' : 'Setujui Tugas'"></h3>
                         <p class="mt-1 text-xs text-muted" x-text="reviewMode === 'revision' ? 'Tugas kembali ke On Process. Jelaskan apa yang perlu diperbaiki PIC.' : 'Tugas akan ditandai Done dan waktu penyelesaian dicatat.'"></p>
                         <label for="review-note" class="{{ $labelClass }} mt-3">Catatan <span x-show="reviewMode === 'revision'" class="text-red-500">*</span><span x-show="reviewMode !== 'revision'">(opsional)</span></label>
-                        <textarea id="review-note" x-ref="reviewNote" x-model="reviewNote" rows="3" class="{{ $textareaClass }}" @input="reviewError = ''" maxlength="1000"
+                        <textarea id="review-note" x-ref="reviewNote" x-model="reviewNote" rows="3" class="{{ $textareaClass }}" @input="reviewError = ''" maxlength="2000"
                             :placeholder="reviewMode === 'revision' ? 'Contoh: lampirkan versi final desain dan perbaiki ukuran banner.' : 'Catatan untuk PIC'"></textarea>
                         <p x-show="reviewError" x-text="reviewError" class="{{ $errorClass }}"></p>
                         <div class="mt-3 flex justify-end gap-2">
@@ -254,6 +254,7 @@
                         </div>
 
                         <form x-show="canSubmitEvidence" class="mt-3 flex flex-col gap-3 rounded-lg border border-line p-4" novalidate @submit.prevent="sendEvidence()">
+                            <p x-show="evidenceErrors.evidence" x-text="evidenceErrors.evidence" class="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700" role="alert"></p>
                             <div class="inline-flex self-start rounded-lg border border-line bg-soft p-1" role="group" aria-label="Jenis evidence">
                                 <button type="button" class="rounded-md px-3 py-1 text-xs font-semibold" :class="evidenceForm.type === 'file' ? 'bg-white text-ink shadow-sm' : 'text-muted'" @click="evidenceForm.type = 'file'; evidenceErrors = {}">File</button>
                                 <button type="button" class="rounded-md px-3 py-1 text-xs font-semibold" :class="evidenceForm.type === 'link' ? 'bg-white text-ink shadow-sm' : 'text-muted'" @click="evidenceForm.type = 'link'; evidenceErrors = {}">Tautan</button>
@@ -267,12 +268,13 @@
                             </div>
                             <div x-show="evidenceForm.type === 'link'">
                                 <label for="evidence-url" class="{{ $labelClass }}">Tautan</label>
-                                <input id="evidence-url" type="url" x-model="evidenceForm.url" class="{{ $inputClass }}" :class="evidenceErrors.url && 'border-red-500!'" placeholder="https://" @input="evidenceErrors.url = null">
+                                <input id="evidence-url" type="url" x-model="evidenceForm.url" maxlength="2048" class="{{ $inputClass }}" :class="evidenceErrors.url && 'border-red-500!'" placeholder="https://" @input="evidenceErrors.url = null">
                                 <p x-show="evidenceErrors.url" x-text="evidenceErrors.url" class="{{ $errorClass }}"></p>
                             </div>
                             <div>
                                 <label for="evidence-note" class="{{ $labelClass }}">Keterangan (opsional)</label>
-                                <input id="evidence-note" type="text" x-model="evidenceForm.note" class="{{ $inputClass }}" maxlength="255">
+                                <input id="evidence-note" type="text" x-model="evidenceForm.note" class="{{ $inputClass }}" :class="evidenceErrors.note && 'border-red-500!'" maxlength="2000" @input="evidenceErrors.note = null">
+                                <p x-show="evidenceErrors.note" x-text="evidenceErrors.note" class="{{ $errorClass }}"></p>
                             </div>
                             <button type="submit" class="{{ $primaryButton }} self-end" :disabled="sendingEvidence" x-text="sendingEvidence ? 'Mengirim…' : 'Kirim Evidence'"></button>
                         </form>
