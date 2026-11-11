@@ -131,28 +131,3 @@ export const isActive = (task) => task.status !== 'done';
 
 export const isOverdue = (task, on = today()) => isActive(task) && Boolean(task.deadline) && task.deadline.slice(0, 10) < on;
 
-export const isDueToday = (task, on = today()) => isActive(task) && Boolean(task.deadline) && task.deadline.slice(0, 10) === on;
-
-/**
- * Ringkasan TASK-09, dihitung dari daftar tugas yang sama dengan Board/Table agar selalu konsisten.
- */
-export function summarize(tasks, on = today()) {
-    const count = (predicate) => tasks.filter(predicate).length;
-    const total = tasks.length;
-    const completed = count((task) => task.status === 'done');
-
-    return {
-        total,
-        backlog: count((task) => task.status === 'backlog'),
-        todo: count((task) => task.status === 'todo'),
-        in_progress: count((task) => task.status === 'in_progress'),
-        ready_for_qa: count((task) => task.status === 'ready_for_qa'),
-        on_qa: count((task) => task.status === 'on_qa'),
-        completed,
-        unfinished: total - completed,
-        overdue: count((task) => isOverdue(task, on)),
-        due_today: count((task) => isDueToday(task, on)),
-        urgent: count((task) => isActive(task) && task.priority === 'urgent'),
-        completion_rate: total ? Math.round((completed / total) * 1000) / 10 : 0,
-    };
-}
