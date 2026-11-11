@@ -5,9 +5,9 @@
 @endphp
 
 <div x-data="promoUnregisteredCodes" @promo-codes-changed.window="refresh()" class="mt-5 min-w-0">
-    <p x-show="loadError && pendingTotal === null" x-cloak class="flex flex-wrap items-center gap-3 rounded-lg border border-red-200 bg-red-50 px-4 py-2.5 text-sm text-red-700" role="alert">
-        <span x-text="loadError"></span>
-        <button type="button" class="font-semibold underline hover:no-underline" @click="fetchItems()">Coba Lagi</button>
+    <p x-show="totalError" x-cloak class="mb-4 flex flex-wrap items-center gap-3 rounded-lg border border-red-200 bg-red-50 px-4 py-2.5 text-sm text-red-700" role="alert">
+        <span x-text="totalError"></span>
+        <button type="button" class="font-semibold underline hover:no-underline" @click="refresh()">Coba Lagi</button>
     </p>
 
     <section x-show="visible" x-cloak class="rounded-lg border border-amber-300 bg-amber-50" aria-labelledby="unregistered-title">

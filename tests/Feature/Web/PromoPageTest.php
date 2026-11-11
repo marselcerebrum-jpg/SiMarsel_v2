@@ -347,6 +347,7 @@ class PromoPageTest extends TestCase
             ->get(route('promo.index'))
             ->assertSee('x-data="promoUnregisteredCodes"', false)
             ->assertSee('x-show="visible"', false)
+            ->assertSeeInOrder(['x-show="totalError"', 'x-text="totalError"', '@click="refresh()">Coba Lagi'], false)
             ->assertSeeInOrder([
                 'Kode transaksi belum terdaftar',
                 'Ada kode pada transaksi yang belum punya master di platform terkait. Cek kode lalu daftarkan agar pemetaannya dapat dilengkapi.',

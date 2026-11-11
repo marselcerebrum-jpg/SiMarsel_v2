@@ -24,6 +24,9 @@ export default function promoUnregisteredCodes() {
         searched: false,
         // Codes still to review without a search; null until the first unfiltered response.
         pendingTotal: null,
+        // Set when checking pendingTotal failed, so a failed check is never shown as "nothing to review".
+        totalError: '',
+        totalRequestId: 0,
         reviewOpen: false,
 
         init() {
@@ -36,10 +39,10 @@ export default function promoUnregisteredCodes() {
         },
 
         /**
-         * A search stays visible while it is in use, even when it hides every code.
+         * Based on the unsearched total only, so the alert hides once no code is left even while a search is active.
          */
         get visible() {
-            return this.pendingTotal > 0 || (this.reviewOpen && this.hasFilter);
+            return this.pendingTotal > 0;
         },
 
         get hasFilter() {
@@ -64,6 +67,7 @@ export default function promoUnregisteredCodes() {
         async fetchItems() {
             const requestId = ++this.requestId;
             const searched = this.hasFilter;
+            if (!searched) this.totalRequestId++;
             this.loading = true;
             this.loadError = '';
 
@@ -80,10 +84,14 @@ export default function promoUnregisteredCodes() {
                 this.items = data;
                 this.meta = meta ?? null;
                 this.searched = searched;
-                if (!searched) this.pendingTotal = meta?.total ?? data.length;
+                if (!searched) {
+                    this.pendingTotal = meta?.total ?? data.length;
+                    this.totalError = '';
+                }
             } catch (error) {
                 if (requestId !== this.requestId) return;
                 this.loadError = errorMessage(error, 'Gagal memuat kode promo yang belum terdaftar.');
+                if (!searched) this.totalError = this.loadError;
             } finally {
                 if (requestId === this.requestId) this.loading = false;
             }
@@ -94,8 +102,26 @@ export default function promoUnregisteredCodes() {
             this.fetchItems();
         },
 
+        /**
+         * Unsearched total, fetched on its own while a search is active so the search result stays on screen.
+         */
+        async fetchPendingTotal() {
+            const requestId = ++this.totalRequestId;
+
+            try {
+                const { data, meta } = await fetchUnregisteredCodes(toQueryString(defaultFilter()));
+                if (requestId !== this.totalRequestId) return;
+
+                this.pendingTotal = meta?.total ?? data.length;
+                this.totalError = '';
+            } catch (error) {
+                if (requestId !== this.totalRequestId) return;
+                this.totalError = errorMessage(error, 'Gagal memeriksa kode promo yang belum terdaftar.');
+            }
+        },
+
         refresh() {
-            this.fetchItems();
+            return Promise.all([this.fetchItems(), this.hasFilter && this.fetchPendingTotal()]);
         },
 
         goToPage(page) {
