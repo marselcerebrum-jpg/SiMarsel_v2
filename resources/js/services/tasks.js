@@ -1,7 +1,7 @@
 import { http } from '../http';
 
 /**
- * API daftar, meta, detail, pembuatan, pembaruan, penugasan, status, evidence, dan review tugas sudah tersedia dan dipakai langsung.
+ * API daftar, meta, detail, pembuatan, pembaruan, penugasan, status, evidence, review, dan histori tugas sudah tersedia dan dipakai langsung.
  * Endpoint Tasklist lain yang belum terintegrasi tetap menunggu VITE_TASK_API_READY=true.
  * Kontrak lengkap ada di docs/api/tasks.md.
  *
@@ -16,6 +16,7 @@ import { http } from '../http';
  * GET    /api/tasks/{id}/evidences             → { data: [Evidence] }
  * POST   /api/tasks/{id}/evidences             → { data: Evidence, message }           (multipart: file atau url, note)
  * POST   /api/tasks/{id}/reviews               → { data: TaskDetail, message }         (kirim decision, note, version)
+ * GET    /api/tasks/{id}/activities            → { data: [Activity] }                  (terbaru lebih dulu)
  * GET    /api/tasks/schedule?from&to&division  → { data: [ScheduleItem] }
  * GET    /api/tasks/calendar?month&division    → { data: { events: [Event], deadlines: [Task] } }
  */
@@ -54,6 +55,9 @@ export const fetchEvidences = (id) => http(`/api/tasks/${id}/evidences`);
 
 // Keputusan QA (approve/revisi) tidak bergantung pada VITE_TASK_API_READY: API-nya sudah tersedia.
 export const reviewTask = (id, body) => http(`/api/tasks/${id}/reviews`, { method: 'POST', body });
+
+// Histori aktivitas tidak bergantung pada VITE_TASK_API_READY: API-nya sudah tersedia.
+export const fetchActivities = (id) => http(`/api/tasks/${id}/activities`);
 
 export const fetchSchedule = (params) => request(`/api/tasks/schedule${query(params)}`);
 

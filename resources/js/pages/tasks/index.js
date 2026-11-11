@@ -8,6 +8,7 @@ import {
     fetchAssignmentOptions,
     fetchCalendar,
     fetchSchedule,
+    fetchActivities,
     fetchTask,
     fetchTaskCreateOptions,
     fetchTaskMeta,
@@ -650,6 +651,8 @@ Alpine.data('taskDetail', () => ({
     evidenceState: 'idle',
     activities: [],
     activityState: 'idle',
+    activityError: '',
+    activityRequest: 0,
 
     editing: false,
     editForm: {},
@@ -681,7 +684,8 @@ Alpine.data('taskDetail', () => ({
     },
 
     reset() {
-        Object.assign(this, { task: null, state: 'idle', editing: false, reviewMode: null, reviewNote: '', reviewError: '', evidences: [], activities: [] });
+        Object.assign(this, { task: null, state: 'idle', editing: false, reviewMode: null, reviewNote: '', reviewError: '', evidences: [], activities: [], activityState: 'idle', activityError: '' });
+        this.activityRequest += 1;
     },
 
     async open(id) {
@@ -693,7 +697,7 @@ Alpine.data('taskDetail', () => ({
             this.task = data;
             this.state = 'ready';
             this.syncTask(data);
-            this.syncDetailCollections(data);
+            this.syncDetailCollections(data, { history: false });
             // Tugas yang belum ada di daftar baru masuk Board setelah detailnya dimuat.
             if (this.highlightId === data.id) this.$nextTick(() => this.revealHighlight());
             // Form revisi dari Board hanya dibuka bila backend mengizinkan user memberi keputusan QA saat ini.
@@ -702,6 +706,7 @@ Alpine.data('taskDetail', () => ({
                 else showToast({ type: 'info', title: 'Revisi tidak dapat diminta', text: 'Anda tidak dapat memberi keputusan QA untuk tugas ini saat ini.', duration: 5000 });
             }
             if (this.detailFocus === 'edit' && this.canEditThis) this.startEdit();
+            await this.loadActivities();
         } catch (error) {
             if (this.highlightId === id) this.highlightId = null;
             this.state = error?.unavailable ? 'unavailable' : { 403: 'forbidden', 404: 'not_found' }[error?.status] ?? 'error';
@@ -722,27 +727,58 @@ Alpine.data('taskDetail', () => ({
         this.syncTask(this.task);
     },
 
-    syncDetailCollections(data) {
+    syncDetailCollections(data, { history = true } = {}) {
         if (Array.isArray(data.evidence)) {
             this.evidences = data.evidence;
             this.evidenceState = 'ready';
         }
-        if (Array.isArray(data.history)) {
+        if (history && Array.isArray(data.history)) {
+            // Histori dari respons perubahan lebih baru daripada permintaan histori yang mungkin masih berjalan.
+            this.activityRequest += 1;
             this.activities = data.history;
             this.activityState = 'ready';
+            this.activityError = '';
+        }
+    },
+
+    // Histori aktivitas (TASK-08) diambil dari API histori agar punya state loading dan error sendiri,
+    // tanpa menutup detail bila gagal. Respons lama (tugas lain dibuka, atau histori sudah diperbarui) diabaikan.
+    async loadActivities() {
+        const id = this.task?.id;
+        if (!id) return;
+
+        const request = ++this.activityRequest;
+        this.activityState = 'loading';
+        this.activityError = '';
+
+        try {
+            const { data } = await fetchActivities(id);
+            if (request !== this.activityRequest) return;
+            this.activities = data;
+            this.activityState = 'ready';
+        } catch (error) {
+            if (request !== this.activityRequest) return;
+            this.activityState = 'error';
+            this.activityError = taskErrorMessage(error, 'Histori aktivitas gagal dimuat.');
         }
     },
 
     // Ambil ulang detail tanpa mengosongkan panel, agar daftar evidence dan histori sama dengan yang tersimpan.
     // Bila gagal, data yang sudah tampil dipertahankan; panel tetap bisa dimuat ulang saat dibuka kembali.
+    // Bila gagal, evidence tetap tampil dari respons POST, tetapi histori belum memuat aktivitasnya: bagian histori
+    // menampilkan pesan dan tombol Coba lagi (memuat ulang dari API histori).
     async refreshDetail() {
         const id = this.task?.id;
+        // Permintaan histori yang masih berjalan dimulai sebelum aktivitas ini tercatat.
+        const request = ++this.activityRequest;
 
         try {
             const { data } = await fetchTask(id);
             if (this.task?.id === id) this.applyTask(data);
         } catch {
-            // Evidence sudah tersimpan dan ditampilkan dari respons POST.
+            if (this.task?.id !== id || request !== this.activityRequest) return;
+            this.activityState = 'error';
+            this.activityError = 'Evidence tersimpan, tetapi histori aktivitas gagal diperbarui.';
         }
     },
 
