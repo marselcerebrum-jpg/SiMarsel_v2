@@ -12,6 +12,7 @@ async function alertFixture(totals) {
             fetchUnregisteredCodes: async (query) => {
                 requests.push(query);
                 const total = totals.shift();
+                if (total instanceof Error) throw total;
                 return { data: Array.from({ length: total }, (_, i) => ({ code: `KODE${i}` })), meta: { total, last_page: 1 } };
             },
         },
@@ -93,4 +94,93 @@ test('the badge keeps the loaded status until the search response arrives', asyn
     alert.filter.search = 'TIDAKADA';
 
     assert.equal(alert.status.text, '5 Belum Terdaftar');
+});
+
+test('the alert stays hidden while loading and when no code needs a review', async () => {
+    const { alert } = await alertFixture([0]);
+    assert.equal(alert.visible, false);
+
+    await alert.fetchItems();
+
+    assert.equal(alert.visible, false);
+});
+
+test('the alert shows for one or more codes and a search does not change the codes to review', async () => {
+    const { alert } = await alertFixture([1, 0]);
+
+    await alert.fetchItems();
+    assert.equal(alert.visible, true);
+
+    alert.reviewOpen = true;
+    await search(alert, 'TIDAKADA');
+
+    assert.equal(alert.pendingTotal, 1);
+    assert.equal(alert.visible, true);
+});
+
+test('the alert hides once the last code is registered', async () => {
+    const { alert } = await alertFixture([1, 0]);
+
+    await alert.fetchItems();
+    // What refresh() runs after a registration.
+    await alert.fetchItems();
+
+    assert.equal(alert.pendingTotal, 0);
+    assert.equal(alert.visible, false);
+});
+
+test('registering the last code from a search hides the alert and keeps the search', async () => {
+    const { alert, requests } = await alertFixture([1, 1, 0, 0]);
+
+    await alert.fetchItems();
+    alert.reviewOpen = true;
+    await search(alert, 'KODE0');
+    assert.equal(alert.visible, true);
+
+    // What @promo-codes-changed runs after the registration succeeds.
+    await alert.refresh();
+
+    assert.deepEqual(requests.slice(2), ['KODE0', '']);
+    assert.equal(alert.filter.search, 'KODE0');
+    assert.equal(alert.status.text, '0 Hasil');
+    assert.equal(alert.pendingTotal, 0);
+    assert.equal(alert.visible, false);
+});
+
+test('registering from a search with codes left keeps the alert with the new total', async () => {
+    const { alert } = await alertFixture([3, 1, 0, 2]);
+
+    await alert.fetchItems();
+    await search(alert, 'KODE0');
+    await alert.refresh();
+
+    assert.equal(alert.pendingTotal, 2);
+    assert.equal(alert.visible, true);
+});
+
+test('a failed check after a total of zero shows the error with a retry', async () => {
+    const { alert } = await alertFixture([0, new Error('down'), 2]);
+
+    await alert.fetchItems();
+    assert.equal(alert.totalError, '');
+
+    await alert.refresh();
+    assert.equal(alert.totalError, 'Request failed');
+    assert.equal(alert.visible, false);
+
+    // Coba Lagi.
+    await alert.refresh();
+    assert.equal(alert.totalError, '');
+    assert.equal(alert.visible, true);
+});
+
+test('a failed total check during a search also shows the error', async () => {
+    const { alert } = await alertFixture([0, 1, 1, new Error('down')]);
+
+    await alert.fetchItems();
+    await search(alert, 'KODE0');
+    await alert.refresh();
+
+    assert.equal(alert.totalError, 'Request failed');
+    assert.equal(alert.loadError, '');
 });

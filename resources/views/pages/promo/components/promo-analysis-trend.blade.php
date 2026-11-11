@@ -13,11 +13,11 @@
     @promo-analysis-filter.window="load($event.detail)"
     @promo-analysis-copy.window="provideCopy($event.detail)"
     @promo-analysis-export-params.window="provideExportParams($event.detail)"
-    class="mt-5 border-t border-line pt-5"
+    class="{{ $card }} min-w-0 p-5"
     aria-labelledby="promo-trend-title"
 >
     <div class="flex flex-wrap items-center justify-between gap-3">
-        <h3 id="promo-trend-title" class="text-sm font-semibold text-ink">Tren Penggunaan Promo</h3>
+        <h2 id="promo-trend-title" class="text-base font-semibold text-ink">Tren Penggunaan Promo</h2>
 
         <div class="inline-flex h-9 shrink-0 items-center gap-0.5 rounded-lg border border-line bg-soft p-0.5" role="radiogroup" aria-label="Periode Grafik">
             @foreach ($periods as $option)

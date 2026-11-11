@@ -34,13 +34,13 @@
                     class="h-9 w-full rounded-lg border border-line bg-white px-3 text-sm text-ink placeholder:text-label focus:border-primary focus:ring-2 focus:ring-primary/20 focus:outline-none"
                     :class="errors.name && 'border-red-500!'"
                     :aria-invalid="Boolean(errors.name)"
-                    aria-describedby="{{ $type }}-name-hint"
+                    aria-describedby="{{ $type }}-name-error {{ $type }}-name-hint"
                     placeholder="{{ $placeholder }}"
                     autocomplete="off"
                     maxlength="100"
                 >
                 <p id="{{ $type }}-name-hint" x-show="!errors.name" class="mt-1.5 text-xs text-muted">Nama unik, maksimal 100 karakter.</p>
-                <p x-show="errors.name" x-text="errors.name" class="mt-1.5 text-xs text-red-600" role="alert"></p>
+                <p id="{{ $type }}-name-error" x-show="errors.name" x-text="errors.name" class="mt-1.5 text-xs text-red-600" role="alert"></p>
             </div>
 
             <p x-show="formError" x-text="formError" class="text-xs text-red-600" role="alert"></p>

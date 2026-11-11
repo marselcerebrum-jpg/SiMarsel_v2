@@ -3,7 +3,7 @@
     x-data="promoAnalysisFunnel"
     @promo-analysis-filter.window="load($event.detail)"
     @promo-analysis-copy.window="provideCopy($event.detail)"
-    class="mt-5 border-t border-line pt-5"
+    class="min-w-0"
     aria-labelledby="promo-funnel-title"
 >
     <h3 id="promo-funnel-title" class="text-sm font-semibold text-ink">Analisis Promo per Funnel</h3>

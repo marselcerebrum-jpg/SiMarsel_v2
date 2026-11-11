@@ -4,7 +4,7 @@
         <h2 id="platform-list-title" class="text-base font-semibold text-ink">Daftar Platform</h2>
         <span class="inline-flex items-center gap-1 rounded-md bg-soft px-2 py-0.5 text-xs font-semibold text-muted">
             <x-icon name="lock" class="size-3" />
-            Read Only
+            Baca Saja
         </span>
     </div>
     <p class="mt-1 text-sm text-muted">Diambil dari master platform global. Platform tidak dapat ditambah, diubah, atau dihapus dari modul promo.</p>

@@ -9,7 +9,8 @@ function formatUsedOn(date) {
 }
 
 /**
- * Alert of promo codes found in Markaz transactions without a master for their platform.
+ * Alert of promo codes found in Markaz transactions without a master for their platform. The alert only
+ * shows while such codes exist; "Lihat kode" opens their review cards.
  */
 export default function promoUnregisteredCodes() {
     return {
@@ -21,6 +22,12 @@ export default function promoUnregisteredCodes() {
         requestId: 0,
         // Whether the loaded result is a search result, so the badge does not change before the response arrives.
         searched: false,
+        // Codes still to review without a search; null until the first unfiltered response.
+        pendingTotal: null,
+        // Set when checking pendingTotal failed, so a failed check is never shown as "nothing to review".
+        totalError: '',
+        totalRequestId: 0,
+        reviewOpen: false,
 
         init() {
             this.fetchItems();
@@ -29,6 +36,13 @@ export default function promoUnregisteredCodes() {
 
         get total() {
             return this.meta?.total ?? 0;
+        },
+
+        /**
+         * Based on the unsearched total only, so the alert hides once no code is left even while a search is active.
+         */
+        get visible() {
+            return this.pendingTotal > 0;
         },
 
         get hasFilter() {
@@ -53,6 +67,7 @@ export default function promoUnregisteredCodes() {
         async fetchItems() {
             const requestId = ++this.requestId;
             const searched = this.hasFilter;
+            if (!searched) this.totalRequestId++;
             this.loading = true;
             this.loadError = '';
 
@@ -69,9 +84,14 @@ export default function promoUnregisteredCodes() {
                 this.items = data;
                 this.meta = meta ?? null;
                 this.searched = searched;
+                if (!searched) {
+                    this.pendingTotal = meta?.total ?? data.length;
+                    this.totalError = '';
+                }
             } catch (error) {
                 if (requestId !== this.requestId) return;
                 this.loadError = errorMessage(error, 'Gagal memuat kode promo yang belum terdaftar.');
+                if (!searched) this.totalError = this.loadError;
             } finally {
                 if (requestId === this.requestId) this.loading = false;
             }
@@ -82,8 +102,26 @@ export default function promoUnregisteredCodes() {
             this.fetchItems();
         },
 
+        /**
+         * Unsearched total, fetched on its own while a search is active so the search result stays on screen.
+         */
+        async fetchPendingTotal() {
+            const requestId = ++this.totalRequestId;
+
+            try {
+                const { data, meta } = await fetchUnregisteredCodes(toQueryString(defaultFilter()));
+                if (requestId !== this.totalRequestId) return;
+
+                this.pendingTotal = meta?.total ?? data.length;
+                this.totalError = '';
+            } catch (error) {
+                if (requestId !== this.totalRequestId) return;
+                this.totalError = errorMessage(error, 'Gagal memeriksa kode promo yang belum terdaftar.');
+            }
+        },
+
         refresh() {
-            this.fetchItems();
+            return Promise.all([this.fetchItems(), this.hasFilter && this.fetchPendingTotal()]);
         },
 
         goToPage(page) {
@@ -91,6 +129,11 @@ export default function promoUnregisteredCodes() {
 
             this.filter.page = page;
             this.fetchItems();
+        },
+
+        toggleReview() {
+            this.reviewOpen = !this.reviewOpen;
+            if (this.reviewOpen) this.$nextTick(() => this.$refs.review?.focus());
         },
 
         register(item) {

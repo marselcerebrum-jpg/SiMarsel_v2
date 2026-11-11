@@ -51,13 +51,14 @@
                     :class="errors.code && 'border-red-500!'"
                     :disabled="isLocked"
                     :aria-invalid="Boolean(errors.code)"
+                    aria-describedby="promo-code-code-error"
                     placeholder="CPNS26"
                     autocomplete="off"
                     autocapitalize="characters"
                     spellcheck="false"
                     maxlength="255"
                 >
-                <p x-show="errors.code" x-text="errors.code" class="{{ $errorClass }}" role="alert"></p>
+                <p id="promo-code-code-error" x-show="errors.code" x-text="errors.code" class="{{ $errorClass }}" role="alert"></p>
             </div>
 
             <div>
@@ -70,13 +71,14 @@
                     :class="errors.platform_id && 'border-red-500!'"
                     :disabled="isLocked"
                     :aria-invalid="Boolean(errors.platform_id)"
+                    aria-describedby="promo-code-platform-error"
                 >
                     <option value="">Pilih platform</option>
                     <template x-for="platform in options.platforms" :key="platform.id">
                         <option :value="String(platform.id)" x-text="platform.name" :selected="String(platform.id) === form.platform_id"></option>
                     </template>
                 </select>
-                <p x-show="errors.platform_id" x-text="errors.platform_id" class="{{ $errorClass }}" role="alert"></p>
+                <p id="promo-code-platform-error" x-show="errors.platform_id" x-text="errors.platform_id" class="{{ $errorClass }}" role="alert"></p>
                 <p x-show="!errors.platform_id && !isLocked" class="{{ $helperClass }}">Kode yang sama boleh dipakai di platform berbeda.</p>
             </div>
 
@@ -96,13 +98,14 @@
                     class="{{ $inputClass }}"
                     :class="errors.funnel_id && 'border-red-500!'"
                     :aria-invalid="Boolean(errors.funnel_id)"
+                    aria-describedby="promo-code-funnel-error"
                 >
                     <option value="">Belum diketahui</option>
                     <template x-for="funnel in options.funnels" :key="funnel.id">
                         <option :value="String(funnel.id)" x-text="funnel.name" :selected="String(funnel.id) === form.funnel_id"></option>
                     </template>
                 </select>
-                <p x-show="errors.funnel_id" x-text="errors.funnel_id" class="{{ $errorClass }}" role="alert"></p>
+                <p id="promo-code-funnel-error" x-show="errors.funnel_id" x-text="errors.funnel_id" class="{{ $errorClass }}" role="alert"></p>
                 <p x-show="!errors.funnel_id" class="{{ $helperClass }}">Opsional, boleh dikosongkan jika belum diketahui.</p>
             </div>
 
@@ -115,13 +118,14 @@
                     class="{{ $inputClass }}"
                     :class="errors.source_id && 'border-red-500!'"
                     :aria-invalid="Boolean(errors.source_id)"
+                    aria-describedby="promo-code-source-error"
                 >
                     <option value="">Belum diketahui</option>
                     <template x-for="source in options.sources" :key="source.id">
                         <option :value="String(source.id)" x-text="source.name" :selected="String(source.id) === form.source_id"></option>
                     </template>
                 </select>
-                <p x-show="errors.source_id" x-text="errors.source_id" class="{{ $errorClass }}" role="alert"></p>
+                <p id="promo-code-source-error" x-show="errors.source_id" x-text="errors.source_id" class="{{ $errorClass }}" role="alert"></p>
                 <p x-show="!errors.source_id" class="{{ $helperClass }}">Opsional, boleh dikosongkan jika belum diketahui.</p>
             </div>
 

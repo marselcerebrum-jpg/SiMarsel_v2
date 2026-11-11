@@ -3,7 +3,7 @@
     x-data="promoAnalysisTopCodes"
     @promo-analysis-filter.window="load($event.detail)"
     @promo-analysis-copy.window="provideCopy($event.detail)"
-    class="mt-5 border-t border-line pt-5"
+    class="min-w-0"
     aria-labelledby="promo-top-codes-title"
 >
     <h3 id="promo-top-codes-title" class="text-sm font-semibold text-ink">5 Kode Promo Teratas</h3>

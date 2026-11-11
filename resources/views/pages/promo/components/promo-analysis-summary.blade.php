@@ -15,9 +15,11 @@
     x-data="promoAnalysisSummary(@js($metrics))"
     @promo-analysis-filter.window="load($event.detail)"
     @promo-analysis-copy.window="provideCopy($event.detail)"
-    class="mt-5 border-t border-line pt-5"
-    aria-label="Ringkasan Promo"
+    class="min-w-0"
+    aria-labelledby="promo-summary-title"
 >
+    <h2 id="promo-summary-title" class="mb-3 text-base font-semibold text-ink">Ringkasan Performa</h2>
+
     <div x-show="!loading && loadError" x-cloak class="flex flex-col items-center gap-3 rounded-lg border border-red-200 bg-red-50 px-4 py-10 text-center" role="alert">
         <p class="text-sm text-red-700" x-text="loadError"></p>
         <button type="button" class="{{ $stateButton }}" @click="retry()">Coba Lagi</button>

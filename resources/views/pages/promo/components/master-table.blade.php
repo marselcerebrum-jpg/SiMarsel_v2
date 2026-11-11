@@ -12,27 +12,30 @@
 
         <button
             type="button"
-            class="inline-flex h-9 shrink-0 items-center justify-center gap-2 self-start rounded-lg bg-primary px-4 text-sm font-semibold text-white hover:bg-primary-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+            class="inline-flex h-11 w-full shrink-0 items-center justify-center gap-2 rounded-lg bg-primary px-4 text-sm font-semibold text-white hover:bg-primary-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary sm:w-auto"
             @click="openCreate()"
         >Tambah {{ $label }}</button>
     </div>
 
-    <div class="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center">
-        <label class="relative block w-full sm:max-w-xs">
-            <span class="sr-only">Cari {{ $label }}</span>
-            <svg class="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-label" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true">
-                <circle cx="11" cy="11" r="7" />
-                <path d="M20 20l-3.5-3.5" />
-            </svg>
-            <input
-                type="search"
-                x-model="search"
-                placeholder="Cari nama {{ $noun }}…"
-                class="h-9 w-full rounded-lg border border-line bg-white pr-3 pl-9 text-sm text-ink placeholder:text-label focus:border-primary focus:ring-2 focus:ring-primary/20 focus:outline-none"
-            >
-        </label>
+    <div class="mt-5 flex flex-col gap-3 sm:flex-row sm:items-end">
+        <div class="w-full sm:max-w-xs">
+            <label for="{{ $type }}-search" class="mb-1.5 block text-xs font-semibold text-label">Cari {{ $label }}</label>
+            <div class="relative">
+                <svg class="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-label" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true">
+                    <circle cx="11" cy="11" r="7" />
+                    <path d="M20 20l-3.5-3.5" />
+                </svg>
+                <input
+                    id="{{ $type }}-search"
+                    type="search"
+                    x-model="search"
+                    placeholder="Cari nama {{ $noun }}…"
+                    class="h-10 w-full rounded-lg border border-line bg-white pr-3 pl-9 text-sm text-ink placeholder:text-label focus:border-primary focus:ring-2 focus:ring-primary/20 focus:outline-none"
+                >
+            </div>
+        </div>
 
-        <p class="text-xs text-muted sm:ml-auto" aria-live="polite">
+        <p class="text-xs text-muted sm:ml-auto sm:pb-3" aria-live="polite">
             Menampilkan <span class="font-semibold text-ink" x-text="filteredItems.length"></span>
             dari <span x-text="items.length"></span> {{ $noun }}
         </p>

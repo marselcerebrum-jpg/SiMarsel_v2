@@ -37,7 +37,7 @@ class PromoPageTest extends TestCase
         $this->get('/promo')->assertRedirect(route('login'));
     }
 
-    public function test_every_role_can_open_promo_page_with_both_tabs(): void
+    public function test_every_role_can_open_promo_page_with_three_tabs(): void
     {
         foreach ([$this->manager, $this->employee] as $account) {
             $this->actingAs($account)
@@ -45,31 +45,57 @@ class PromoPageTest extends TestCase
                 ->assertOk()
                 ->assertSee('Manajemen Promo')
                 ->assertSee('x-data="promoManagement"', false)
-                ->assertSeeInOrder(['role="tablist"', 'Kode Promo', 'Data Master'], false)
-                ->assertSee('id="panel-promo-codes"', false)
-                ->assertSee('id="panel-master-data"', false);
+                ->assertSeeInOrder(['role="tablist"', 'Analisis', 'Kelola Kode', 'Data Master'], false)
+                ->assertSeeInOrder(['id="tab-promo-analysis"', 'id="tab-promo-promo-codes"', 'id="tab-promo-master-data"'], false)
+                ->assertSee('id="panel-promo-analysis"', false)
+                ->assertSee('id="panel-promo-promo-codes"', false)
+                ->assertSee('id="panel-promo-master-data"', false);
         }
     }
 
-    public function test_promo_codes_tab_provides_analysis_and_management_area(): void
+    public function test_analysis_code_management_and_master_data_live_in_separate_tabs(): void
     {
         $this->actingAs($this->employee)
             ->get(route('promo.index'))
-            ->assertSeeInOrder(['Analisis Kode Promo', 'Daftar Kode Promo']);
+            ->assertSeeInOrder([
+                'id="panel-promo-analysis"', 'x-data="promoAnalysis"', 'x-data="promoAnalysisCode"',
+                'id="panel-promo-promo-codes"', 'x-data="promoCodeManagement"',
+                'id="panel-promo-master-data"', "promoMasterTable('funnel', 'Funnel')",
+            ], false);
     }
 
-    public function test_promo_analysis_filter_offers_platform_payment_method_search_and_two_period_modes(): void
+    public function test_analysis_tab_orders_filter_summary_trend_and_breakdown(): void
+    {
+        $this->actingAs($this->employee)
+            ->get(route('promo.index'))
+            ->assertSeeInOrder(['Filter Analisis', 'Ringkasan Performa', 'Tren Penggunaan Promo', 'Rincian Performa'])
+            ->assertSeeInOrder([
+                'aria-label="Kategori Rincian Performa"',
+                'Top 5 Kode Promo', 'Per Funnel', 'Per Source', 'Perdana vs Perpanjangan', 'Rekap per Kode Promo',
+                'id="panel-promo-breakdown-top-codes"', 'x-data="promoAnalysisTopCodes"',
+                'id="panel-promo-breakdown-funnel"', 'x-data="promoAnalysisFunnel"',
+                'id="panel-promo-breakdown-source"', 'x-data="promoAnalysisSource"',
+                'id="panel-promo-breakdown-product-type"', 'x-data="promoAnalysisProductType"',
+                'id="panel-promo-breakdown-codes"', 'x-data="promoAnalysisCode"',
+            ], false);
+    }
+
+    public function test_promo_analysis_filter_shows_period_and_platform_first_and_keeps_every_filter(): void
     {
         $this->actingAs($this->employee)
             ->get(route('promo.index'))
             ->assertSee('x-data="promoAnalysis"', false)
             ->assertSee('@promo-analysis-errors="showServerErrors($event.detail)"', false)
-            ->assertSeeInOrder(['Platform / Source App', 'Metode Pembayaran', 'Kode Promo', 'Periode'])
+            ->assertSee('@submit.prevent="apply()"', false)
+            ->assertSeeInOrder(['Periode', 'Platform / Source App', 'Filter lanjutan', 'Metode Pembayaran', 'Kode Promo', 'Terapkan filter', 'Atur ulang'])
+            ->assertSee('aria-controls="promo-analysis-advanced"', false)
             ->assertSee('id="promo-analysis-month"', false)
             ->assertSee('id="promo-analysis-year"', false)
             ->assertSee('id="promo-analysis-start"', false)
             ->assertSee('id="promo-analysis-end"', false)
             ->assertSee('@click="resetFilter()"', false)
+            ->assertSee('Data yang ditampilkan')
+            ->assertSee('x-for="item in activeFilters"', false)
             ->assertSee('tanggal bayar Markaz');
     }
 
@@ -166,11 +192,12 @@ class PromoPageTest extends TestCase
             ->get(route('promo.index'))
             ->assertSeeInOrder([
                 'x-data="promoAnalysis"',
+                'id="promo-analysis-search"',
                 'x-data="promoAnalysisActions"',
                 'Komponen yang Disalin',
                 'Salin',
                 'Ekspor Excel',
-                'id="promo-analysis-search"',
+                'Ekspor berisi seluruh analisis sesuai filter aktif.',
             ], false)
             ->assertSee('@promo-analysis-filter.window="clearStatus()"', false)
             ->assertSeeInOrder(['x-data="promoAnalysisCodeUsage"', 'x-ref="codeUsageClose"', '@click="copy()"', 'x-text="copyError"'], false);
@@ -284,15 +311,56 @@ class PromoPageTest extends TestCase
             ->assertSee('@promo-codes-changed.window="reload()"', false);
     }
 
-    public function test_unregistered_code_alert_shows_raw_code_platform_and_usage(): void
+    public function test_code_management_orders_actions_alert_filter_list_and_pagination(): void
     {
         $this->actingAs($this->employee)
             ->get(route('promo.index'))
+            ->assertSeeInOrder([
+                'x-data="promoCodeManagement"',
+                'Tambah kode promo',
+                'Input massal',
+                'x-data="promoUnregisteredCodes"',
+                'for="promo-code-search"',
+                'for="promo-code-platform-filter"',
+                '<table',
+                'aria-label="Navigasi halaman kode promo"',
+            ], false);
+    }
+
+    public function test_promo_code_delete_sits_in_the_more_actions_menu_next_to_edit(): void
+    {
+        $this->actingAs($this->employee)
+            ->get(route('promo.index'))
+            ->assertSeeInOrder([
+                '@click="openEdit(item)"',
+                'x-data="promoRowMenu"',
+                'aria-haspopup="menu"',
+                'role="menu"',
+                'role="menuitem"',
+                '@click="close(); openDelete(item)"',
+            ], false);
+    }
+
+    public function test_unregistered_codes_show_as_an_alert_with_review_cards_instead_of_a_table(): void
+    {
+        $response = $this->actingAs($this->employee)
+            ->get(route('promo.index'))
             ->assertSee('x-data="promoUnregisteredCodes"', false)
-            ->assertSeeInOrder(['Kode Promo Belum Terdaftar', 'Daftar Kode Promo'])
-            ->assertSeeInOrder(['Kode Asli', 'Platform', 'Penggunaan', 'Terakhir Dipakai', 'Aksi'])
-            ->assertSee('Daftarkan Kode')
-            ->assertSee('Transaksi dengan kode ini tetap tersimpan dan tetap dihitung dalam analisis.');
+            ->assertSee('x-show="visible"', false)
+            ->assertSeeInOrder(['x-show="totalError"', 'x-text="totalError"', '@click="refresh()">Coba Lagi'], false)
+            ->assertSeeInOrder([
+                'Kode transaksi belum terdaftar',
+                'Ada kode pada transaksi yang belum punya master di platform terkait. Cek kode lalu daftarkan agar pemetaannya dapat dilengkapi.',
+                'Lihat kode',
+                'aria-label="Daftar kode transaksi belum terdaftar"',
+            ], false)
+            ->assertSeeInOrder(['Kode asli', 'Didaftarkan sebagai', 'Platform', 'Penggunaan', 'Terakhir dipakai', 'Daftarkan kode'])
+            ->assertSee('aria-label="Navigasi halaman kode belum terdaftar"', false)
+            ->assertSee('Transaksi dengan kode ini tetap tersimpan dan tetap dihitung dalam analisis.')
+            ->assertDontSee('Kode Promo Belum Terdaftar');
+
+        $alert = str($response->getContent())->between('x-data="promoUnregisteredCodes"', 'for="promo-code-search"');
+        $this->assertStringNotContainsString('<table', $alert);
     }
 
     public function test_registering_from_alert_opens_prefilled_single_entry(): void
@@ -312,6 +380,14 @@ class PromoPageTest extends TestCase
     {
         $this->actingAs($this->employee)
             ->get(route('promo.index'))
+            ->assertSeeInOrder([
+                'aria-label="Data Master"',
+                'id="panel-promo-master-funnel"', "promoMasterTable('funnel', 'Funnel')",
+                'id="panel-promo-master-source"', "promoMasterTable('source', 'Source')",
+                'id="panel-promo-master-platform"', 'x-data="promoPlatformTable"',
+            ], false)
+            ->assertSee('adalah kelompok hasil analisis sistem, sehingga tidak perlu dibuat sebagai master.')
+            ->assertSee('Mengganti nama funnel atau source tidak mengubah riwayat penggunaan kode promo yang sudah tercatat.')
             ->assertSee("promoMasterTable('funnel', 'Funnel')", false)
             ->assertSee("promoMasterTable('source', 'Source')", false)
             ->assertSeeInOrder(['Daftar Funnel', 'Tambah Funnel', 'Daftar Source', 'Tambah Source'])
@@ -325,7 +401,8 @@ class PromoPageTest extends TestCase
         $this->actingAs($this->employee)
             ->get(route('promo.index'))
             ->assertSee('x-data="promoPlatformTable"', false)
-            ->assertSeeInOrder(['Daftar Platform', 'Read Only'])
+            ->assertSeeInOrder(['Daftar Platform', 'Baca Saja'])
+            ->assertSee('Diambil dari master platform global.')
             ->assertDontSee('Create Platform')
             ->assertDontSee('Edit Platform')
             ->assertDontSee('Delete Platform');

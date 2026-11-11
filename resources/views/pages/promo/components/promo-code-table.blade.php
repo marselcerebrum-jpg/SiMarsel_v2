@@ -37,18 +37,48 @@
                             <span x-show="!item.usages_count" class="{{ $notSet }}">Belum Dipakai</span>
                         </td>
                         <td class="px-4 py-3 text-right whitespace-nowrap">
-                            <button
-                                type="button"
-                                class="rounded-md px-2 py-1 font-semibold text-primary hover:text-primary-hover focus-visible:outline-2 focus-visible:outline-primary"
-                                :aria-label="'Ubah ' + item.code"
-                                @click="openEdit(item)"
-                            >Ubah</button>
-                            <button
-                                type="button"
-                                class="ml-2 rounded-md px-2 py-1 font-semibold text-red-600 hover:text-red-700 focus-visible:outline-2 focus-visible:outline-red-600"
-                                :aria-label="'Hapus ' + item.code"
-                                @click="openDelete(item)"
-                            >Hapus</button>
+                            <div class="inline-flex items-center gap-1">
+                                <button
+                                    type="button"
+                                    class="inline-flex h-9 items-center rounded-md px-3 font-semibold text-primary hover:bg-primary-soft hover:text-primary-hover focus-visible:outline-2 focus-visible:outline-primary"
+                                    :aria-label="'Ubah ' + item.code"
+                                    @click="openEdit(item)"
+                                >Ubah</button>
+
+                                {{-- Hapus sits in "more actions"; the delete modal still enforces the existing rules. --}}
+                                <div x-data="promoRowMenu" @keydown.escape.prevent="close(true)" @click.outside="close()" @scroll.window="close()" @resize.window="close()">
+                                    <button
+                                        type="button"
+                                        x-ref="trigger"
+                                        class="inline-flex size-9 items-center justify-center rounded-md text-muted hover:bg-soft hover:text-ink focus-visible:outline-2 focus-visible:outline-primary"
+                                        aria-haspopup="menu"
+                                        :aria-expanded="open.toString()"
+                                        :aria-label="'Tindakan lainnya untuk ' + item.code"
+                                        @click="toggle()"
+                                    >
+                                        <x-icon name="more" class="size-5" />
+                                    </button>
+
+                                    <div
+                                        x-ref="menu"
+                                        x-show="open"
+                                        x-cloak
+                                        class="fixed z-40 min-w-40 rounded-lg border border-line bg-white p-1 text-left shadow-lg"
+                                        :style="position"
+                                        role="menu"
+                                        :aria-label="'Tindakan untuk ' + item.code"
+                                        @keydown.tab="close()"
+                                    >
+                                        <button
+                                            type="button"
+                                            role="menuitem"
+                                            class="flex h-10 w-full items-center rounded-md px-3 text-sm font-semibold text-red-700 hover:bg-red-50 focus-visible:bg-red-50 focus-visible:outline-2 focus-visible:outline-red-600"
+                                            :aria-label="'Hapus ' + item.code"
+                                            @click="close(); openDelete(item)"
+                                        >Hapus</button>
+                                    </div>
+                                </div>
+                            </div>
                         </td>
                     </tr>
                 </template>
