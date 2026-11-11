@@ -858,6 +858,45 @@ test('With the default config, the PIC sends a file and a link as evidence and t
     assert.equal(reopened.evidences[1].file_url, '/api/tasks/7/evidences/1/download');
 });
 
+test('Evidence uploaded but the next detail request fails: the history shows a clear message and Coba lagi brings the activity back', async () => {
+    const created = activityOf(1, 'created', 'Tugas dibuat', 'Membuat tugas.');
+    const submitted = activityOf(2, 'evidence_submitted', 'Evidence dikirim', 'Evidence: desain-final.pdf', { id: PIC.id, fullname: 'Staff Marketing' }, '2026-11-11T02:00:00Z');
+    let history = [created];
+    let detailFails = false;
+    const { board, detail: createDetail, requests, toasts } = await tasklistPage({
+        'GET /api/tasks': () => ({ json: { data: [task({ status: 'in_progress' })], meta: { status_counts: {} } } }),
+        'GET /api/tasks/7': () => (detailFails ? { status: 500, json: { message: 'Server Error' } } : { json: { data: task({ status: 'in_progress', evidence: [], history }) } }),
+        'GET /api/tasks/7/activities': () => ({ json: { data: history } }),
+        'POST /api/tasks/7/evidences': () => {
+            history = [submitted, created];
+            detailFails = true;
+            return { status: 201, json: { data: { id: 1, task_id: 7, type: 'file', file_name: 'desain-final.pdf', file_url: '/api/tasks/7/evidences/1/download', url: null, note: null, submitter: { id: PIC.id, fullname: 'Staff Marketing' }, created_at: submitted.created_at }, message: 'Bukti tugas berhasil dikirim.' } };
+        },
+    });
+    await board.load();
+    board.detailId = 7;
+    const detail = createDetail();
+    await detail.open(7);
+    assert.deepEqual([...detail.activities].map(({ id }) => id), [1]);
+
+    detail.evidenceForm = { type: 'file', file: { name: 'desain-final.pdf', size: 1024 }, url: '', note: '' };
+    await detail.sendEvidence();
+
+    // The upload succeeded: the evidence shows, but the history could not be refreshed and says so.
+    assert.equal(toasts.at(-1).title, 'Evidence terkirim');
+    assert.deepEqual([...detail.evidences].map(({ file_name }) => file_name), ['desain-final.pdf']);
+    assert.equal(requests.filter(({ url }) => url === '/api/tasks/7').length, 2, 'the detail was requested again after the upload');
+    assert.equal(detail.activityState, 'error');
+    assert.equal(detail.activityError, 'Evidence tersimpan, tetapi histori aktivitas gagal diperbarui.');
+    assert.equal(detail.state, 'ready', 'the detail stays open');
+
+    // Coba lagi on the history section loads the history again, now with the evidence activity.
+    await detail.loadActivities();
+    assert.equal(detail.activityState, 'ready');
+    assert.equal(detail.activityError, '');
+    assert.deepEqual([...detail.activities].map(({ action_label }) => action_label), ['Evidence dikirim', 'Tugas dibuat']);
+});
+
 test('Evidence rejected by the backend shows the reason in the form and keeps the list unchanged', async () => {
     let reply = { status: 422, json: { message: 'Data tidak valid.', errors: { url: ['Tautan harus berupa URL yang valid dan diawali http:// atau https://.'] } } };
     const { board, detail: createDetail, toasts } = await tasklistPage({
