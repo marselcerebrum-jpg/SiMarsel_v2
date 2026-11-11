@@ -461,7 +461,7 @@ Alpine.data('tasklist', () => ({
         await this.moveTask(task, rule);
     },
 
-    // Keputusan QA (On QA → Done) memakai endpoint review; perpindahan lain memakai endpoint status.
+    // Approve lewat drag-and-drop (On QA → Done) memakai endpoint review; transisi lain memakai endpoint status.
     async moveTask(task, transition) {
         this.movingId = task.id;
 
@@ -474,7 +474,7 @@ Alpine.data('tasklist', () => ({
         } catch (error) {
             if (error?.status === 422) {
                 const errors = validationErrors(error);
-                notifyFailure({ ...error, data: { ...error.data, message: errors.decision ?? errors.status ?? errors.pic_id } }, 'Status tugas gagal diperbarui.');
+                notifyFailure({ ...error, data: { ...error.data, message: errors.status ?? errors.pic_id } }, 'Status tugas gagal diperbarui.');
             } else {
                 notifyFailure(error, 'Status tugas gagal diperbarui.');
             }
@@ -651,9 +651,6 @@ Alpine.data('taskDetail', () => ({
     activityState: 'idle',
 
     editing: false,
-    reviewMode: null,
-    reviewNote: '',
-    reviewError: '',
     editForm: {},
     editErrors: {},
     editCategories: [],
@@ -673,6 +670,9 @@ Alpine.data('taskDetail', () => ({
     evidenceErrors: {},
     sendingEvidence: false,
 
+    reviewMode: null,
+    reviewNote: '',
+    reviewError: '',
     acting: null,
 
     init() {
@@ -695,7 +695,7 @@ Alpine.data('taskDetail', () => ({
             this.syncDetailCollections(data);
             // Tugas yang belum ada di daftar baru masuk Board setelah detailnya dimuat.
             if (this.highlightId === data.id) this.$nextTick(() => this.revealHighlight());
-            if (this.detailFocus === 'revision' && this.task.can_review) this.startReview('revision');
+            if (this.detailFocus === 'revision') this.startReview('revision');
             if (this.detailFocus === 'edit' && this.canEditThis) this.startEdit();
         } catch (error) {
             if (this.highlightId === id) this.highlightId = null;
@@ -895,7 +895,8 @@ Alpine.data('taskDetail', () => ({
 
     // --- Workflow status (TASK-05) ------------------------------------------------------------
 
-    // Status tujuan mengikuti next_statuses dari backend; keputusan QA mengikuti can_review.
+    // Status tujuan mengikuti next_statuses dari backend. Approve/Revisi tidak pernah lewat endpoint status:
+    // tombolnya membuka form review (TASK-07) dan hanya tampil bila backend mengirim can_review.
     get transitions() {
         if (!this.task) return [];
 
@@ -906,8 +907,12 @@ Alpine.data('taskDetail', () => ({
     },
 
     async runTransition(transition) {
-        if (transition.review) {
-            this.startReview(transition.review);
+        if (transition.review === 'revision') {
+            this.startReview('revision');
+            return;
+        }
+        if (transition.review === 'approve') {
+            this.startReview('approve');
             return;
         }
 
@@ -930,8 +935,6 @@ Alpine.data('taskDetail', () => ({
         }
     },
 
-    // --- Review QA (TASK-07) -------------------------------------------------------------------
-
     startReview(mode) {
         this.reviewMode = mode;
         this.reviewNote = '';
@@ -952,7 +955,7 @@ Alpine.data('taskDetail', () => ({
         try {
             const { data, message } = await reviewTask(this.task.id, {
                 decision,
-                note: this.reviewNote.trim() || null,
+                note: this.reviewNote.trim(),
                 version: this.task.version,
             });
             this.applyTask(data);
@@ -962,12 +965,8 @@ Alpine.data('taskDetail', () => ({
                 text: message ?? `Status menjadi ${statusOf(data.status).label}.`,
             });
         } catch (error) {
-            if (error?.status === 422) {
-                const errors = validationErrors(error);
-                this.reviewError = errors.note ?? errors.decision ?? taskErrorMessage(error, 'Keputusan review tidak valid.');
-            } else {
-                await this.handleFailure(error, 'Keputusan review gagal disimpan.');
-            }
+            if (error?.status === 422) this.reviewError = validationErrors(error).note ?? taskErrorMessage(error, 'Keputusan review tidak valid.');
+            else await this.handleFailure(error, 'Keputusan review gagal disimpan.');
         } finally {
             this.acting = null;
         }
