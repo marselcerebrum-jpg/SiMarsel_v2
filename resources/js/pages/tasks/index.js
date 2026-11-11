@@ -188,7 +188,8 @@ Alpine.data('tasklist', () => ({
     },
 
     get canCreate() {
-        return this.meta?.can_create ?? this.user.role !== 'staff';
+        // Diputuskan backend lewat meta; bila meta gagal dimuat, pakai aturan TaskPolicy::create yang sama.
+        return this.meta?.can_create ?? (this.user.role === 'admin' || (this.user.role === 'manager' && Boolean(this.user.division)));
     },
 
     get hasActiveFilter() {
@@ -620,6 +621,10 @@ Alpine.data('taskCreateForm', () => ({
             if (error?.status === 422) {
                 this.errors = validationErrors(error);
                 this.formError = 'Periksa kembali isian yang ditandai.';
+            } else if (error?.status === 409) {
+                // Pengiriman ganda: tugas yang sama sudah tersimpan, jadi muat ulang daftar agar terlihat.
+                this.formError = errorMessage(error, 'Tugas yang sama baru saja dikirim. Periksa daftar tugas sebelum mengirim ulang.');
+                this.load();
             } else if (error?.unavailable) {
                 this.formPending = true;
                 this.formError = `${BACKEND_PENDING} Isian sudah valid, tetapi penyimpanan tugas belum tersedia.`;
@@ -746,47 +751,12 @@ Alpine.data('taskDetail', () => ({
         return this.task?.editable_fields?.includes(field) ?? false;
     },
 
-    activityLabel(action) {
-        return ({
-            created: 'Tugas dibuat',
-            updated: 'Informasi tugas diperbarui',
-            assigned: 'PIC ditetapkan',
-            reassigned: 'PIC diubah',
-            status_changed: 'Status tugas diperbarui',
-            evidence_submitted: 'Evidence dikirim',
-            approved: 'Tugas disetujui',
-            revision_requested: 'Revisi diminta',
-            resubmitted: 'Dikirim ulang ke QA',
-        })[action] ?? action;
-    },
+    // Kalimat histori disusun backend (action_label + description) agar label status, catatan review,
+    // dan nama evidence selalu sama dengan data yang tersimpan. Rincian disembunyikan bila hanya mengulang judul.
+    activityDetail(activity) {
+        const detail = activity.description ?? '';
 
-    activityFieldLabel(field) {
-        return ({
-            title: 'Judul',
-            description: 'Deskripsi',
-            category: 'Kategori',
-            division: 'Divisi',
-            platform: 'Platform',
-            pic: 'PIC',
-            priority: 'Prioritas',
-            status: 'Status',
-            start_date: 'Tanggal mulai',
-            deadline: 'Deadline',
-            requires_review: 'Kewajiban QA',
-            evidence_required: 'Wajib evidence',
-            review: 'Catatan review',
-        })[field] ?? field;
-    },
-
-    activityValue(value, field) {
-        if (value === null || value === undefined || value === '') return '-';
-        if (typeof value === 'boolean') return value ? 'Ya' : 'Tidak';
-        if (field === 'status') return statusOf(value).label;
-        if (field === 'priority') return priorityOf(value).label;
-        if (field === 'review') return value.note || `Review ke-${value.cycle}`;
-        if (typeof value === 'object') return value.name ?? value.fullname ?? JSON.stringify(value);
-
-        return String(value);
+        return detail === 'Membuat tugas.' || detail === `${activity.action_label}.` ? '' : detail;
     },
 
     get assignment() {
