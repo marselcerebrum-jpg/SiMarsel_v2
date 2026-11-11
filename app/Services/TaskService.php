@@ -549,6 +549,7 @@ class TaskService
                 $account->isManager() => 'manager',
                 default => 'staff',
             },
+            'can_create' => $account->isAdmin() || ($account->isManager() && $account->division_id !== null),
             'division' => $account->division?->code_division,
             // Admin starts on "Semua Divisi" (null); a Manager starts on the division they manage.
             'default_division' => $account->isManager() ? $account->division?->code_division : null,
