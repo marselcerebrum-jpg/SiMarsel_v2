@@ -1,7 +1,7 @@
 import { http } from '../http';
 
 /**
- * API daftar, meta, detail, pembuatan, dan pembaruan tugas sudah tersedia dan dipakai langsung.
+ * API daftar, meta, detail, pembuatan, pembaruan, penugasan, status, dan evidence tugas sudah tersedia dan dipakai langsung.
  * Endpoint Tasklist lain yang belum terintegrasi tetap menunggu VITE_TASK_API_READY=true.
  * Kontrak lengkap ada di docs/api/tasks.md.
  *
@@ -49,7 +49,8 @@ export const fetchAssignmentOptions = (id) => http(`/api/tasks/${id}/assignment-
 
 export const assignTask = (id, body) => http(`/api/tasks/${id}/assignment`, { method: 'PATCH', body });
 
-export const fetchEvidences = (id) => request(`/api/tasks/${id}/evidences`);
+// Evidence tidak bergantung pada VITE_TASK_API_READY: API-nya sudah tersedia.
+export const fetchEvidences = (id) => http(`/api/tasks/${id}/evidences`);
 
 export const reviewTask = (id, body) => request(`/api/tasks/${id}/reviews`, { method: 'POST', body });
 
@@ -61,8 +62,6 @@ export const fetchCalendar = (params) => request(`/api/tasks/calendar${query(par
  * Evidence dikirim sebagai multipart agar bisa membawa file; helper http() hanya untuk JSON.
  */
 export async function submitEvidence(id, { file, url, note }) {
-    if (!TASK_API_READY) return unavailable();
-
     const form = new FormData();
     if (file) form.append('file', file);
     if (url) form.append('url', url);
