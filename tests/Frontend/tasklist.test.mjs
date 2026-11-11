@@ -11,7 +11,8 @@ import vm from 'node:vm';
  * - POST /api/tasks/{id}/reviews (ReviewTaskRequest: decision, note, version) for QA decisions, with the default VITE_TASK_API_READY=false;
  * - POST /api/tasks (StoreTaskRequest) from the Create Task form, until the task shows on the Board and Table;
  * - PATCH /api/tasks/{id}/assignment (AssignTaskRequest: pic_id, division_id, version) from the detail;
- * - POST /api/tasks/{id}/evidences (StoreTaskEvidenceRequest: file or url, note) with the default VITE_TASK_API_READY=false.
+ * - POST /api/tasks/{id}/evidences (StoreTaskEvidenceRequest: file or url, note) with the default VITE_TASK_API_READY=false;
+ * - GET /api/tasks/{id}/activities for the detail's history, with its loading, error, and empty states.
  */
 const PIC = { id: 10, role: { code_role: 'EMP' }, division: { code_division: 'MKT' } };
 const ADMIN = { id: 1, role: { code_role: 'ADM' }, division: null };
@@ -28,7 +29,7 @@ async function tasklistPage(routes, sessionUser = PIC, apiReady = 'false') {
 
         const handler = routes[`${method} ${url.split('?')[0]}`];
         if (!handler) throw new Error(`Unexpected request ${method} ${url}`);
-        const { status = 200, json } = handler(body, requests);
+        const { status = 200, json } = await handler(body, requests);
 
         return { ok: status >= 200 && status < 300, status, json: async () => json };
     };
@@ -400,7 +401,8 @@ test('History shows the backend sentence for approval, revision request, and res
     ];
     const { board, detail: createDetail } = await tasklistPage({
         'GET /api/tasks': () => ({ json: { data: [task()], meta: { status_counts: {} } } }),
-        'GET /api/tasks/7': () => ({ json: { data: task({ status: 'done', history, evidence: [] }) } }),
+        'GET /api/tasks/7': () => ({ json: { data: task({ status: 'done', evidence: [] }) } }),
+        'GET /api/tasks/7/activities': () => ({ json: { data: history } }),
     }, ADMIN);
     await board.load();
     board.detailId = 7;
@@ -687,6 +689,111 @@ test('Dragging On QA to On Process does not open the revision form when the back
     assert.equal(toasts.at(-1).title, 'Revisi tidak dapat diminta');
     assert.deepEqual(board.tasksIn('on_qa').map(({ id }) => id), [7]);
     assert.equal(requests.some(({ method }) => method !== 'GET'), false);
+});
+
+const activityOf = (id, action, action_label, description, actor = { id: 1, fullname: 'Admin' }, created_at = '2026-11-10T02:00:00Z') => ({ id, action, action_label, description, changes: {}, actor, created_at });
+
+test('With the default config, the detail loads its history from the history API, newest first, with the actor, time, and change', async () => {
+    const history = [
+        activityOf(5, 'evidence_submitted', 'Evidence dikirim', 'Evidence: desain-final.pdf', { id: PIC.id, fullname: 'Staff Marketing' }, '2026-11-10T04:00:00Z'),
+        activityOf(4, 'status_changed', 'Status diubah', 'Status: To Do → On Process', { id: PIC.id, fullname: 'Staff Marketing' }, '2026-11-10T03:00:00Z'),
+        activityOf(3, 'reassigned', 'PIC diganti', 'PIC: Budi → Staff Marketing', { id: 2, fullname: 'Manajer Marketing' }, '2026-11-10T02:30:00Z'),
+        activityOf(2, 'updated', 'Informasi tugas diubah', 'Deadline: 20 Nov 2026 → 25 Nov 2026', { id: 2, fullname: 'Manajer Marketing' }, '2026-11-10T02:10:00Z'),
+        activityOf(1, 'created', 'Tugas dibuat', 'Membuat tugas.', { id: null, fullname: 'Akun Terhapus' }, '2026-11-10T02:00:00Z'),
+    ];
+    let states = [];
+    const { board, detail: createDetail, requests } = await tasklistPage({
+        'GET /api/tasks': () => ({ json: { data: [task()], meta: { status_counts: {} } } }),
+        'GET /api/tasks/7': () => ({ json: { data: task({ evidence: [] }) } }),
+        'GET /api/tasks/7/activities': () => {
+            states.push(detail.activityState);
+            return { json: { data: history } };
+        },
+    });
+    await board.load();
+    board.detailId = 7;
+    const detail = createDetail();
+    await detail.open(7);
+
+    const gets = requests.filter(({ method }) => method === 'GET').map(({ url }) => url);
+    assert.deepEqual(gets.slice(-2), ['/api/tasks/7', '/api/tasks/7/activities'], 'history is fetched although VITE_TASK_API_READY is false');
+    assert.equal(requests.at(-1).headers.Accept, 'application/json');
+    assert.deepEqual(states, ['loading'], 'the history section shows its loading state while the history is fetched');
+    assert.equal(detail.state, 'ready');
+    assert.equal(detail.activityState, 'ready');
+    assert.deepEqual([...detail.activities].map(({ id }) => id), [5, 4, 3, 2, 1], 'the order of the backend (newest first) is kept');
+    assert.deepEqual([...detail.activities].map((item) => [item.action_label, item.actor.fullname, detail.activityDetail(item)]), [
+        ['Evidence dikirim', 'Staff Marketing', 'Evidence: desain-final.pdf'],
+        ['Status diubah', 'Staff Marketing', 'Status: To Do → On Process'],
+        ['PIC diganti', 'Manajer Marketing', 'PIC: Budi → Staff Marketing'],
+        ['Informasi tugas diubah', 'Manajer Marketing', 'Deadline: 20 Nov 2026 → 25 Nov 2026'],
+        ['Tugas dibuat', 'Akun Terhapus', ''],
+    ]);
+    assert.equal(detail.activities[0].created_at, '2026-11-10T04:00:00Z');
+
+    // A task without activity shows the empty state, not a loading or error state.
+    history.length = 0;
+    states = [];
+    await detail.open(7);
+    assert.equal(detail.activityState, 'ready');
+    assert.equal(detail.activities.length, 0);
+});
+
+test('A failed history request shows its own error with a retry and keeps the detail open', async () => {
+    let reply = () => ({ status: 500, json: { message: 'Server Error' } });
+    const { board, detail: createDetail } = await tasklistPage({
+        'GET /api/tasks': () => ({ json: { data: [task()], meta: { status_counts: {} } } }),
+        'GET /api/tasks/7': () => ({ json: { data: task({ title: 'Tetap tampil' }) } }),
+        'GET /api/tasks/7/activities': () => reply(),
+    });
+    await board.load();
+    board.detailId = 7;
+    const detail = createDetail();
+    await detail.open(7);
+
+    assert.equal(detail.state, 'ready', 'the rest of the detail stays usable');
+    assert.equal(detail.task.title, 'Tetap tampil');
+    assert.equal(detail.activityState, 'error');
+    assert.equal(detail.activityError, 'Histori aktivitas gagal dimuat.');
+
+    reply = () => ({ status: 403, json: { message: 'This action is unauthorized.' } });
+    await detail.loadActivities();
+    assert.equal(detail.activityState, 'error');
+    assert.equal(detail.activityError, 'Anda tidak memiliki akses untuk tindakan ini.');
+
+    reply = () => ({ json: { data: [activityOf(1, 'created', 'Tugas dibuat', 'Membuat tugas.')] } });
+    await detail.loadActivities();
+    assert.equal(detail.activityState, 'ready');
+    assert.equal(detail.activityError, '');
+    assert.deepEqual([...detail.activities].map(({ id }) => id), [1]);
+});
+
+test('History updated by a change is not overwritten by an older history response, and closing the detail clears it', async () => {
+    let releaseHistory;
+    const { board, detail: createDetail } = await tasklistPage({
+        'GET /api/tasks': () => ({ json: { data: [task()], meta: { status_counts: {} } } }),
+        'GET /api/tasks/7': () => ({ json: { data: task() } }),
+        'GET /api/tasks/7/activities': () => new Promise((resolve) => {
+            releaseHistory = () => resolve({ json: { data: [activityOf(1, 'created', 'Tugas dibuat', 'Membuat tugas.')] } });
+        }),
+    }, MANAGER);
+    await board.load();
+    board.detailId = 7;
+    const detail = createDetail();
+    const opening = detail.open(7);
+    await new Promise((resolve) => setTimeout(resolve));
+    assert.equal(detail.activityState, 'loading');
+
+    // The change's response carries the newest history before the first history request returns.
+    detail.applyTask(task({ title: 'Judul baru', version: 5, history: [activityOf(2, 'updated', 'Informasi tugas diubah', 'Judul: Konten promo November → Judul baru'), activityOf(1, 'created', 'Tugas dibuat', 'Membuat tugas.')] }));
+    releaseHistory();
+    await opening;
+    assert.equal(detail.activityState, 'ready');
+    assert.deepEqual([...detail.activities].map(({ id }) => id), [2, 1]);
+
+    detail.reset();
+    assert.equal(detail.activityState, 'idle');
+    assert.equal(detail.activities.length, 0);
 });
 
 test('With the default config, the PIC sends a file and a link as evidence and the saved evidence shows again in the detail', async () => {
