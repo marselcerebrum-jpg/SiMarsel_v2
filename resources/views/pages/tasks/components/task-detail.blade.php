@@ -302,7 +302,16 @@
                     {{-- Histori aktivitas (TASK-08) --}}
                     <section>
                         <h3 class="{{ $sectionTitle }}">Histori Aktivitas</h3>
-                        <div class="mt-3">
+                        <div class="mt-3" :aria-busy="activityState === 'loading'">
+                            <div x-show="activityState === 'loading'" class="flex animate-pulse flex-col gap-3" aria-label="Memuat histori aktivitas">
+                                <div class="h-10 rounded-lg bg-soft"></div>
+                                <div class="h-10 rounded-lg bg-soft"></div>
+                                <div class="h-10 rounded-lg bg-soft"></div>
+                            </div>
+                            <div x-show="activityState === 'error'" x-cloak class="flex items-center justify-between gap-3 rounded-lg border border-red-200 bg-red-50 px-3 py-3 text-sm text-red-700" role="alert">
+                                <span x-text="activityError"></span>
+                                <button type="button" class="shrink-0 font-semibold underline" @click="loadActivities()">Coba lagi</button>
+                            </div>
                             <ol x-show="activityState === 'ready' && activities.length" class="relative flex flex-col gap-4 border-l border-line pl-5">
                                 <template x-for="activity in activities" :key="activity.id">
                                     <li class="relative">
