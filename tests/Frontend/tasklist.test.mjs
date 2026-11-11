@@ -10,7 +10,8 @@ import vm from 'node:vm';
  * - PATCH /api/tasks/{id}/status (ChangeTaskStatusRequest: status + version) from the Board and the detail;
  * - POST /api/tasks/{id}/reviews (ReviewTaskRequest: decision, note, version) for QA decisions;
  * - POST /api/tasks (StoreTaskRequest) from the Create Task form, until the task shows on the Board and Table;
- * - PATCH /api/tasks/{id}/assignment (AssignTaskRequest: pic_id, division_id, version) from the detail.
+ * - PATCH /api/tasks/{id}/assignment (AssignTaskRequest: pic_id, division_id, version) from the detail;
+ * - POST /api/tasks/{id}/evidences (StoreTaskEvidenceRequest: file or url, note) with the default VITE_TASK_API_READY=false.
  */
 const PIC = { id: 10, role: { code_role: 'EMP' }, division: { code_division: 'MKT' } };
 const ADMIN = { id: 1, role: { code_role: 'ADM' }, division: null };
@@ -22,7 +23,7 @@ async function tasklistPage(routes, sessionUser = PIC, apiReady = 'false') {
 
     const fetch = async (url, options = {}) => {
         const method = options.method ?? 'GET';
-        const body = options.body ? JSON.parse(options.body) : undefined;
+        const body = typeof options.body === 'string' ? JSON.parse(options.body) : options.body;
         requests.push({ method, url, body, headers: options.headers });
 
         const handler = routes[`${method} ${url.split('?')[0]}`];
@@ -32,8 +33,18 @@ async function tasklistPage(routes, sessionUser = PIC, apiReady = 'false') {
         return { ok: status >= 200 && status < 300, status, json: async () => json };
     };
 
+    // Evidence is sent as multipart; the mock keeps the appended fields so the test can read them.
+    class FormData {
+        fields = {};
+
+        append(key, value) {
+            this.fields[key] = value;
+        }
+    }
+
     const context = vm.createContext({
         fetch,
+        FormData,
         URL,
         URLSearchParams,
         setTimeout,
@@ -558,4 +569,94 @@ test('Approve and Request Revision on an On QA task never use the status endpoin
     assert.equal(detail.task.status, 'on_qa');
 
     assert.equal(requests.some(({ url }) => url.endsWith('/status')), false);
+});
+
+test('With the default config, the PIC sends a file and a link as evidence and the saved evidence shows again in the detail', async () => {
+    const saved = [];
+    const evidence = (id, fields) => ({
+        id,
+        task_id: 7,
+        type: fields.file ? 'file' : 'link',
+        file_name: fields.file?.name ?? null,
+        file_url: fields.file ? `/api/tasks/7/evidences/${id}/download` : null,
+        url: fields.url ?? null,
+        note: fields.note ?? null,
+        submitter: { id: PIC.id, fullname: 'Staff Marketing' },
+        created_at: '2026-11-11T02:00:00Z',
+    });
+    const detail = () => task({
+        status: 'in_progress',
+        evidence_required: true,
+        evidence_count: saved.length,
+        evidence: [...saved].reverse(),
+        history: saved.map((item) => ({ id: item.id, action: 'evidence_submitted', action_label: 'Evidence dikirim', description: `Evidence: ${item.file_name ?? item.url}`, changes: {}, actor: null, created_at: item.created_at })),
+    });
+    const { board, detail: createDetail, requests, toasts } = await tasklistPage({
+        'GET /api/tasks': () => ({ json: { data: [task({ status: 'in_progress', evidence_required: true })], meta: { status_counts: {} } } }),
+        'GET /api/tasks/7': () => ({ json: { data: detail() } }),
+        'POST /api/tasks/7/evidences': (form) => {
+            const created = evidence(saved.length + 1, form.fields);
+            saved.push(created);
+            return { status: 201, json: { data: created, message: 'Bukti tugas berhasil dikirim.' } };
+        },
+    });
+    await board.load();
+    board.detailId = 7;
+    const panel = createDetail();
+    await panel.open(7);
+    assert.equal(panel.canSubmitEvidence, true);
+    assert.equal(panel.evidences.length, 0);
+
+    const file = { name: 'desain-final.pdf', size: 1024 };
+    panel.evidenceForm = { type: 'file', file, url: '', note: 'Versi final' };
+    await panel.sendEvidence();
+
+    panel.evidenceForm = { type: 'link', file: null, url: ' https://drive.example.com/banner ', note: '' };
+    await panel.sendEvidence();
+
+    const posts = requests.filter(({ method, url }) => method === 'POST' && url === '/api/tasks/7/evidences');
+    assert.equal(posts.length, 2, 'evidence is sent although VITE_TASK_API_READY is false');
+    assert.deepEqual({ ...posts[0].body.fields }, { file, note: 'Versi final' });
+    assert.deepEqual({ ...posts[1].body.fields }, { url: 'https://drive.example.com/banner' });
+    assert.equal(posts[0].headers['X-CSRF-TOKEN'], 'csrf-test');
+    assert.equal(toasts.at(-1).title, 'Evidence terkirim');
+
+    // After each submission the detail is fetched again: evidence and history come from the backend.
+    assert.deepEqual([...panel.evidences].map(({ id, type }) => [id, type]), [[2, 'link'], [1, 'file']]);
+    assert.deepEqual([...panel.activities].map(({ description }) => description), ['Evidence: desain-final.pdf', 'Evidence: https://drive.example.com/banner']);
+    assert.equal(board.tasks[0].evidence_count, 2);
+
+    // Opening the detail again shows the saved evidence.
+    const reopened = createDetail();
+    await reopened.open(7);
+    assert.deepEqual([...reopened.evidences].map((item) => item.file_name ?? item.url), ['https://drive.example.com/banner', 'desain-final.pdf']);
+    assert.equal(reopened.evidences[1].file_url, '/api/tasks/7/evidences/1/download');
+});
+
+test('Evidence rejected by the backend shows the reason in the form and keeps the list unchanged', async () => {
+    let reply = { status: 422, json: { message: 'Data tidak valid.', errors: { url: ['Tautan harus berupa URL yang valid dan diawali http:// atau https://.'] } } };
+    const { board, detail: createDetail, toasts } = await tasklistPage({
+        'GET /api/tasks': () => ({ json: { data: [task()], meta: { status_counts: {} } } }),
+        'GET /api/tasks/7': () => ({ json: { data: task({ evidence: [], history: [] }) } }),
+        'POST /api/tasks/7/evidences': () => reply,
+    });
+    await board.load();
+    board.detailId = 7;
+    const panel = createDetail();
+    await panel.open(7);
+
+    panel.evidenceForm = { type: 'link', file: null, url: 'https://contoh.test/a', note: '' };
+    await panel.sendEvidence();
+    assert.equal(panel.evidenceErrors.url, 'Tautan harus berupa URL yang valid dan diawali http:// atau https://.');
+
+    reply = { status: 422, json: { message: 'Data tidak valid.', errors: { evidence: ['Evidence hanya dapat dikirim saat tugas berstatus To Do atau On Process, bukan Done.'] } } };
+    await panel.sendEvidence();
+    assert.equal(panel.evidenceErrors.evidence, 'Evidence hanya dapat dikirim saat tugas berstatus To Do atau On Process, bukan Done.');
+
+    reply = { status: 403, json: { message: 'This action is unauthorized.' } };
+    await panel.sendEvidence();
+    assert.equal(toasts.at(-1).text, 'Anda tidak memiliki akses untuk tindakan ini.');
+
+    assert.equal(panel.evidences.length, 0);
+    assert.equal(panel.sendingEvidence, false);
 });
