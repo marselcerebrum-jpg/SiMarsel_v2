@@ -728,6 +728,19 @@ Alpine.data('taskDetail', () => ({
         }
     },
 
+    // Ambil ulang detail tanpa mengosongkan panel, agar daftar evidence dan histori sama dengan yang tersimpan.
+    // Bila gagal, data yang sudah tampil dipertahankan; panel tetap bisa dimuat ulang saat dibuka kembali.
+    async refreshDetail() {
+        const id = this.task?.id;
+
+        try {
+            const { data } = await fetchTask(id);
+            if (this.task?.id === id) this.applyTask(data);
+        } catch {
+            // Evidence sudah tersimpan dan ditampilkan dari respons POST.
+        }
+    },
+
     async handleFailure(error, fallback) {
         notifyFailure(error, fallback);
         if (error?.status === 409) {
@@ -1008,11 +1021,12 @@ Alpine.data('taskDetail', () => ({
 
         try {
             const { data, message } = await submitEvidence(this.task.id, { file: type === 'file' ? file : null, url: type === 'link' ? url.trim() : '', note: note.trim() });
-            this.evidences = [data, ...this.evidences];
+            this.evidences = [data, ...this.evidences.filter(({ id }) => id !== data.id)];
             this.applyTask({ evidence_count: (this.task.evidence_count ?? 0) + 1 });
             this.evidenceForm = { type, file: null, url: '', note: '' };
             if (this.$refs.evidenceFile) this.$refs.evidenceFile.value = '';
             showToast({ title: 'Evidence terkirim', text: message ?? 'Bukti pekerjaan berhasil disimpan.' });
+            await this.refreshDetail();
         } catch (error) {
             if (error?.status === 422) this.evidenceErrors = validationErrors(error);
             else notifyFailure(error, 'Evidence gagal dikirim.');
