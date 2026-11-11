@@ -480,12 +480,11 @@ test('Assignment conflicts reload both views and a rejected PIC shows the server
     assert.equal(detail.task.pic.id, PIC.id, 'a rejected assignment leaves the shown PIC unchanged');
 });
 
-test('Detail buttons follow next_statuses and can_review from the backend, and a rejected move shows the server reason', async () => {
+test('Detail buttons follow next_statuses, and Approve/Revision only show when the backend sends can_review', async () => {
     let detail = task({ next_statuses: [{ value: 'in_progress', label: 'On Process' }] });
-    const { board, detail: createDetail, toasts, requests } = await tasklistPage({
+    const { board, detail: createDetail } = await tasklistPage({
         'GET /api/tasks': () => ({ json: { data: [task()], meta: { status_counts: {} } } }),
         'GET /api/tasks/7': () => ({ json: { data: detail } }),
-        'PATCH /api/tasks/7/status': () => ({ status: 422, json: { message: 'Data tidak valid.', errors: { status: ['Unggah evidence sebelum menyelesaikan tugas.'] } } }),
     }, ADMIN);
     await board.load();
     board.detailId = 7;
@@ -504,12 +503,59 @@ test('Detail buttons follow next_statuses and can_review from the backend, and a
     const reviewer = createDetail();
     await reviewer.open(7);
     assert.deepEqual([...reviewer.transitions].map(({ review }) => review).sort(), ['approve', 'revision']);
+});
 
-    detail = task({ status: 'in_progress', next_statuses: [{ value: 'done', label: 'Done' }] });
-    const pic = createDetail();
-    await pic.open(7);
-    await pic.runTransition(pic.transitions.find(({ to }) => to === 'done') ?? { to: 'done' });
-    assert.equal(toasts.at(-1).text, 'Unggah evidence sebelum menyelesaikan tugas.');
-    assert.equal(pic.task.status, 'in_progress');
-    assert.deepEqual(requests.find(({ method }) => method === 'PATCH').body, { status: 'done', version: 4 });
+test('A status move rejected in the detail shows the server reason and keeps the task where it was', async () => {
+    const working = task({ status: 'in_progress', next_statuses: [{ value: 'done', label: 'Done' }] });
+    const { board, detail: createDetail, toasts, requests } = await tasklistPage({
+        'GET /api/tasks': () => ({ json: { data: [working], meta: { status_counts: {} } } }),
+        'GET /api/tasks/7': () => ({ json: { data: working } }),
+        'PATCH /api/tasks/7/status': () => ({ status: 422, json: { message: 'Data tidak valid.', errors: { status: ['Unggah evidence terlebih dahulu sebelum mengubah status ke Done.'] } } }),
+    });
+    await board.load();
+    board.detailId = 7;
+    const detail = createDetail();
+    await detail.open(7);
+
+    assert.deepEqual([...detail.transitions].map(({ to }) => to), ['done']);
+    await detail.runTransition(detail.transitions[0]);
+
+    assert.deepEqual(statusRequests(requests)[0].body, { status: 'done', version: 4 });
+    assert.equal(toasts.at(-1).title, 'Gagal');
+    assert.equal(toasts.at(-1).text, 'Unggah evidence terlebih dahulu sebelum mengubah status ke Done.');
+    assert.equal(detail.task.status, 'in_progress');
+    assert.deepEqual(board.tasksIn('in_progress').map(({ id }) => id), [7]);
+    assert.equal(detail.acting, null);
+});
+
+test('Approve and Request Revision on an On QA task never use the status endpoint, from the Board or the detail', async () => {
+    const reviewed = task({ status: 'on_qa', requires_review: true, can_review: true, next_statuses: [] });
+    const { board, detail: createDetail, requests, toasts } = await tasklistPage({
+        'GET /api/tasks': () => ({ json: { data: [reviewed], meta: { status_counts: {} } } }),
+        'GET /api/tasks/7': () => ({ json: { data: reviewed } }),
+    }, ADMIN);
+    await board.load();
+
+    // Board: On QA → Done is a QA approval; until TASK-07 the review API is not called and the card stays.
+    board.draggingId = 7;
+    await board.drop('done');
+    assert.equal(toasts.at(-1).title, 'Menunggu Back End');
+    assert.deepEqual(board.tasksIn('on_qa').map(({ id }) => id), [7]);
+
+    // Board: On QA → On Process is a revision; it opens the detail for the note instead of moving the card.
+    board.draggingId = 7;
+    await board.drop('in_progress');
+    assert.equal(board.detailId, 7);
+    assert.deepEqual(board.tasksIn('on_qa').map(({ id }) => id), [7]);
+
+    // Detail: both buttons open the review form, never a status change.
+    const detail = createDetail();
+    await detail.open(7);
+    for (const transition of detail.transitions) {
+        await detail.runTransition(transition);
+        assert.equal(detail.reviewMode, transition.review);
+    }
+    assert.equal(detail.task.status, 'on_qa');
+
+    assert.equal(requests.some(({ url }) => url.endsWith('/status')), false);
 });
