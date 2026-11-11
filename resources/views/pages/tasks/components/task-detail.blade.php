@@ -95,7 +95,7 @@
                         <h3 class="{{ $sectionTitle }}" x-text="reviewMode === 'revision' ? 'Minta Revisi' : 'Setujui Tugas'"></h3>
                         <p class="mt-1 text-xs text-muted" x-text="reviewMode === 'revision' ? 'Tugas kembali ke On Process. Jelaskan apa yang perlu diperbaiki PIC.' : 'Tugas akan ditandai Done dan waktu penyelesaian dicatat.'"></p>
                         <label for="review-note" class="{{ $labelClass }} mt-3">Catatan <span x-show="reviewMode === 'revision'" class="text-red-500">*</span><span x-show="reviewMode !== 'revision'">(opsional)</span></label>
-                        <textarea id="review-note" x-ref="reviewNote" x-model="reviewNote" rows="3" class="{{ $textareaClass }}" @input="reviewError = ''" maxlength="1000"
+                        <textarea id="review-note" x-ref="reviewNote" x-model="reviewNote" rows="3" class="{{ $textareaClass }}" @input="reviewError = ''" maxlength="2000"
                             :placeholder="reviewMode === 'revision' ? 'Contoh: lampirkan versi final desain dan perbaiki ukuran banner.' : 'Catatan untuk PIC'"></textarea>
                         <p x-show="reviewError" x-text="reviewError" class="{{ $errorClass }}"></p>
                         <div class="mt-3 flex justify-end gap-2">

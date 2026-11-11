@@ -474,11 +474,12 @@ Alpine.data('tasklist', () => ({
         } catch (error) {
             if (error?.status === 422) {
                 const errors = validationErrors(error);
-                notifyFailure({ ...error, data: { ...error.data, message: errors.status ?? errors.pic_id } }, 'Status tugas gagal diperbarui.');
+                notifyFailure({ ...error, data: { ...error.data, message: errors.status ?? errors.decision ?? errors.pic_id } }, 'Status tugas gagal diperbarui.');
             } else {
                 notifyFailure(error, 'Status tugas gagal diperbarui.');
             }
-            if (error?.status === 409) this.load();
+            // Data lama, atau tugas sudah diputuskan reviewer lain: muat ulang agar kartu berada di kolom yang benar.
+            if (error?.status === 409 || (error?.status === 422 && transition.review)) this.load();
         } finally {
             this.movingId = null;
         }
@@ -695,7 +696,11 @@ Alpine.data('taskDetail', () => ({
             this.syncDetailCollections(data);
             // Tugas yang belum ada di daftar baru masuk Board setelah detailnya dimuat.
             if (this.highlightId === data.id) this.$nextTick(() => this.revealHighlight());
-            if (this.detailFocus === 'revision') this.startReview('revision');
+            // Form revisi dari Board hanya dibuka bila backend mengizinkan user memberi keputusan QA saat ini.
+            if (this.detailFocus === 'revision') {
+                if (data.can_review === true) this.startReview('revision');
+                else showToast({ type: 'info', title: 'Revisi tidak dapat diminta', text: 'Anda tidak dapat memberi keputusan QA untuk tugas ini saat ini.', duration: 5000 });
+            }
             if (this.detailFocus === 'edit' && this.canEditThis) this.startEdit();
         } catch (error) {
             if (this.highlightId === id) this.highlightId = null;
@@ -968,18 +973,32 @@ Alpine.data('taskDetail', () => ({
         try {
             const { data, message } = await reviewTask(this.task.id, {
                 decision,
-                note: this.reviewNote.trim(),
+                note: this.reviewNote.trim() || null,
                 version: this.task.version,
             });
             this.applyTask(data);
+            this.load();
             this.reviewMode = null;
             showToast({
                 title: decision === 'revision' ? 'Revisi diminta' : 'Tugas disetujui',
                 text: message ?? `Status menjadi ${statusOf(data.status).label}.`,
             });
         } catch (error) {
-            if (error?.status === 422) this.reviewError = validationErrors(error).note ?? taskErrorMessage(error, 'Keputusan review tidak valid.');
-            else await this.handleFailure(error, 'Keputusan review gagal disimpan.');
+            if (error?.status === 422) {
+                const errors = validationErrors(error);
+                if (errors.note) {
+                    this.reviewError = errors.note;
+                } else {
+                    // Tugas sudah tidak di On QA (misalnya diputuskan reviewer lain): tutup form dan muat data terbaru.
+                    notifyFailure({ ...error, data: { ...error.data, message: errors.decision ?? errors.version } }, 'Keputusan review gagal disimpan.');
+                    this.reviewMode = null;
+                    await this.reload();
+                    this.load();
+                }
+            } else {
+                if (error?.status === 409) this.reviewMode = null;
+                await this.handleFailure(error, 'Keputusan review gagal disimpan.');
+            }
         } finally {
             this.acting = null;
         }
