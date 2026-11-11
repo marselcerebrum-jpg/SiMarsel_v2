@@ -197,7 +197,7 @@ test('Board drag rejected by a backend business rule shows the server reason and
 test('Detail status button sends the displayed version and updates the panel and the Board', async () => {
     const { board, detail: createDetail, requests, toasts } = await tasklistPage({
         'GET /api/tasks': () => ({ json: { data: [task({ version: 2 })], meta: { status_counts: {} } } }),
-        'GET /api/tasks/7': () => ({ json: { data: task({ version: 2, description: null, history: [] }) } }),
+        'GET /api/tasks/7': () => ({ json: { data: task({ version: 2, description: null, history: [], next_statuses: [{ value: 'in_progress', label: 'On Process' }] }) } }),
         'PATCH /api/tasks/7/status': (body) => ({ json: { data: task({ status: body.status, version: 3 }), message: 'Status tugas berhasil diperbarui.' } }),
     });
     await board.load();
@@ -227,7 +227,7 @@ test('Detail status change based on an outdated version is rejected with a clear
         },
         'GET /api/tasks/7': () => {
             detailCalls += 1;
-            return { json: { data: detailCalls === 1 ? task() : task({ status: 'in_progress', version: 5 }) } };
+            return { json: { data: detailCalls === 1 ? task({ next_statuses: [{ value: 'in_progress', label: 'On Process' }] }) : task({ status: 'in_progress', version: 5 }) } };
         },
         'PATCH /api/tasks/7/status': () => ({
             status: 409,
@@ -478,4 +478,38 @@ test('Assignment conflicts reload both views and a rejected PIC shows the server
     assert.equal(detail.assigneeState, 'error');
     assert.equal(detail.assignmentError, 'PIC harus Staff aktif dari divisi tugas.');
     assert.equal(detail.task.pic.id, PIC.id, 'a rejected assignment leaves the shown PIC unchanged');
+});
+
+test('Detail buttons follow next_statuses and can_review from the backend, and a rejected move shows the server reason', async () => {
+    let detail = task({ next_statuses: [{ value: 'in_progress', label: 'On Process' }] });
+    const { board, detail: createDetail, toasts, requests } = await tasklistPage({
+        'GET /api/tasks': () => ({ json: { data: [task()], meta: { status_counts: {} } } }),
+        'GET /api/tasks/7': () => ({ json: { data: detail } }),
+        'PATCH /api/tasks/7/status': () => ({ status: 422, json: { message: 'Data tidak valid.', errors: { status: ['Unggah evidence sebelum menyelesaikan tugas.'] } } }),
+    }, ADMIN);
+    await board.load();
+    board.detailId = 7;
+
+    detail = task({ next_statuses: [] });
+    const blocked = createDetail();
+    await blocked.open(7);
+    assert.deepEqual([...blocked.transitions], [], 'no button when the backend offers no next status');
+
+    detail = task({ status: 'on_qa', requires_review: true, can_review: false, next_statuses: [] });
+    const notReviewer = createDetail();
+    await notReviewer.open(7);
+    assert.deepEqual([...notReviewer.transitions], [], 'QA buttons need can_review');
+
+    detail = task({ status: 'on_qa', requires_review: true, can_review: true, next_statuses: [] });
+    const reviewer = createDetail();
+    await reviewer.open(7);
+    assert.deepEqual([...reviewer.transitions].map(({ review }) => review).sort(), ['approve', 'revision']);
+
+    detail = task({ status: 'in_progress', next_statuses: [{ value: 'done', label: 'Done' }] });
+    const pic = createDetail();
+    await pic.open(7);
+    await pic.runTransition(pic.transitions.find(({ to }) => to === 'done') ?? { to: 'done' });
+    assert.equal(toasts.at(-1).text, 'Unggah evidence sebelum menyelesaikan tugas.');
+    assert.equal(pic.task.status, 'in_progress');
+    assert.deepEqual(requests.find(({ method }) => method === 'PATCH').body, { status: 'done', version: 4 });
 });
