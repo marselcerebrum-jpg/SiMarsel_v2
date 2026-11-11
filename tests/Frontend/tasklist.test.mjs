@@ -913,6 +913,45 @@ test('A status change from the Board reloads the summary, and opening a detail w
     assert.equal(board.summary.todo, 0);
 });
 
+test('Overdue marks on the cards use the same today as the KPI: the backend as_of, the browser date only before it loads', async () => {
+    let asOf = '2020-01-01';
+    const late = task({ status: 'todo', deadline: '2020-01-02' });
+    const { board } = await tasklistPage({
+        'GET /api/tasks': () => ({ json: { data: [late], meta: { status_counts: {} } } }),
+        'GET /api/tasks/monitoring': () => ({ json: { data: { ...monitoringOf({ total_tasks: 1, todo: 1, unfinished: 1 }), as_of: asOf } } }),
+    }, ADMIN);
+
+    assert.equal(board.isOverdue(late), true, 'before the summary loads, the browser date is used');
+    await board.load();
+    assert.equal(board.isOverdue(late), false, 'on the backend date the deadline has not passed, as in the Terlambat KPI');
+
+    asOf = '2020-01-03';
+    await board.loadSummary();
+    assert.equal(board.isOverdue(late), true);
+    assert.equal(board.isOverdue({ ...late, status: 'done' }), false);
+});
+
+test('Removing the PIC or the division reloads the summary, while an update without summary fields does not', async () => {
+    const { board, requests } = await tasklistPage({
+        'GET /api/tasks': () => ({ json: { data: [task()], meta: { status_counts: {} } } }),
+        'GET /api/tasks/monitoring': () => ({ json: { data: monitoringOf({ total_tasks: 1 }) } }),
+    }, ADMIN);
+    await board.load();
+    const tick = () => new Promise((resolve) => setTimeout(resolve));
+
+    board.syncTask({ id: 7, evidence_count: 1 });
+    await tick();
+    assert.equal(monitoringRequests(requests).length, 1, 'fields the summary does not use change nothing');
+
+    board.syncTask({ ...task(), pic: null });
+    await tick();
+    assert.equal(monitoringRequests(requests).length, 2, 'a PIC set to null is a change');
+
+    board.syncTask({ ...task(), pic: null, division: null });
+    await tick();
+    assert.equal(monitoringRequests(requests).length, 3, 'a division set to null is a change');
+});
+
 test('With the default config, the PIC sends a file and a link as evidence and the saved evidence shows again in the detail', async () => {
     const saved = [];
     const evidence = (id, fields) => ({
