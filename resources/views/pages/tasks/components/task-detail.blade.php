@@ -77,7 +77,7 @@
                             <template x-for="transition in transitions" :key="transition.to">
                                 <button type="button"
                                     class="{{ $button }}"
-                                    :class="transition.review === 'revision' ? 'border-amber-300 text-amber-800' : (transition.review === 'approve' || transition.to === 'done' ? 'border-primary bg-primary text-white hover:bg-primary-hover' : '')"
+                                    :class="transition.review === 'revision' ? 'border-amber-300! text-amber-800!' : (transition.review === 'approve' || transition.to === 'done' ? 'border-primary! bg-primary! text-white! hover:bg-primary-hover!' : '')"
                                     :disabled="acting !== null"
                                     @click="runTransition(transition)">
                                     <span x-text="acting === transition.to ? 'Menyimpan…' : transition.label"></span>
@@ -95,7 +95,7 @@
                         <h3 class="{{ $sectionTitle }}" x-text="reviewMode === 'revision' ? 'Minta Revisi' : 'Setujui Tugas'"></h3>
                         <p class="mt-1 text-xs text-muted" x-text="reviewMode === 'revision' ? 'Tugas kembali ke On Process. Jelaskan apa yang perlu diperbaiki PIC.' : 'Tugas akan ditandai Done dan waktu penyelesaian dicatat.'"></p>
                         <label for="review-note" class="{{ $labelClass }} mt-3">Catatan <span x-show="reviewMode === 'revision'" class="text-red-500">*</span><span x-show="reviewMode !== 'revision'">(opsional)</span></label>
-                        <textarea id="review-note" x-ref="reviewNote" x-model="reviewNote" rows="3" class="{{ $textareaClass }}" @input="reviewError = ''" maxlength="2000"
+                        <textarea id="review-note" x-ref="reviewNote" x-model="reviewNote" rows="3" class="{{ $textareaClass }}" @input="reviewError = ''" maxlength="1000"
                             :placeholder="reviewMode === 'revision' ? 'Contoh: lampirkan versi final desain dan perbaiki ukuran banner.' : 'Catatan untuk PIC'"></textarea>
                         <p x-show="reviewError" x-text="reviewError" class="{{ $errorClass }}"></p>
                         <div class="mt-3 flex justify-end gap-2">
@@ -305,15 +305,8 @@
                                 <template x-for="activity in activities" :key="activity.id">
                                     <li class="relative">
                                         <span class="absolute top-1 -left-[25px] size-2.5 rounded-full border-2 border-surface bg-primary"></span>
-                                        <p class="text-sm font-semibold text-ink" x-text="activity.action_label ?? activityLabel(activity.action)"></p>
-                                        <template x-for="[field, change] in Object.entries(activity.changes ?? {})" :key="field">
-                                            <p class="mt-0.5 text-xs text-muted">
-                                                <span x-text="`${activityFieldLabel(field)}: `"></span>
-                                                <span class="line-through" x-text="activityValue(change.old, field)"></span>
-                                                →
-                                                <span class="font-semibold text-ink" x-text="activityValue(change.new, field)"></span>
-                                            </p>
-                                        </template>
+                                        <p class="text-sm font-semibold text-ink" x-text="activity.action_label"></p>
+                                        <p x-show="activityDetail(activity)" class="mt-0.5 text-xs text-muted" x-text="activityDetail(activity)"></p>
                                         <p class="mt-0.5 text-xs text-muted"><span x-text="activity.actor?.fullname ?? 'Sistem'"></span> · <span x-text="formatDateTime(activity.created_at)"></span></p>
                                     </li>
                                 </template>

@@ -174,6 +174,22 @@ class TaskRepository
     }
 
     /**
+     * Tasks the account may see with a deadline in the period, for the Calendar's deadline list. Unlike the
+     * shared schedule this stays inside the account's visibility scope; tasks without a deadline are left out.
+     *
+     * @return Collection<int, Task>
+     */
+    public function deadlinesBetween(Account $account, CarbonInterface $from, CarbonInterface $to, ?string $division): Collection
+    {
+        return $this->visible($account, ['search' => null, 'division' => $division, 'priority' => null, 'status' => null])
+            ->with(['division', 'pic'])
+            ->whereBetween('deadline', [$from->copy()->startOfDay()->toDateTimeString(), $to->copy()->endOfDay()->toDateTimeString()])
+            ->orderBy('deadline')
+            ->orderBy('id')
+            ->get();
+    }
+
+    /**
      * Number of tasks per status, with every status present so empty Board columns show 0.
      *
      * @param  Builder<Task>  $query
