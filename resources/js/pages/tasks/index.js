@@ -39,6 +39,9 @@ import {
 
 const VIEWS = ['board', 'table', 'timeline', 'calendar'];
 
+// Nama metrik monitoring untuk tiap status Tasklist.
+const STATUS_METRICS = { backlog: 'backlog', todo: 'todo', in_progress: 'on_process', ready_for_qa: 'ready_for_qa', on_qa: 'on_qa', done: 'completed' };
+
 // Field yang memengaruhi angka ringkasan atau cakupan/filter tugas: perubahannya memuat ulang ringkasan.
 // Field yang tidak dikirim (undefined) diabaikan; PIC atau divisi yang dilepas (null) tetap dihitung sebagai perubahan.
 const nested = (value, key) => (value === undefined ? undefined : (value?.[key] ?? null));
@@ -308,6 +311,21 @@ Alpine.data('tasklist', () => ({
     // Tanpa tugas dalam cakupan, backend mengirim semua angka 0.
     get summary() {
         return this.monitoring?.metrics ?? {};
+    },
+
+    // Angka hanya tampil untuk respons filter yang sedang aktif; selama dimuat atau gagal tampil "—",
+    // agar angka filter sebelumnya tidak terbaca sebagai hasil filter baru.
+    metric(key) {
+        return this.summaryState === 'ready' ? (this.summary[key] ?? 0) : '—';
+    },
+
+    get completionRateText() {
+        return this.summaryState === 'ready' ? `${(this.summary.completion_rate ?? 0).toLocaleString('id-ID')}%` : '—';
+    },
+
+    // Jumlah tiap status di ringkasan, terlihat di semua tampilan (kolom Board tersembunyi di Tabel/Linimasa/Kalender).
+    get statusSummary() {
+        return STATUSES.map((status) => ({ ...status, value: this.metric(STATUS_METRICS[status.key]) }));
     },
 
     // 'none' = belum ada tugas sama sekali, 'filtered' = filter tidak menemukan tugas.
