@@ -12,7 +12,8 @@ import vm from 'node:vm';
  * - POST /api/tasks (StoreTaskRequest) from the Create Task form, until the task shows on the Board and Table;
  * - PATCH /api/tasks/{id}/assignment (AssignTaskRequest: pic_id, division_id, version) from the detail;
  * - POST /api/tasks/{id}/evidences (StoreTaskEvidenceRequest: file or url, note) with the default VITE_TASK_API_READY=false;
- * - GET /api/tasks/{id}/activities for the detail's history, with its loading, error, and empty states.
+ * - GET /api/tasks/{id}/activities for the detail's history, with its loading, error, and empty states;
+ * - GET /api/tasks/monitoring?scope=tasklist for the summary KPIs, with the same filters as the list.
  */
 const PIC = { id: 10, role: { code_role: 'EMP' }, division: { code_division: 'MKT' } };
 const ADMIN = { id: 1, role: { code_role: 'ADM' }, division: null };
@@ -794,6 +795,210 @@ test('History updated by a change is not overwritten by an older history respons
     detail.reset();
     assert.equal(detail.activityState, 'idle');
     assert.equal(detail.activities.length, 0);
+});
+
+const metrics = (overrides = {}) => ({
+    total_tasks: 0, backlog: 0, todo: 0, on_process: 0, ready_for_qa: 0, on_qa: 0,
+    completed: 0, unfinished: 0, overdue: 0, due_today: 0, urgent: 0, completion_rate: 0,
+    ...overrides,
+});
+const monitoringOf = (values, label = 'Tugas divisi Anda') => ({
+    scope: { key: 'tasklist', label },
+    as_of: '2026-11-11',
+    metrics: metrics(values),
+    by_priority: {},
+    by_division: [],
+});
+const monitoringRequests = (requests) => requests.filter(({ url }) => url.startsWith('/api/tasks/monitoring'));
+
+test('With the default config, the summary comes from the monitoring API with the Tasklist scope and the same filters as the list', async () => {
+    const backend = metrics({ total_tasks: 12, on_process: 3, overdue: 2, due_today: 1, completed: 3, unfinished: 9, urgent: 4, completion_rate: 25 });
+    const { board, requests } = await tasklistPage({
+        'GET /api/tasks': () => ({ json: { data: [task()], meta: { status_counts: {} } } }),
+        'GET /api/tasks/monitoring': () => ({ json: { data: { ...monitoringOf(), metrics: backend } } }),
+    }, MANAGER);
+    board.filters = { search: '  promo ', division: 'MKT', priority: 'urgent', status: 'todo' };
+    await board.load();
+
+    const list = requests.find(({ url }) => url.startsWith('/api/tasks?'));
+    const summary = monitoringRequests(requests);
+    assert.equal(summary.length, 1, 'the summary is requested although VITE_TASK_API_READY is false');
+    assert.equal(summary[0].url, '/api/tasks/monitoring?scope=tasklist&search=promo&division=MKT&priority=urgent&status=todo');
+    assert.equal(list.url, '/api/tasks?search=promo&division=MKT&priority=urgent&status=todo', 'the list and the summary use the same filters');
+    assert.equal(summary[0].headers.Accept, 'application/json');
+
+    // The numbers are the backend's, not counted from the single task loaded in the list.
+    assert.equal(board.summaryState, 'ready');
+    assert.deepEqual({ ...board.summary }, backend);
+    assert.equal(board.summary.completion_rate, 25);
+
+    // Reset Filter asks for the default configuration again.
+    board.resetFilters();
+    await board.load();
+    assert.equal(monitoringRequests(requests).at(-1).url, '/api/tasks/monitoring?scope=tasklist&division=MKT');
+});
+
+test('Without tasks the summary shows zero, a failed summary shows its own error with a retry, and an older response is ignored', async () => {
+    let reply = () => ({ json: { data: monitoringOf({}) } });
+    let states = [];
+    const { board } = await tasklistPage({
+        'GET /api/tasks': () => ({ json: { data: [], meta: { status_counts: {} } } }),
+        'GET /api/tasks/monitoring': () => {
+            states.push(board.summaryState);
+            return reply();
+        },
+    }, ADMIN);
+    await board.load();
+    assert.deepEqual(states, ['loading'], 'loading while the summary is fetched');
+    assert.equal(board.summaryState, 'ready');
+    assert.equal(board.summary.total_tasks, 0);
+    assert.equal(board.summary.completion_rate, 0);
+
+    reply = () => ({ status: 500, json: { message: 'Server Error' } });
+    await board.load();
+    assert.equal(board.summaryState, 'error');
+    assert.equal(board.summaryError, 'Ringkasan tugas gagal dimuat.');
+    assert.equal(board.status, 'ready', 'the list stays usable when only the summary fails');
+
+    reply = () => ({ status: 422, json: { message: 'Data tidak valid.', errors: { division: ['Divisi tidak ditemukan.'] } } });
+    await board.loadSummary();
+    assert.equal(board.summaryState, 'error');
+
+    reply = () => ({ json: { data: monitoringOf({ total_tasks: 5, unfinished: 5 }) } });
+    await board.loadSummary();
+    assert.equal(board.summaryState, 'ready');
+    assert.equal(board.summaryError, '');
+    assert.equal(board.summary.total_tasks, 5);
+
+    // A response for an older filter that arrives last does not replace the newer summary.
+    let releaseOld;
+    reply = () => new Promise((resolve) => {
+        releaseOld = () => resolve({ json: { data: monitoringOf({ total_tasks: 99 }) } });
+    });
+    const older = board.loadSummary();
+    reply = () => ({ json: { data: monitoringOf({ total_tasks: 7 }) } });
+    await board.loadSummary();
+    releaseOld();
+    await older;
+    assert.equal(board.summary.total_tasks, 7);
+});
+
+test('A status change from the Board reloads the summary, and opening a detail without changes does not', async () => {
+    let current = metrics({ total_tasks: 1, todo: 1, unfinished: 1 });
+    const { board, detail: createDetail, requests } = await tasklistPage({
+        'GET /api/tasks': () => ({ json: { data: [task()], meta: { status_counts: {} } } }),
+        'GET /api/tasks/7': () => ({ json: { data: task() } }),
+        'GET /api/tasks/7/activities': () => ({ json: { data: [] } }),
+        'GET /api/tasks/monitoring': () => ({ json: { data: { ...monitoringOf({}, 'Tugas yang ditugaskan kepada Anda'), metrics: current } } }),
+        'PATCH /api/tasks/7/status': (body) => {
+            current = metrics({ total_tasks: 1, on_process: 1, unfinished: 1 });
+            return { json: { data: task({ status: body.status, version: body.version + 1 }), message: 'Status tugas berhasil diperbarui.' } };
+        },
+    });
+    await board.load();
+    assert.equal(monitoringRequests(requests).length, 1);
+    assert.equal(board.summary.todo, 1);
+
+    board.detailId = 7;
+    await createDetail().open(7);
+    await new Promise((resolve) => setTimeout(resolve));
+    assert.equal(monitoringRequests(requests).length, 1, 'no summary request when nothing changed');
+
+    board.draggingId = 7;
+    await board.drop('in_progress');
+    await new Promise((resolve) => setTimeout(resolve));
+    await new Promise((resolve) => setTimeout(resolve));
+    assert.equal(monitoringRequests(requests).length, 2, 'the summary is reloaded after the status change');
+    assert.equal(board.summary.on_process, 1);
+    assert.equal(board.summary.todo, 0);
+});
+
+test('Overdue marks on the cards use the same today as the KPI: the backend as_of, the browser date only before it loads', async () => {
+    let asOf = '2020-01-01';
+    const late = task({ status: 'todo', deadline: '2020-01-02' });
+    const { board } = await tasklistPage({
+        'GET /api/tasks': () => ({ json: { data: [late], meta: { status_counts: {} } } }),
+        'GET /api/tasks/monitoring': () => ({ json: { data: { ...monitoringOf({ total_tasks: 1, todo: 1, unfinished: 1 }), as_of: asOf } } }),
+    }, ADMIN);
+
+    assert.equal(board.isOverdue(late), true, 'before the summary loads, the browser date is used');
+    await board.load();
+    assert.equal(board.isOverdue(late), false, 'on the backend date the deadline has not passed, as in the Terlambat KPI');
+
+    asOf = '2020-01-03';
+    await board.loadSummary();
+    assert.equal(board.isOverdue(late), true);
+    assert.equal(board.isOverdue({ ...late, status: 'done' }), false);
+});
+
+test('Removing the PIC or the division reloads the summary, while an update without summary fields does not', async () => {
+    const { board, requests } = await tasklistPage({
+        'GET /api/tasks': () => ({ json: { data: [task()], meta: { status_counts: {} } } }),
+        'GET /api/tasks/monitoring': () => ({ json: { data: monitoringOf({ total_tasks: 1 }) } }),
+    }, ADMIN);
+    await board.load();
+    const tick = () => new Promise((resolve) => setTimeout(resolve));
+
+    board.syncTask({ id: 7, evidence_count: 1 });
+    await tick();
+    assert.equal(monitoringRequests(requests).length, 1, 'fields the summary does not use change nothing');
+
+    board.syncTask({ ...task(), pic: null });
+    await tick();
+    assert.equal(monitoringRequests(requests).length, 2, 'a PIC set to null is a change');
+
+    board.syncTask({ ...task(), pic: null, division: null });
+    await tick();
+    assert.equal(monitoringRequests(requests).length, 3, 'a division set to null is a change');
+});
+
+test('The count of every status is in the summary in every view, zero included', async () => {
+    const { board } = await tasklistPage({
+        'GET /api/tasks': () => ({ json: { data: [task()], meta: { status_counts: {} } } }),
+        'GET /api/tasks/monitoring': () => ({ json: { data: monitoringOf({ total_tasks: 9, backlog: 0, todo: 2, on_process: 3, ready_for_qa: 0, on_qa: 1, completed: 3, unfinished: 6 }) } }),
+    }, ADMIN);
+    await board.load();
+
+    const expected = [['Back Log', 0], ['To Do', 2], ['On Process', 3], ['Ready for QA', 0], ['On QA', 1], ['Done', 3]];
+    for (const view of ['board', 'table', 'timeline', 'calendar']) {
+        board.view = view;
+        assert.deepEqual([...board.statusSummary].map(({ label, value }) => [label, value]), expected, `status counts in the ${view} view`);
+    }
+});
+
+test('While a new filter is loading the summary shows — instead of the previous filter numbers, then the new numbers', async () => {
+    const pending = [];
+    const { board } = await tasklistPage({
+        'GET /api/tasks': () => ({ json: { data: [task()], meta: { status_counts: {} } } }),
+        'GET /api/tasks/monitoring': () => (pending.length || board.filters.division === ''
+            ? { json: { data: monitoringOf({ total_tasks: 100, todo: 40, on_process: 20, completed: 40, unfinished: 60, overdue: 5, completion_rate: 40 }, 'Seluruh divisi') } }
+            : new Promise((resolve) => pending.push(resolve))),
+    }, ADMIN);
+    board.divisions = [{ code_division: 'SLS', name: 'Sales' }];
+    await board.load();
+    assert.equal(board.metric('total_tasks'), 100);
+
+    // Divisi Sales is chosen; the server has not answered yet.
+    board.filters.division = 'SLS';
+    const loading = board.load();
+    await new Promise((resolve) => setTimeout(resolve));
+    assert.equal(board.scopeLabel, 'Divisi Sales');
+    assert.equal(board.summaryState, 'loading');
+    for (const key of ['total_tasks', 'on_process', 'overdue', 'due_today', 'completed', 'unfinished', 'urgent']) {
+        assert.equal(board.metric(key), '—', `${key} hides the number of the previous filter`);
+    }
+    assert.equal(board.completionRateText, '—');
+    assert.ok(board.statusSummary.every(({ value }) => value === '—'));
+
+    // Switching the view while it loads keeps the summary hidden too.
+    board.view = 'table';
+    assert.equal(board.metric('total_tasks'), '—');
+
+    pending[0]({ json: { data: monitoringOf({ total_tasks: 7, todo: 4, on_process: 3, unfinished: 7, completion_rate: 0 }) } });
+    await loading;
+    assert.equal(board.metric('total_tasks'), 7);
+    assert.equal(board.completionRateText, '0%');
+    assert.deepEqual([...board.statusSummary].map(({ value }) => value), [0, 4, 3, 0, 0, 0]);
 });
 
 test('With the default config, the PIC sends a file and a link as evidence and the saved evidence shows again in the detail', async () => {

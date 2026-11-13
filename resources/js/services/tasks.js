@@ -1,12 +1,13 @@
 import { http } from '../http';
 
 /**
- * API daftar, meta, detail, pembuatan, pembaruan, penugasan, status, evidence, review, dan histori tugas sudah tersedia dan dipakai langsung.
+ * API daftar, meta, monitoring, detail, pembuatan, pembaruan, penugasan, status, evidence, review, dan histori tugas sudah tersedia dan dipakai langsung.
  * Endpoint Tasklist lain yang belum terintegrasi tetap menunggu VITE_TASK_API_READY=true.
  * Kontrak lengkap ada di docs/api/tasks.md.
  *
  * GET    /api/tasks/meta                       → { data: { role, division, default_division, can_create, divisions, statuses, priorities } }
  * GET    /api/tasks?search&division&priority&status → { data: [Task], meta: { status_counts } }
+ * GET    /api/tasks/monitoring?scope&search&division&priority&status → { data: { scope, as_of, metrics, by_priority, by_division } }
  * POST   /api/tasks                            → { data: Task, message }
  * GET    /api/tasks/{id}                       → { data: TaskDetail }
  * PATCH  /api/tasks/{id}                       → { data: TaskDetail, message }         (kirim version)
@@ -35,6 +36,9 @@ const request = (url, options) => (TASK_API_READY ? http(url, options) : unavail
 export const fetchTaskMeta = () => http('/api/tasks/meta');
 
 export const fetchTasks = (filters) => http(`/api/tasks${query(filters)}`);
+
+// Ringkasan KPI Tasklist dihitung backend dalam cakupan Tasklist user, dengan filter yang sama seperti daftar tugas.
+export const fetchTaskMonitoring = (filters) => http(`/api/tasks/monitoring${query({ scope: 'tasklist', ...filters })}`);
 
 export const fetchTaskCreateOptions = () => http('/api/tasks/create-options');
 

@@ -10,6 +10,7 @@ import {
     fetchSchedule,
     fetchActivities,
     fetchTask,
+    fetchTaskMonitoring,
     fetchTaskCreateOptions,
     fetchTaskMeta,
     fetchTasks,
@@ -30,7 +31,6 @@ import {
     parseISODate,
     priorityOf,
     statusOf,
-    summarize,
     toISODate,
     today,
     transitionRule,
@@ -38,6 +38,23 @@ import {
 } from './workflow';
 
 const VIEWS = ['board', 'table', 'timeline', 'calendar'];
+
+// Nama metrik monitoring untuk tiap status Tasklist.
+const STATUS_METRICS = { backlog: 'backlog', todo: 'todo', in_progress: 'on_process', ready_for_qa: 'ready_for_qa', on_qa: 'on_qa', done: 'completed' };
+
+// Field yang memengaruhi angka ringkasan atau cakupan/filter tugas: perubahannya memuat ulang ringkasan.
+// Field yang tidak dikirim (undefined) diabaikan; PIC atau divisi yang dilepas (null) tetap dihitung sebagai perubahan.
+const nested = (value, key) => (value === undefined ? undefined : (value?.[key] ?? null));
+const SUMMARY_FIELDS = [
+    (task) => task.status,
+    (task) => task.deadline,
+    (task) => task.priority,
+    (task) => task.title,
+    (task) => nested(task.division, 'code_division'),
+    (task) => nested(task.pic, 'id'),
+];
+
+const affectsSummary = (before, after) => !before || SUMMARY_FIELDS.some((field) => field(after) !== undefined && field(after) !== field(before));
 const PAGE_SIZE = 10;
 const BACKEND_PENDING = 'Menunggu pengerjaan Back End.';
 
@@ -102,6 +119,12 @@ Alpine.data('tasklist', () => ({
     loading: true,
     error: '',
     loadSequence: 0,
+
+    monitoring: null,
+    summaryState: 'loading',
+    summaryError: '',
+    summarySequence: 0,
+    summaryQueued: false,
 
     filters: { search: '', division: '', priority: '', status: '' },
     sort: { key: 'deadline', dir: 'asc' },
@@ -202,18 +225,24 @@ Alpine.data('tasklist', () => ({
         this.sort = { key: 'deadline', dir: 'asc' };
     },
 
+    get requestFilters() {
+        return {
+            search: this.filters.search.trim(),
+            division: this.filters.division,
+            priority: this.filters.priority,
+            status: this.filters.status,
+        };
+    },
+
+    // Daftar tugas dan ringkasan KPI dimuat bersamaan dengan filter yang sama.
     async load() {
         const sequence = ++this.loadSequence;
+        const summary = this.loadSummary();
         this.loading = true;
         this.error = '';
 
         try {
-            const { data } = await fetchTasks({
-                search: this.filters.search.trim(),
-                division: this.filters.division,
-                priority: this.filters.priority,
-                status: this.filters.status,
-            });
+            const { data } = await fetchTasks(this.requestFilters);
             if (sequence !== this.loadSequence) return;
 
             this.tasks = data;
@@ -230,6 +259,37 @@ Alpine.data('tasklist', () => ({
                 if (this.highlightId) this.$nextTick(() => this.revealHighlight());
             }
         }
+
+        await summary;
+    },
+
+    // Ringkasan TASK-09 dari GET /api/tasks/monitoring (scope=tasklist): angkanya dihitung backend dalam cakupan
+    // dan filter yang sama dengan Board/Table. Respons lama (filter sudah berubah) diabaikan.
+    async loadSummary() {
+        const sequence = ++this.summarySequence;
+        this.summaryState = 'loading';
+        this.summaryError = '';
+
+        try {
+            const { data } = await fetchTaskMonitoring(this.requestFilters);
+            if (sequence !== this.summarySequence) return;
+            this.monitoring = data;
+            this.summaryState = 'ready';
+        } catch (error) {
+            if (sequence !== this.summarySequence) return;
+            this.summaryState = 'error';
+            this.summaryError = taskErrorMessage(error, 'Ringkasan tugas gagal dimuat.');
+        }
+    },
+
+    // Beberapa perubahan dalam satu aksi digabung menjadi satu permintaan ringkasan.
+    queueSummary() {
+        if (this.summaryQueued) return;
+        this.summaryQueued = true;
+        setTimeout(() => {
+            this.summaryQueued = false;
+            this.loadSummary();
+        });
     },
 
     /**
@@ -248,8 +308,24 @@ Alpine.data('tasklist', () => ({
         return this.tasks.filter((task) => this.matchesFilters(task));
     },
 
+    // Tanpa tugas dalam cakupan, backend mengirim semua angka 0.
     get summary() {
-        return summarize(this.filteredTasks);
+        return this.monitoring?.metrics ?? {};
+    },
+
+    // Angka hanya tampil untuk respons filter yang sedang aktif; selama dimuat atau gagal tampil "—",
+    // agar angka filter sebelumnya tidak terbaca sebagai hasil filter baru.
+    metric(key) {
+        return this.summaryState === 'ready' ? (this.summary[key] ?? 0) : '—';
+    },
+
+    get completionRateText() {
+        return this.summaryState === 'ready' ? `${(this.summary.completion_rate ?? 0).toLocaleString('id-ID')}%` : '—';
+    },
+
+    // Jumlah tiap status di ringkasan, terlihat di semua tampilan (kolom Board tersembunyi di Tabel/Linimasa/Kalender).
+    get statusSummary() {
+        return STATUSES.map((status) => ({ ...status, value: this.metric(STATUS_METRICS[status.key]) }));
     },
 
     // 'none' = belum ada tugas sama sekali, 'filtered' = filter tidak menemukan tugas.
@@ -332,8 +408,9 @@ Alpine.data('tasklist', () => ({
     formatDate,
     formatDateTime,
 
+    // Acuan hari ini sama dengan KPI Terlambat: as_of dari backend (zona waktu aplikasi), tanggal browser bila belum ada.
     isOverdue(task) {
-        return isOverdue(task);
+        return isOverdue(task, this.monitoring?.as_of ?? today());
     },
 
     canOpen(task) {
@@ -398,8 +475,10 @@ Alpine.data('tasklist', () => ({
     // Satu tugas berubah (status, PIC, informasi): perbarui Board, Table, dan ringkasan sekaligus.
     syncTask(task) {
         const index = this.tasks.findIndex((item) => item.id === task.id);
+        const before = index === -1 ? null : this.tasks[index];
         if (index === -1) this.tasks.push(task);
         else this.tasks.splice(index, 1, { ...this.tasks[index], ...task });
+        if (affectsSummary(before, task)) this.queueSummary();
     },
 
     // --- Drag-and-drop Board (TASK-05 D) ------------------------------------------------------
@@ -1184,7 +1263,7 @@ Alpine.data('taskTimeline', () => ({
                 return {
                     ...item,
                     partial: !item.start_date || !item.end_date,
-                    overdue: item.type === 'task' && Boolean(item.end_date) && item.status !== 'done' && item.end_date.slice(0, 10) < today(),
+                    overdue: item.type === 'task' && Boolean(item.end_date) && item.status !== 'done' && item.end_date.slice(0, 10) < (this.monitoring?.as_of ?? today()),
                     left: `${(startIndex / total) * 100}%`,
                     width: `${((endIndex - startIndex + 1) / total) * 100}%`,
                 };
@@ -1252,7 +1331,7 @@ Alpine.data('taskCalendar', () => ({
                 today: iso === today(),
                 events: this.eventsOn(iso).length,
                 deadlines: this.deadlinesOn(iso).length,
-                overdue: this.deadlinesOn(iso).some((task) => isOverdue(task)),
+                overdue: this.deadlinesOn(iso).some((task) => this.isOverdue(task)),
             };
         });
     },
