@@ -130,7 +130,7 @@ class TaskActivityTest extends TestCase
     public function test_actor_name_is_still_shown_after_the_actor_account_is_deleted(): void
     {
         $task = $this->task(['pic_id' => $this->otherStaff->id]);
-        $this->send('patchJson', "/api/tasks/{$task->id}/assignment", $this->manager, $task, ['pic_id' => $this->staff->id]);
+        $this->send('patchJson', "/api/tasks/{$task->id}/assignment", $this->manager, $task, ['pic_ids' => [$this->staff->id]]);
 
         $this->actingAs($this->financeManager)->deleteJson("/api/accounts/{$this->manager->id}")->assertSuccessful();
         $this->assertModelMissing($this->manager);
@@ -184,12 +184,12 @@ class TaskActivityTest extends TestCase
     public function test_the_whole_workflow_is_recorded_and_earlier_entries_stay_after_status_and_pic_change(): void
     {
         $task = Task::findOrFail($this->actingAs($this->manager)
-            ->postJson('/api/tasks', ['title' => 'Desain banner', 'division_id' => $this->marketing->id, 'pic_id' => $this->otherStaff->id])
+            ->postJson('/api/tasks', ['title' => 'Desain banner', 'division_id' => $this->marketing->id, 'pic_ids' => [$this->otherStaff->id]])
             ->assertCreated()
             ->json('data.id'));
 
         $this->send('putJson', "/api/tasks/{$task->id}", $this->manager, $task, ['title' => 'Desain banner promo', 'priority' => 'high', 'requires_review' => true]);
-        $this->send('patchJson', "/api/tasks/{$task->id}/assignment", $this->manager, $task, ['pic_id' => $this->staff->id]);
+        $this->send('patchJson', "/api/tasks/{$task->id}/assignment", $this->manager, $task, ['pic_ids' => [$this->staff->id]]);
         $this->moveTo($task, $this->manager, 'todo');
         $this->moveTo($task, $this->staff, 'in_progress');
         $this->actingAs($this->staff)

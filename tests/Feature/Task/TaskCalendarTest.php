@@ -111,14 +111,14 @@ class TaskCalendarTest extends TestCase
             'id' => $this->staffTask->id,
             'title' => 'Update landing page',
             'division' => ['code_division' => 'MKT', 'name' => 'Marketing'],
-            'pic' => ['id' => $this->staff->id, 'fullname' => 'Mkt Staff'],
+            'pics' => [['id' => $this->staff->id, 'fullname' => 'Mkt Staff']],
             'priority' => 'high',
             'status' => 'in_progress',
             'deadline' => '2026-10-15',
             'can_view_detail' => true,
             'description' => 'Rincian tugas',
             'is_overdue' => true,
-        ], collect($deadline)->only(['id', 'title', 'division', 'pic', 'priority', 'status', 'deadline', 'description', 'is_overdue', 'can_view_detail'])->all());
+        ], collect($deadline)->only(['id', 'title', 'division', 'pics', 'priority', 'status', 'deadline', 'description', 'is_overdue', 'can_view_detail'])->all());
 
         $this->assertSame(
             $this->actingAs($this->staff)->getJson('/api/tasks')->json('data.0.deadline'),

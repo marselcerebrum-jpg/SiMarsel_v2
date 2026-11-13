@@ -4,6 +4,7 @@ namespace Database\Factories;
 
 use App\Enums\TaskPriority;
 use App\Enums\TaskStatus;
+use App\Models\Account;
 use App\Models\Division;
 use App\Models\Task;
 use Illuminate\Database\Eloquent\Factories\Factory;
@@ -36,5 +37,34 @@ class TaskFactory extends Factory
             'requires_review' => fake()->boolean(),
             'evidence_required' => fake()->boolean(),
         ];
+    }
+
+    /**
+     * A task created with the legacy pic_id gets the active assignment the backfill would give it, so it looks like
+     * migrated data.
+     */
+    public function configure(): static
+    {
+        return $this->afterCreating(function (Task $task) {
+            if ($task->pic_id !== null && ! $task->assignments()->exists()) {
+                $task->assignments()->create([
+                    'account_id' => $task->pic_id,
+                    'assigned_by' => $task->creator_id,
+                    'assigned_at' => $task->created_at ?? now(),
+                ]);
+            }
+        });
+    }
+
+    /**
+     * Active PICs for the task.
+     */
+    public function withPics(Account ...$pics): static
+    {
+        return $this->afterCreating(function (Task $task) use ($pics) {
+            foreach ($pics as $pic) {
+                $task->assignments()->create(['account_id' => $pic->id, 'assigned_by' => $task->creator_id, 'assigned_at' => now()]);
+            }
+        });
     }
 }

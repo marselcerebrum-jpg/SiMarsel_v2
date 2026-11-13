@@ -132,7 +132,7 @@ class TaskStatusTransitionTest extends TestCase
         $this->actingAs($this->manager)
             ->patchJson($this->url($task), $this->payload('todo'))
             ->assertUnprocessable()
-            ->assertJsonValidationErrors(['pic_id' => 'Tetapkan PIC sebelum memindahkan tugas dari Back Log.']);
+            ->assertJsonValidationErrors(['pic_ids' => 'Tetapkan PIC sebelum memindahkan tugas dari Back Log.']);
     }
 
     public function test_pic_starts_the_work(): void

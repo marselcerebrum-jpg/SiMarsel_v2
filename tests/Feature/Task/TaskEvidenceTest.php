@@ -158,7 +158,8 @@ class TaskEvidenceTest extends TestCase
         // The route lets the old PIC through, then the Manager reassigns the task before the evidence is saved.
         Gate::after(function (Account $user, string $ability) use ($task) {
             if ($ability === 'submitEvidence') {
-                Task::whereKey($task->id)->update(['pic_id' => $this->otherStaff->id]);
+                $task->activeAssignments()->update(['unassigned_at' => now(), 'unassigned_by' => $this->manager->id]);
+                $task->assignments()->create(['account_id' => $this->otherStaff->id, 'assigned_by' => $this->manager->id, 'assigned_at' => now()]);
             }
         });
 
@@ -177,7 +178,7 @@ class TaskEvidenceTest extends TestCase
         $task = $this->task(TaskStatus::InProgress);
 
         $this->actingAs($this->manager)
-            ->patchJson("/api/tasks/{$task->id}/assignment", ['version' => $task->version, 'pic_id' => $this->otherStaff->id])
+            ->patchJson("/api/tasks/{$task->id}/assignment", ['version' => $task->version, 'pic_ids' => [$this->otherStaff->id]])
             ->assertOk();
 
         $this->actingAs($this->staff)

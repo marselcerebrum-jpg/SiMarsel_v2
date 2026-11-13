@@ -44,9 +44,10 @@ class TasklistFoundationTest extends TestCase
         $migration = $this->migration('create_task_assignments_table');
         $migration->down();
 
-        $withHistory = Task::factory()->create(['division_id' => $this->division->id, 'pic_id' => $this->staff->id, 'creator_id' => $this->manager->id]);
-        $withoutHistory = Task::factory()->create(['division_id' => $this->division->id, 'pic_id' => $this->staff->id, 'creator_id' => $this->manager->id]);
-        $unassigned = Task::factory()->create(['division_id' => $this->division->id, 'pic_id' => null]);
+        // Legacy rows: pic_id is written directly, as before task_assignments existed.
+        $withHistory = $this->legacyTask($this->staff);
+        $withoutHistory = $this->legacyTask($this->staff);
+        $unassigned = $this->legacyTask(null);
 
         $admin = $this->account(Role::ADMIN, 'admin');
         DB::table('task_activities')->insert([
@@ -145,7 +146,7 @@ class TasklistFoundationTest extends TestCase
     {
         $task = Task::factory()->create(['division_id' => $this->division->id]);
         $finance = Division::create(['code_division' => 'FIN', 'name' => 'Finance']);
-        $task->collaboratingDivisions()->attach($finance->id, ['added_by' => $this->manager->id, 'created_at' => now()]);
+        $task->collaboratingDivisions()->attach($finance->id, ['added_by' => $this->manager->id]);
 
         $comment = TaskComment::create(['task_id' => $task->id, 'author_id' => $this->manager->id, 'content' => 'Mohon dicek.']);
         $reply = TaskComment::create(['task_id' => $task->id, 'author_id' => $this->staff->id, 'parent_comment_id' => $comment->id, 'content' => 'Siap.']);
@@ -188,6 +189,20 @@ class TasklistFoundationTest extends TestCase
             $this->assertFalse($role->hasPermission(Permission::TASK_CREATE), $code);
             $this->assertFalse($role->hasPermission(Permission::TASK_REVIEW), $code);
         }
+    }
+
+    private function legacyTask(?Account $pic): Task
+    {
+        return Task::find(DB::table('tasks')->insertGetId([
+            'title' => 'Tugas lama',
+            'division_id' => $this->division->id,
+            'pic_id' => $pic?->id,
+            'creator_id' => $this->manager->id,
+            'priority' => 'medium',
+            'status' => 'todo',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]));
     }
 
     private function migration(string $name): Migration

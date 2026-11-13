@@ -78,9 +78,8 @@ class TaskUpdateTest extends TestCase
             ['title' => 'Baru'],
             ['description' => 'Deskripsi baru'],
             ['category_id' => $this->unreviewed->id],
-            ['division_id' => $this->finance->id, 'pic_id' => $this->financeStaff->id],
+            ['division_id' => $this->finance->id],
             ['platform_id' => Platform::factory()->create()->id],
-            ['pic_id' => $this->otherStaff->id],
             ['priority' => 'high'],
             ['start_date' => '2026-10-25'],
             ['deadline' => '2026-11-15'],
@@ -221,7 +220,7 @@ class TaskUpdateTest extends TestCase
     public function test_staff_loses_access_once_the_task_is_reassigned(): void
     {
         $this->actingAs($this->manager)
-            ->patchJson($this->url(), $this->payload(['pic_id' => $this->otherStaff->id]))
+            ->patchJson("{$this->url()}/assignment", ['version' => 1, 'pic_ids' => [$this->otherStaff->id]])
             ->assertOk();
 
         $this->actingAs($this->staff)
@@ -254,7 +253,6 @@ class TaskUpdateTest extends TestCase
                 'title' => 'Desain banner promo Desember',
                 'description' => 'Revisi warna.',
                 'priority' => 'urgent',
-                'pic_id' => $this->otherStaff->id,
                 'start_date' => '2026-10-24',
                 'deadline' => '2026-10-31',
             ]))
@@ -263,7 +261,6 @@ class TaskUpdateTest extends TestCase
             ->assertJsonPath('data.title', 'Desain banner promo Desember')
             ->assertJsonPath('data.description', 'Revisi warna.')
             ->assertJsonPath('data.priority', 'urgent')
-            ->assertJsonPath('data.pic.id', $this->otherStaff->id)
             ->assertJsonPath('data.deadline', '2026-10-31')
             ->assertJsonPath('data.version', 2);
     }
@@ -340,49 +337,42 @@ class TaskUpdateTest extends TestCase
 
     // PIC & divisi
 
-    public function test_pic_must_be_staff_of_the_task_division(): void
-    {
-        $this->actingAs($this->admin);
-
-        foreach ([$this->financeStaff, $this->manager] as $pic) {
-            $this->patchJson($this->url(), $this->payload(['pic_id' => $pic->id]))
-                ->assertUnprocessable()
-                ->assertJsonValidationErrors(['pic_id' => 'PIC harus Staff dari divisi yang dipilih.']);
-        }
-    }
-
-    public function test_pic_is_required_once_the_task_leaves_back_log(): void
+    public function test_the_edit_form_ignores_pic_fields(): void
     {
         $this->actingAs($this->admin)
-            ->patchJson($this->url(), $this->payload(['pic_id' => null]))
+            ->patchJson($this->url(), $this->payload(['pic_id' => $this->otherStaff->id, 'pic_ids' => [], 'title' => 'Baru']))
+            ->assertOk()
+            ->assertJsonPath('data.pics', [['id' => $this->staff->id, 'fullname' => 'mkt.staff']]);
+    }
+
+    public function test_a_back_log_task_without_a_pic_cannot_leave_back_log_through_the_edit_form(): void
+    {
+        $backlog = $this->task(['status' => TaskStatus::Backlog, 'pic_id' => null]);
+
+        $this->actingAs($this->admin)
+            ->patchJson("/api/tasks/{$backlog->id}", $this->payload(['status' => 'todo']))
             ->assertUnprocessable()
-            ->assertJsonValidationErrors(['pic_id' => 'PIC wajib diisi untuk tugas yang tidak berstatus Back Log.']);
-
-        $backlog = $this->task(['status' => TaskStatus::Backlog]);
-
-        $this->patchJson("/api/tasks/{$backlog->id}", $this->payload(['pic_id' => null]))
-            ->assertOk()
-            ->assertJsonPath('data.pic', null);
+            ->assertJsonValidationErrors(['pic_ids' => 'Tetapkan PIC sebelum memindahkan tugas dari Back Log.']);
     }
 
-    public function test_admin_can_move_a_task_to_another_division_with_a_pic_from_it(): void
-    {
-        $this->actingAs($this->admin)
-            ->patchJson($this->url(), $this->payload([
-                'division_id' => $this->finance->id,
-                'pic_id' => $this->financeStaff->id,
-            ]))
-            ->assertOk()
-            ->assertJsonPath('data.division.code_division', 'FIN')
-            ->assertJsonPath('data.pic.id', $this->financeStaff->id);
-    }
-
-    public function test_moving_division_keeps_the_pic_only_when_they_belong_to_it(): void
+    public function test_admin_can_move_a_task_to_another_division_and_keep_its_pics(): void
     {
         $this->actingAs($this->admin)
             ->patchJson($this->url(), $this->payload(['division_id' => $this->finance->id]))
-            ->assertUnprocessable()
-            ->assertJsonValidationErrors(['pic_id' => 'PIC saat ini bukan Staff dari divisi yang dipilih. Pilih PIC baru.']);
+            ->assertOk()
+            ->assertJsonPath('data.division.code_division', 'FIN')
+            ->assertJsonPath('data.pics', [['id' => $this->staff->id, 'fullname' => 'mkt.staff']]);
+    }
+
+    public function test_moving_the_division_removes_it_from_the_collaborating_divisions(): void
+    {
+        $this->task->collaboratingDivisions()->attach($this->finance->id, ['added_by' => $this->admin->id]);
+
+        $this->actingAs($this->admin)
+            ->patchJson($this->url(), $this->payload(['division_id' => $this->finance->id]))
+            ->assertOk();
+
+        $this->assertSame(0, $this->task->collaboratingDivisions()->count());
     }
 
     public function test_manager_cannot_move_a_task_to_another_division(): void
@@ -390,7 +380,6 @@ class TaskUpdateTest extends TestCase
         $this->actingAs($this->manager)
             ->patchJson($this->url(), $this->payload([
                 'division_id' => $this->finance->id,
-                'pic_id' => $this->financeStaff->id,
             ]))
             ->assertUnprocessable()
             ->assertJsonValidationErrors(['division_id' => 'Hanya Admin yang dapat memindahkan tugas ke divisi lain.']);
@@ -404,7 +393,6 @@ class TaskUpdateTest extends TestCase
             ->patchJson($this->url(), $this->payload([
                 'title' => 'Desain banner promo',
                 'division_id' => $this->marketing->id,
-                'pic_id' => $this->staff->id,
                 'status' => 'todo',
             ]))
             ->assertOk()
@@ -530,7 +518,6 @@ class TaskUpdateTest extends TestCase
         $this->actingAs($this->manager)
             ->patchJson($this->url(), $this->payload([
                 'title' => 'Judul baru',
-                'pic_id' => $this->otherStaff->id,
                 'start_date' => '2026-10-25',
                 'deadline' => '2026-11-01',
             ]))
@@ -538,10 +525,6 @@ class TaskUpdateTest extends TestCase
             ->assertJsonPath('data.history.0.action', 'updated')
             ->assertJsonPath('data.history.0.actor.id', $this->manager->id)
             ->assertJsonPath('data.history.0.changes.title', ['old' => 'Desain banner promo', 'new' => 'Judul baru'])
-            ->assertJsonPath('data.history.0.changes.pic', [
-                'old' => ['id' => $this->staff->id, 'name' => 'mkt.staff'],
-                'new' => ['id' => $this->otherStaff->id, 'name' => 'mkt.other'],
-            ])
             ->assertJsonPath('data.history.0.changes.start_date', ['old' => '2026-10-24', 'new' => '2026-10-25'])
             ->assertJsonPath('data.history.0.changes.deadline', ['old' => '2026-10-30', 'new' => '2026-11-01']);
     }

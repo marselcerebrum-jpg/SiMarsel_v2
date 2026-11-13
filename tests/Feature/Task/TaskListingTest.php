@@ -191,7 +191,7 @@ class TaskListingTest extends TestCase
                 'id' => $this->staffTask->id,
                 'title' => 'Update landing page',
                 'division' => ['code_division' => 'MKT', 'name' => 'Marketing'],
-                'pic' => ['id' => $this->staff->id, 'fullname' => $this->staff->fullname],
+                'pics' => [['id' => $this->staff->id, 'fullname' => $this->staff->fullname]],
                 'priority' => 'high',
                 'status' => 'in_progress',
                 'start_date' => null,
