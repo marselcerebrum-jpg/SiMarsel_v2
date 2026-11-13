@@ -77,9 +77,14 @@ Prasyarat: semua migration sebelumnya sudah jalan, termasuk `2026_11_05_*`, `202
 - `assigned_by` dan `assigned_at` diambil dari riwayat `assigned`/`reassigned` terakhir pada task tersebut. Jika tidak
   ada riwayat, dipakai `creator_id` dan `created_at` task.
 - Memakai `insertOrIgnore`, sehingga aman bila dijalankan ulang.
-- `tasks.pic_id` **tidak diubah dan tidak dihapus**. Kolom ini tetap menjadi sumber data kode existing sampai service,
-  API, dan FE dipindah ke `task_assignments` (subtask berikutnya). Setelah itu baru `pic_id` dihentikan dengan migration
-  terpisah.
+- `tasks.pic_id` **tidak diubah dan tidak dihapus**. Sejak STEAM-270 backend membaca dan menulis PIC hanya lewat
+  `task_assignments`; `pic_id` dibiarkan sebagai data lama. Kolom ini baru di-drop dengan migration terpisah setelah FE
+  memakai kontrak `pic_ids`/`pics` dan tidak ada lagi pembaca `pic_id`.
+- Backfill bisa dijalankan ulang lewat `php artisan tasks:backfill-assignments` (laporan) dan
+  `php artisan tasks:backfill-assignments --apply`. Hanya task yang punya `pic_id` dan **belum punya baris assignment
+  sama sekali** yang diisi, sehingga perintah ini idempotent dan tidak pernah mengembalikan PIC yang sudah dilepas lewat
+  API multi-PIC. Laporan berisi `tasks_with_pic`, `matched` (pic_id = PIC aktif), `missing` (akan di-backfill),
+  `diverged` (PIC sudah diubah lewat API baru), dan `active_assignments`.
 
 ## 4. Constraint penting
 
@@ -96,9 +101,24 @@ Prasyarat: semua migration sebelumnya sudah jalan, termasuk `2026_11_05_*`, `202
 - **Soft delete**: `tasks`, `task_evidences`, `task_comments`, dan `calendar_events`. Foreign key ke `tasks` tetap
   `cascadeOnDelete`, tetapi karena task hanya di-soft delete, data terkait tidak ikut terhapus.
 
-## 5. Hal yang belum dikerjakan di subtask ini
+## 5. Multi-PIC dan relasi lintas divisi (STEAM-270)
 
-- **Logika multi-PIC** di service, API, dan FE masih membaca `tasks.pic_id`.
+- **Sumber PIC**: `task_assignments`. Visibilitas Staff/Freelance/Supervisor, hak menjalankan workflow, hak mengirim
+  evidence, filter `my_tasks`, dan sort PIC membaca assignment aktif.
+- **Tanpa duplikasi Task Card**: semua filter PIC memakai `whereHas`/subquery (bukan join), sehingga listing,
+  pagination, `status_counts`, dan KPI monitoring menghitung satu tugas sekali walaupun PIC-nya banyak.
+- **Konkurensi**: perubahan PIC mengunci baris `tasks` (`lockForUpdate`) dan memeriksa `version`; unique index
+  `task_assignments_active_pic_unique` menjadi pengaman terakhir.
+- **Divisi kolaborator**: pivot `TaskDivision` menolak divisi utama (`PrimaryDivisionCollaboratorException`, 422).
+  Saat tugas dipindah ke divisi lain, divisi tujuan dihapus dari daftar kolaborator. Belum ada endpoint untuk mengelola
+  divisi kolaborator.
+
+## 6. Hal yang belum dikerjakan
+
+- **FE** masih memakai kontrak lama (`pic_id`/`pic`) dan perlu disesuaikan ke `pic_ids`/`pics` (dikerjakan tim FE).
+- **Akses baca global (TASK-12)** belum ada di `dev`: Manager masih terbatas pada divisinya dan Supervisor/Freelance
+  hanya melihat tugas yang ia menjadi PIC-nya. Karena itu `scope=all_tasks` masih mengikuti visibilitas tersebut, dan
+  Supervisor yang mengatur PIC tugas divisinya belum bisa melihat tugas tempat ia bukan PIC.
 - **Penerapan permission** di kode: tabel dan seeder sudah ada, tetapi `TaskPolicy`/`Task` masih memakai cek role.
 - **Calendar**: `calendar_events` sudah dibuat, tetapi endpoint Calendar/Timeline masih membaca `schedule_events`.
   Pemindahan data `schedule_events` → `calendar_events` dilakukan bersama perpindahan kodenya. Perlu diputuskan:
@@ -107,7 +127,7 @@ Prasyarat: semua migration sebelumnya sudah jalan, termasuk `2026_11_05_*`, `202
 - **Catatan kerja PIC (TASK-13)**: masih PENDING di ERD, menunggu keputusan SA.
 - **Divisi yang dikelola Supervisor**: sementara memakai `accounts.division_id`.
 
-## 6. Migration dari branch lama yang belum di-merge
+## 7. Migration dari branch lama yang belum di-merge
 
 Branch berikut membuat ulang migration yang **sudah ada** di `dev` dengan nama file berbeda (`2026_11_01_00000x_*`):
 `feat/task-evidence-storage-submission-validation`, `feat/task-monitoring-aggregation-calculation`,
@@ -117,7 +137,7 @@ Isinya (task_evidences, evidence_required, task_reviews, `tasks.is_shared`) suda
 (`is_shared` diganti visibilitas global). **Jangan merge migration dari branch tersebut**, karena tabelnya akan dibuat
 dua kali dan migration gagal.
 
-## 7. Prosedur deploy, validasi, dan rollback
+## 8. Prosedur deploy, validasi, dan rollback
 
 ### Sebelum migrate
 
