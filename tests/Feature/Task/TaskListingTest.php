@@ -356,7 +356,38 @@ class TaskListingTest extends TestCase
             ])
             ->assertJsonCount(6, 'data.statuses')
             ->assertJsonPath('data.statuses.2', ['value' => 'in_progress', 'label' => 'On Process'])
-            ->assertJsonCount(4, 'data.priorities');
+            ->assertJsonCount(4, 'data.priorities')
+            ->assertJsonPath('data.role_code', 'ADM')
+            ->assertJsonCount(7, 'data.permissions');
+    }
+
+    public function test_meta_reports_the_role_code_and_permissions_of_every_role(): void
+    {
+        $expected = [
+            Role::SUPERVISOR => ['SPV', ['task.assign', 'task.change_status', 'task.create', 'task.delete', 'task.review', 'task.update', 'task.view_all']],
+            Role::FREELANCE => ['FRL', ['task.change_status', 'task.update', 'task.view_all']],
+            Role::EMPLOYEE => ['EMP', ['task.change_status', 'task.update', 'task.view_all']],
+        ];
+
+        foreach ($expected as $code => [$roleCode, $permissions]) {
+            $account = Account::create([
+                'role_id' => Role::where('code_role', $code)->value('id'),
+                'division_id' => null,
+                'fullname' => "Akun {$roleCode}",
+                'username' => 'akun.'.strtolower($roleCode),
+                'password' => 'Password123!',
+            ]);
+
+            $this->actingAs($account)
+                ->getJson('/api/tasks/meta')
+                ->assertOk()
+                ->assertJsonPath('data.role', 'staff')
+                ->assertJsonPath('data.role_code', $roleCode)
+                ->assertJsonPath('data.permissions', $permissions);
+
+            $this->assertTrue($account->hasPermission('task.view_all'));
+            $this->assertSame($code === Role::SUPERVISOR, $account->hasPermission('task.assign'));
+        }
     }
 
     public function test_meta_for_manager_is_limited_to_their_division(): void

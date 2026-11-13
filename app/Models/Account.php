@@ -66,4 +66,23 @@ class Account extends Authenticatable
     {
         return $this->role?->code_role === Role::SUPERVISOR;
     }
+
+    /**
+     * Whether the account's role grants the permission (see Permission). A permission only says what the role may do
+     * in general; division, PIC, status, and field rules are still checked separately.
+     */
+    public function hasPermission(string $code): bool
+    {
+        return (bool) $this->role?->hasPermission($code);
+    }
+
+    /**
+     * Codes of every permission the account's role grants, sorted.
+     *
+     * @return array<int, string>
+     */
+    public function permissionCodes(): array
+    {
+        return $this->role?->permissions->pluck('code')->sort()->values()->all() ?? [];
+    }
 }

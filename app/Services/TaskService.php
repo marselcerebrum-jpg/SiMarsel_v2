@@ -640,7 +640,7 @@ class TaskService
      */
     public function meta(Account $account): array
     {
-        $account->loadMissing('division');
+        $account->loadMissing(['division', 'role.permissions']);
 
         return [
             'role' => match (true) {
@@ -648,6 +648,10 @@ class TaskService
                 $account->isManager() => 'manager',
                 default => 'staff',
             },
+            // The account's own role code (ADM, MGR, SPV, EMP, FRL) and permission codes, so the page can tell
+            // Supervisor and Freelance apart from Staff. role above keeps its three values for existing callers.
+            'role_code' => $account->role?->code_role,
+            'permissions' => $account->permissionCodes(),
             'can_create' => $account->isAdmin() || ($account->isManager() && $account->division_id !== null),
             'division' => $account->division?->code_division,
             // Admin starts on "Semua Divisi" (null); a Manager starts on the division they manage.
