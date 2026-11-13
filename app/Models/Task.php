@@ -10,16 +10,18 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 #[Fillable([
     'title', 'description', 'category_id', 'division_id', 'platform_id', 'pic_id', 'creator_id', 'priority', 'status',
-    'start_date', 'deadline', 'requires_review', 'evidence_required', 'completed_at',
+    'start_date', 'deadline', 'requires_review', 'evidence_required', 'completed_at', 'deleted_by',
 ])]
 class Task extends Model
 {
     /** @use HasFactory<TaskFactory> */
-    use HasFactory;
+    use HasFactory, SoftDeletes;
 
     /**
      * Fields an Admin or the division's Manager may change through the edit form.
@@ -99,6 +101,50 @@ class Task extends Model
     public function creator(): BelongsTo
     {
         return $this->belongsTo(Account::class, 'creator_id');
+    }
+
+    public function deletedBy(): BelongsTo
+    {
+        return $this->belongsTo(Account::class, 'deleted_by');
+    }
+
+    /**
+     * Every assignment, active and ended, oldest first.
+     */
+    public function assignments(): HasMany
+    {
+        return $this->hasMany(TaskAssignment::class)->orderBy('assigned_at')->orderBy('id');
+    }
+
+    public function activeAssignments(): HasMany
+    {
+        return $this->hasMany(TaskAssignment::class)->whereNull('unassigned_at');
+    }
+
+    /**
+     * The active PICs.
+     */
+    public function pics(): BelongsToMany
+    {
+        return $this->belongsToMany(Account::class, 'task_assignments')
+            ->wherePivotNull('unassigned_at')
+            ->withPivot(['id', 'assigned_by', 'assigned_at']);
+    }
+
+    /**
+     * Collaborating divisions, besides the owning division in division_id.
+     */
+    public function collaboratingDivisions(): BelongsToMany
+    {
+        return $this->belongsToMany(Division::class, 'task_divisions')->withPivot(['added_by', 'created_at']);
+    }
+
+    /**
+     * Comments and replies, oldest first.
+     */
+    public function comments(): HasMany
+    {
+        return $this->hasMany(TaskComment::class)->orderBy('created_at')->orderBy('id');
     }
 
     /**
@@ -182,7 +228,7 @@ class Task extends Model
      */
     public function awaitsDecisionFrom(Account $account): bool
     {
-        return $this->status === TaskStatus::OnQa && $this->reviewableBy($account);
+        return $this->status === TaskStatus::OnReview && $this->reviewableBy($account);
     }
 
     /**
@@ -222,7 +268,7 @@ class Task extends Model
      */
     public function resubmitsTo(TaskStatus $status): bool
     {
-        return $status === TaskStatus::ReadyForQa && $this->reviews()->exists();
+        return $status === TaskStatus::ReadyReview && $this->reviews()->exists();
     }
 
     private function movesStatusFor(Account $account): bool

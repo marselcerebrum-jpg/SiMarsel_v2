@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 
-#[Fillable(['role_id', 'division_id', 'fullname', 'username', 'password'])]
+#[Fillable(['role_id', 'division_id', 'fullname', 'username', 'password', 'is_active'])]
 #[Hidden(['password'])]
 class Account extends Authenticatable
 {
@@ -28,6 +28,7 @@ class Account extends Authenticatable
     {
         return [
             'password' => 'hashed',
+            'is_active' => 'boolean',
         ];
     }
 

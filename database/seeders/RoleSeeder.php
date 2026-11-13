@@ -13,9 +13,12 @@ class RoleSeeder extends Seeder
     public function run(): void
     {
         $roles = [
-            ['code_role' => 'ADM', 'name' => 'Admin'],
-            ['code_role' => 'MGR', 'name' => 'Manager'],
-            ['code_role' => 'EMP', 'name' => 'Employee'],
+            ['code_role' => Role::ADMIN, 'name' => 'Admin'],
+            ['code_role' => Role::MANAGER, 'name' => 'Manager'],
+            // Existing roles first, so a fresh database gives them the same ids as the existing ones.
+            ['code_role' => Role::EMPLOYEE, 'name' => 'Staff'],
+            ['code_role' => Role::SUPERVISOR, 'name' => 'Supervisor'],
+            ['code_role' => Role::FREELANCE, 'name' => 'Freelance'],
         ];
 
         foreach ($roles as $role) {
