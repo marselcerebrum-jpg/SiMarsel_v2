@@ -256,8 +256,8 @@ class TaskListingTest extends TestCase
                 'backlog' => 1,
                 'todo' => 1,
                 'in_progress' => 1,
-                'ready_for_qa' => 0,
-                'on_qa' => 0,
+                'ready_review' => 0,
+                'on_review' => 0,
                 'done' => 0,
             ]);
 

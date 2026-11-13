@@ -168,7 +168,7 @@ class TaskService
     /**
      * Move the task to another status following the transition matrix: the PIC starts the work and hands it
      * to QA (or finishes it when QA is not required), and Admin or the division's Manager moves Back Log to
-     * To Do and starts the review (Ready for QA → On QA). The decision that ends it is made through
+     * To Do and starts the review (Ready Review → On Review). The decision that ends it is made through
      * TaskReviewService. The change is appended to the history.
      *
      * @param  array{version: int|string, status: string}  $data

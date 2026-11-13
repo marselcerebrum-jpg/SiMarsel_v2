@@ -186,7 +186,7 @@ class TaskDetailTest extends TestCase
             ->getJson("/api/tasks/{$this->task->id}")
             ->assertJsonPath('data.can_edit', true)
             ->assertJsonPath('data.editable_fields', ['status'])
-            ->assertJsonPath('data.next_statuses', [['value' => 'ready_for_qa', 'label' => 'Ready for QA']]);
+            ->assertJsonPath('data.next_statuses', [['value' => 'ready_review', 'label' => 'Ready Review']]);
     }
 
     public function test_staff_sees_their_done_task_read_only(): void
@@ -209,7 +209,7 @@ class TaskDetailTest extends TestCase
 
     public function test_staff_sees_tasks_waiting_for_or_in_qa_read_only(): void
     {
-        foreach ([TaskStatus::Backlog, TaskStatus::ReadyForQa, TaskStatus::OnQa] as $status) {
+        foreach ([TaskStatus::Backlog, TaskStatus::ReadyReview, TaskStatus::OnReview] as $status) {
             $this->task->forceFill(['status' => $status, 'requires_review' => true])->save();
 
             $this->actingAs($this->staff)
@@ -223,7 +223,7 @@ class TaskDetailTest extends TestCase
 
     public function test_manager_decides_qa_and_done_task_is_read_only(): void
     {
-        $this->task->forceFill(['status' => TaskStatus::OnQa, 'requires_review' => true])->save();
+        $this->task->forceFill(['status' => TaskStatus::OnReview, 'requires_review' => true])->save();
 
         $this->actingAs($this->manager)
             ->getJson("/api/tasks/{$this->task->id}")

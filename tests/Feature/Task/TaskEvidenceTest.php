@@ -310,7 +310,7 @@ class TaskEvidenceTest extends TestCase
 
     public function test_evidence_is_rejected_once_the_task_has_left_the_pic(): void
     {
-        foreach ([TaskStatus::Backlog, TaskStatus::ReadyForQa, TaskStatus::OnQa, TaskStatus::Done] as $status) {
+        foreach ([TaskStatus::Backlog, TaskStatus::ReadyReview, TaskStatus::OnReview, TaskStatus::Done] as $status) {
             $task = $this->task($status);
 
             $this->actingAs($this->staff)
@@ -327,20 +327,20 @@ class TaskEvidenceTest extends TestCase
 
     // Submission
 
-    public function test_task_requiring_qa_goes_to_ready_for_qa_only_after_evidence(): void
+    public function test_task_requiring_qa_goes_to_ready_review_only_after_evidence(): void
     {
         $task = $this->task(TaskStatus::InProgress, ['evidence_required' => true, 'requires_review' => true]);
 
         $this->actingAs($this->staff)
-            ->patchJson($this->statusUrl($task), ['version' => $task->version, 'status' => 'ready_for_qa'])
+            ->patchJson($this->statusUrl($task), ['version' => $task->version, 'status' => 'ready_review'])
             ->assertUnprocessable()
             ->assertJsonValidationErrors(['status']);
 
         $this->postJson($this->url($task), ['url' => 'https://example.com/hasil'])->assertCreated();
 
-        $this->patchJson($this->statusUrl($task), ['version' => $task->version, 'status' => 'ready_for_qa'])
+        $this->patchJson($this->statusUrl($task), ['version' => $task->version, 'status' => 'ready_review'])
             ->assertOk()
-            ->assertJsonPath('data.status', 'ready_for_qa')
+            ->assertJsonPath('data.status', 'ready_review')
             ->assertJsonPath('data.evidence_count', 1);
     }
 
@@ -366,7 +366,7 @@ class TaskEvidenceTest extends TestCase
         $task = $this->task(TaskStatus::InProgress, ['evidence_required' => false]);
 
         $this->actingAs($this->staff)
-            ->patchJson($this->statusUrl($task), ['version' => $task->version, 'status' => 'ready_for_qa'])
+            ->patchJson($this->statusUrl($task), ['version' => $task->version, 'status' => 'ready_review'])
             ->assertOk()
             ->assertJsonPath('data.evidence_count', 0);
     }
@@ -376,19 +376,19 @@ class TaskEvidenceTest extends TestCase
         $task = $this->task(TaskStatus::InProgress, ['evidence_required' => true, 'requires_review' => true]);
 
         $this->actingAs($this->staff)->postJson($this->url($task), ['url' => 'https://example.com/v1'])->assertCreated();
-        $this->moveTo($task, $this->staff, 'ready_for_qa');
-        $this->moveTo($task, $this->manager, 'on_qa');
+        $this->moveTo($task, $this->staff, 'ready_review');
+        $this->moveTo($task, $this->manager, 'on_review');
         $this->actingAs($this->manager)
             ->postJson("/api/tasks/{$task->id}/reviews", ['version' => $task->fresh()->version, 'decision' => 'revision', 'note' => 'Perbaiki data.'])
             ->assertOk();
 
         $this->actingAs($this->staff)->postJson($this->url($task), ['url' => 'https://example.com/v2'])->assertCreated();
-        $this->moveTo($task, $this->staff, 'ready_for_qa');
+        $this->moveTo($task, $this->staff, 'ready_review');
 
         $this->actingAs($this->manager)
             ->getJson("/api/tasks/{$task->id}")
             ->assertOk()
-            ->assertJsonPath('data.status', 'ready_for_qa')
+            ->assertJsonPath('data.status', 'ready_review')
             ->assertJsonPath('data.evidence_count', 2)
             ->assertJsonPath('data.evidence.0.url', 'https://example.com/v2')
             ->assertJsonPath('data.evidence.1.url', 'https://example.com/v1');

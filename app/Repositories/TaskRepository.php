@@ -21,8 +21,8 @@ class TaskRepository
         'backlog' => TaskStatus::Backlog,
         'todo' => TaskStatus::Todo,
         'on_process' => TaskStatus::InProgress,
-        'ready_for_qa' => TaskStatus::ReadyForQa,
-        'on_qa' => TaskStatus::OnQa,
+        'ready_review' => TaskStatus::ReadyReview,
+        'on_review' => TaskStatus::OnReview,
         'completed' => TaskStatus::Done,
     ];
 

@@ -7,8 +7,8 @@ enum TaskStatus: string
     case Backlog = 'backlog';
     case Todo = 'todo';
     case InProgress = 'in_progress';
-    case ReadyForQa = 'ready_for_qa';
-    case OnQa = 'on_qa';
+    case ReadyReview = 'ready_review';
+    case OnReview = 'on_review';
     case Done = 'done';
 
     /**
@@ -22,8 +22,8 @@ enum TaskStatus: string
     }
 
     /**
-     * Statuses this one may move to. A task that requires QA reaches Done only through Ready for QA and On QA;
-     * one that does not goes from On Process straight to Done. On QA goes back to On Process for revision,
+     * Statuses this one may move to. A task that requires QA reaches Done only through Ready Review and On Review;
+     * one that does not goes from On Process straight to Done. On Review goes back to On Process for revision,
      * and a Done task stays done.
      *
      * @return array<int, self>
@@ -33,9 +33,9 @@ enum TaskStatus: string
         return match ($this) {
             self::Backlog => [self::Todo],
             self::Todo => [self::InProgress],
-            self::InProgress => [$requiresReview ? self::ReadyForQa : self::Done],
-            self::ReadyForQa => [self::OnQa],
-            self::OnQa => [self::InProgress, self::Done],
+            self::InProgress => [$requiresReview ? self::ReadyReview : self::Done],
+            self::ReadyReview => [self::OnReview],
+            self::OnReview => [self::InProgress, self::Done],
             self::Done => [],
         };
     }
@@ -60,12 +60,12 @@ enum TaskStatus: string
      */
     public function decidedByReview(): bool
     {
-        return $this === self::OnQa;
+        return $this === self::OnReview;
     }
 
     public function inQa(): bool
     {
-        return $this === self::ReadyForQa || $this === self::OnQa;
+        return $this === self::ReadyReview || $this === self::OnReview;
     }
 
     public function label(): string
@@ -74,8 +74,8 @@ enum TaskStatus: string
             self::Backlog => 'Back Log',
             self::Todo => 'To Do',
             self::InProgress => 'On Process',
-            self::ReadyForQa => 'Ready for QA',
-            self::OnQa => 'On QA',
+            self::ReadyReview => 'Ready Review',
+            self::OnReview => 'On Review',
             self::Done => 'Done',
         };
     }

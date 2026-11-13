@@ -27,14 +27,14 @@ class TaskReviewService
     }
 
     /**
-     * Record the QA decision of an Admin or the division's Manager on a task in On QA: Approve moves it to Done
+     * Record the QA decision of an Admin or the division's Manager on a task in On Review: Approve moves it to Done
      * and stores when it was completed, Request Revision sends it back to On Process with the reason for its PIC.
      * The decision is kept as a review and in the history, so earlier review cycles stay on record.
      *
      * @param  array{version: int|string, decision: string, note?: ?string}  $data
      *
      * @throws TaskVersionConflictException When the task was saved by someone else after the reviewer loaded it.
-     * @throws ValidationException When the task does not require QA or is not in On QA.
+     * @throws ValidationException When the task does not require QA or is not in On Review.
      */
     public function decide(Account $reviewer, Task $task, array $data): Task
     {
@@ -52,9 +52,9 @@ class TaskReviewService
                 throw ValidationException::withMessages(['decision' => 'Tugas ini tidak memerlukan QA.']);
             }
 
-            if ($locked->status !== TaskStatus::OnQa) {
+            if ($locked->status !== TaskStatus::OnReview) {
                 throw ValidationException::withMessages([
-                    'decision' => "Keputusan review hanya dapat diberikan pada tugas berstatus On QA, bukan {$locked->status->label()}.",
+                    'decision' => "Keputusan review hanya dapat diberikan pada tugas berstatus On Review, bukan {$locked->status->label()}.",
                 ]);
             }
 

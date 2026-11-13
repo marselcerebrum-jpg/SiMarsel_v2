@@ -58,7 +58,7 @@ class TaskPolicy
 
     /**
      * Only Admin, or the Manager of the task's division, may approve a task that requires QA or request its
-     * revision; Staff only sees the result. Whether the task is in On QA is checked by TaskReviewService so the
+     * revision; Staff only sees the result. Whether the task is in On Review is checked by TaskReviewService so the
      * rejection carries its reason.
      */
     public function review(Account $user, Task $task): bool

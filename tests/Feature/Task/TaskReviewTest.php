@@ -51,7 +51,7 @@ class TaskReviewTest extends TestCase
 
     public function test_guest_cannot_review(): void
     {
-        $task = $this->task(TaskStatus::OnQa);
+        $task = $this->task(TaskStatus::OnReview);
 
         $this->postJson($this->url($task), $this->approve())->assertUnauthorized();
         $this->getJson($this->url($task))->assertUnauthorized();
@@ -59,27 +59,27 @@ class TaskReviewTest extends TestCase
 
     public function test_staff_cannot_approve_or_request_revision_even_on_their_own_task(): void
     {
-        $task = $this->task(TaskStatus::OnQa);
+        $task = $this->task(TaskStatus::OnReview);
 
         $this->actingAs($this->staff)->postJson($this->url($task), $this->approve())->assertForbidden();
         $this->actingAs($this->staff)->postJson($this->url($task), $this->revision())->assertForbidden();
 
-        $this->assertSame(TaskStatus::OnQa, $task->fresh()->status);
+        $this->assertSame(TaskStatus::OnReview, $task->fresh()->status);
         $this->assertDatabaseCount('task_reviews', 0);
     }
 
     public function test_manager_cannot_review_a_task_of_another_division(): void
     {
-        $task = $this->task(TaskStatus::OnQa);
+        $task = $this->task(TaskStatus::OnReview);
 
         $this->actingAs($this->financeManager)->postJson($this->url($task), $this->approve())->assertForbidden();
 
-        $this->assertSame(TaskStatus::OnQa, $task->fresh()->status);
+        $this->assertSame(TaskStatus::OnReview, $task->fresh()->status);
     }
 
     public function test_admin_reviews_tasks_of_any_division(): void
     {
-        $task = $this->task(TaskStatus::OnQa, ['division_id' => $this->finance->id, 'pic_id' => null]);
+        $task = $this->task(TaskStatus::OnReview, ['division_id' => $this->finance->id, 'pic_id' => null]);
 
         $this->actingAs($this->admin)->postJson($this->url($task), $this->approve())->assertOk();
     }
@@ -93,7 +93,7 @@ class TaskReviewTest extends TestCase
 
     public function test_manager_approves_a_task_in_qa(): void
     {
-        $task = $this->task(TaskStatus::OnQa);
+        $task = $this->task(TaskStatus::OnReview);
 
         $this->actingAs($this->manager)
             ->postJson($this->url($task), $this->approve())
@@ -117,7 +117,7 @@ class TaskReviewTest extends TestCase
 
     public function test_approval_may_carry_a_note(): void
     {
-        $task = $this->task(TaskStatus::OnQa);
+        $task = $this->task(TaskStatus::OnReview);
 
         $this->actingAs($this->manager)
             ->postJson($this->url($task), $this->approve(['note' => 'Rapi.']))
@@ -127,14 +127,14 @@ class TaskReviewTest extends TestCase
 
     public function test_decision_is_only_given_on_a_task_in_qa(): void
     {
-        foreach ([TaskStatus::InProgress, TaskStatus::ReadyForQa, TaskStatus::Done] as $status) {
+        foreach ([TaskStatus::InProgress, TaskStatus::ReadyReview, TaskStatus::Done] as $status) {
             $task = $this->task($status);
 
             $this->actingAs($this->manager)
                 ->postJson($this->url($task), $this->approve())
                 ->assertUnprocessable()
                 ->assertJsonValidationErrors([
-                    'decision' => "Keputusan review hanya dapat diberikan pada tugas berstatus On QA, bukan {$status->label()}.",
+                    'decision' => "Keputusan review hanya dapat diberikan pada tugas berstatus On Review, bukan {$status->label()}.",
                 ]);
 
             $this->assertSame($status, $task->fresh()->status);
@@ -154,7 +154,7 @@ class TaskReviewTest extends TestCase
 
     public function test_revision_requires_a_reason(): void
     {
-        $task = $this->task(TaskStatus::OnQa);
+        $task = $this->task(TaskStatus::OnReview);
 
         foreach ([[], ['note' => ''], ['note' => '   ']] as $note) {
             $this->actingAs($this->manager)
@@ -163,13 +163,13 @@ class TaskReviewTest extends TestCase
                 ->assertJsonValidationErrors(['note' => 'Catatan alasan revisi wajib diisi.']);
         }
 
-        $this->assertSame(TaskStatus::OnQa, $task->fresh()->status);
+        $this->assertSame(TaskStatus::OnReview, $task->fresh()->status);
         $this->assertDatabaseCount('task_reviews', 0);
     }
 
     public function test_decision_and_version_are_validated(): void
     {
-        $task = $this->task(TaskStatus::OnQa);
+        $task = $this->task(TaskStatus::OnReview);
 
         $this->actingAs($this->manager)
             ->postJson($this->url($task), ['decision' => 'reject', 'note' => str_repeat('a', 2001)])
@@ -183,7 +183,7 @@ class TaskReviewTest extends TestCase
 
     public function test_revision_sends_the_task_back_to_its_pic_with_the_reason(): void
     {
-        $task = $this->task(TaskStatus::OnQa);
+        $task = $this->task(TaskStatus::OnReview);
 
         $this->actingAs($this->manager)
             ->postJson($this->url($task), $this->revision())
@@ -197,7 +197,7 @@ class TaskReviewTest extends TestCase
         $this->actingAs($this->staff)
             ->getJson("/api/tasks/{$task->id}")
             ->assertOk()
-            ->assertJsonPath('data.next_statuses', [['value' => 'ready_for_qa', 'label' => 'Ready for QA']])
+            ->assertJsonPath('data.next_statuses', [['value' => 'ready_review', 'label' => 'Ready Review']])
             ->assertJsonPath('data.last_review.note', 'Lengkapi data bulan Oktober.')
             ->assertJsonPath('data.can_review', false);
     }
@@ -206,15 +206,15 @@ class TaskReviewTest extends TestCase
 
     public function test_revision_cycle_repeats_until_approved_and_keeps_every_review(): void
     {
-        $task = $this->task(TaskStatus::ReadyForQa);
+        $task = $this->task(TaskStatus::ReadyReview);
 
-        $this->moveTo($task, $this->manager, 'on_qa');
+        $this->moveTo($task, $this->manager, 'on_review');
         $this->decide($task, $this->manager, $this->revision(['note' => 'Revisi pertama.']));
-        $this->moveTo($task, $this->staff, 'ready_for_qa');
-        $this->moveTo($task, $this->manager, 'on_qa');
+        $this->moveTo($task, $this->staff, 'ready_review');
+        $this->moveTo($task, $this->manager, 'on_review');
         $this->decide($task, $this->admin, $this->revision(['note' => 'Revisi kedua.']));
-        $this->moveTo($task, $this->staff, 'ready_for_qa');
-        $this->moveTo($task, $this->manager, 'on_qa');
+        $this->moveTo($task, $this->staff, 'ready_review');
+        $this->moveTo($task, $this->manager, 'on_review');
         $this->decide($task, $this->manager, $this->approve());
 
         $this->actingAs($this->staff)
@@ -234,10 +234,10 @@ class TaskReviewTest extends TestCase
 
     public function test_review_decisions_and_resubmission_are_recorded_in_history(): void
     {
-        $task = $this->task(TaskStatus::OnQa);
+        $task = $this->task(TaskStatus::OnReview);
 
         $this->decide($task, $this->manager, $this->revision());
-        $this->moveTo($task, $this->staff, 'ready_for_qa');
+        $this->moveTo($task, $this->staff, 'ready_review');
 
         $activities = $task->activities()->get();
 
@@ -245,7 +245,7 @@ class TaskReviewTest extends TestCase
             [TaskActivity::RESUBMITTED, TaskActivity::REVISION_REQUESTED],
             $activities->pluck('action')->all(),
         );
-        $this->assertSame(['old' => 'on_qa', 'new' => 'in_progress'], $activities[1]->changes['status']);
+        $this->assertSame(['old' => 'on_review', 'new' => 'in_progress'], $activities[1]->changes['status']);
         $this->assertSame('Lengkapi data bulan Oktober.', $activities[1]->changes['review']['new']['note']);
         $this->assertSame($this->manager->id, $activities[1]->account_id);
     }
@@ -254,14 +254,14 @@ class TaskReviewTest extends TestCase
     {
         $task = $this->task(TaskStatus::InProgress);
 
-        $this->moveTo($task, $this->staff, 'ready_for_qa');
+        $this->moveTo($task, $this->staff, 'ready_review');
 
         $this->assertSame(TaskActivity::STATUS_CHANGED, $task->activities()->value('action'));
     }
 
     public function test_decision_based_on_an_outdated_version_is_rejected(): void
     {
-        $task = $this->task(TaskStatus::OnQa);
+        $task = $this->task(TaskStatus::OnReview);
         $task->forceFill(['version' => 3])->save();
 
         $this->actingAs($this->manager)
@@ -269,7 +269,7 @@ class TaskReviewTest extends TestCase
             ->assertConflict()
             ->assertJsonPath('current_version', 3);
 
-        $this->assertSame(TaskStatus::OnQa, $task->fresh()->status);
+        $this->assertSame(TaskStatus::OnReview, $task->fresh()->status);
         $this->assertDatabaseCount('task_reviews', 0);
     }
 
@@ -277,7 +277,7 @@ class TaskReviewTest extends TestCase
 
     public function test_pic_sees_the_review_results_of_their_task(): void
     {
-        $task = $this->task(TaskStatus::OnQa);
+        $task = $this->task(TaskStatus::OnReview);
         $this->decide($task, $this->manager, $this->revision());
 
         $this->actingAs($this->staff)
@@ -290,7 +290,7 @@ class TaskReviewTest extends TestCase
 
     public function test_other_staff_and_other_division_managers_cannot_see_the_reviews(): void
     {
-        $task = $this->task(TaskStatus::OnQa);
+        $task = $this->task(TaskStatus::OnReview);
 
         $this->actingAs($this->otherStaff)->getJson($this->url($task))->assertForbidden();
         $this->actingAs($this->financeManager)->getJson($this->url($task))->assertForbidden();
@@ -298,7 +298,7 @@ class TaskReviewTest extends TestCase
 
     public function test_detail_tells_the_reviewer_when_a_decision_is_awaited(): void
     {
-        $task = $this->task(TaskStatus::OnQa);
+        $task = $this->task(TaskStatus::OnReview);
 
         $this->actingAs($this->manager)
             ->getJson("/api/tasks/{$task->id}")

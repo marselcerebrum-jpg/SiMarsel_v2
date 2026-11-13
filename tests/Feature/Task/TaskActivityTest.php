@@ -195,11 +195,11 @@ class TaskActivityTest extends TestCase
         $this->actingAs($this->staff)
             ->postJson("/api/tasks/{$task->id}/evidences", ['url' => 'https://drive.example.com/banner'])
             ->assertCreated();
-        $this->moveTo($task, $this->staff, 'ready_for_qa');
-        $this->moveTo($task, $this->manager, 'on_qa');
+        $this->moveTo($task, $this->staff, 'ready_review');
+        $this->moveTo($task, $this->manager, 'on_review');
         $this->send('postJson', "/api/tasks/{$task->id}/reviews", $this->manager, $task, ['decision' => 'revision', 'note' => 'Perbaiki warna.']);
-        $this->moveTo($task, $this->staff, 'ready_for_qa');
-        $this->moveTo($task, $this->manager, 'on_qa');
+        $this->moveTo($task, $this->staff, 'ready_review');
+        $this->moveTo($task, $this->manager, 'on_review');
         $this->send('postJson', "/api/tasks/{$task->id}/reviews", $this->manager, $task, ['decision' => 'approve']);
 
         $response = $this->actingAs($this->staff)->getJson($this->url($task))->assertOk();
@@ -226,18 +226,18 @@ class TaskActivityTest extends TestCase
         $this->assertStringContainsString('Prioritas: Medium → High', $history[TaskActivity::UPDATED]['description']);
         $this->assertSame('PIC: mkt.other → mkt.staff', $history[TaskActivity::REASSIGNED]['description']);
         $this->assertSame('Evidence: https://drive.example.com/banner', $history[TaskActivity::EVIDENCE_SUBMITTED]['description']);
-        $this->assertSame('Status: On QA → On Process; Catatan: Perbaiki warna.', $history[TaskActivity::REVISION_REQUESTED]['description']);
-        $this->assertSame('Status: On Process → Ready for QA', $history[TaskActivity::RESUBMITTED]['description']);
-        $this->assertSame('Status: On QA → Done', $history[TaskActivity::APPROVED]['description']);
+        $this->assertSame('Status: On Review → On Process; Catatan: Perbaiki warna.', $history[TaskActivity::REVISION_REQUESTED]['description']);
+        $this->assertSame('Status: On Process → Ready Review', $history[TaskActivity::RESUBMITTED]['description']);
+        $this->assertSame('Status: On Review → Done', $history[TaskActivity::APPROVED]['description']);
         $this->assertSame($this->manager->id, $history[TaskActivity::APPROVED]['actor']['id']);
     }
 
     public function test_resubmission_through_the_edit_form_is_recorded_as_resubmitted(): void
     {
-        $task = $this->task(['status' => TaskStatus::OnQa, 'requires_review' => true]);
+        $task = $this->task(['status' => TaskStatus::OnReview, 'requires_review' => true]);
         $this->send('postJson', "/api/tasks/{$task->id}/reviews", $this->manager, $task, ['decision' => 'revision', 'note' => 'Ulangi.']);
 
-        $this->send('putJson', "/api/tasks/{$task->id}", $this->staff, $task, ['status' => 'ready_for_qa']);
+        $this->send('putJson', "/api/tasks/{$task->id}", $this->staff, $task, ['status' => 'ready_review']);
 
         $this->assertSame(TaskActivity::RESUBMITTED, $task->activities()->value('action'));
     }

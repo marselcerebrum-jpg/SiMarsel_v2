@@ -462,7 +462,7 @@ Alpine.data('tasklist', () => ({
         await this.moveTask(task, rule);
     },
 
-    // Approve lewat drag-and-drop (On QA → Done) memakai endpoint review; transisi lain memakai endpoint status.
+    // Approve lewat drag-and-drop (On Review → Done) memakai endpoint review; transisi lain memakai endpoint status.
     async moveTask(task, transition) {
         this.movingId = task.id;
 
@@ -1025,7 +1025,7 @@ Alpine.data('taskDetail', () => ({
                 if (errors.note) {
                     this.reviewError = errors.note;
                 } else {
-                    // Tugas sudah tidak di On QA (misalnya diputuskan reviewer lain): tutup form dan muat data terbaru.
+                    // Tugas sudah tidak di On Review (misalnya diputuskan reviewer lain): tutup form dan muat data terbaru.
                     notifyFailure({ ...error, data: { ...error.data, message: errors.decision ?? errors.version } }, 'Keputusan review gagal disimpan.');
                     this.reviewMode = null;
                     await this.reload();

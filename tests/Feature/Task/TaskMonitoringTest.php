@@ -53,8 +53,8 @@ class TaskMonitoringTest extends TestCase
         $this->task($this->marketing, $this->staff, TaskStatus::Backlog, TaskPriority::Urgent, self::YESTERDAY, 'Overdue urgent backlog');
         $this->task($this->marketing, $otherStaff, TaskStatus::Todo, TaskPriority::Low, self::TODAY, 'Due today');
         $this->task($this->marketing, $this->staff, TaskStatus::InProgress, TaskPriority::High, null, 'No deadline');
-        $this->task($this->marketing, $otherStaff, TaskStatus::ReadyForQa, TaskPriority::Medium, self::TOMORROW, 'Upcoming');
-        $this->task($this->marketing, $otherStaff, TaskStatus::OnQa, TaskPriority::Urgent, self::YESTERDAY, 'Overdue urgent QA');
+        $this->task($this->marketing, $otherStaff, TaskStatus::ReadyReview, TaskPriority::Medium, self::TOMORROW, 'Upcoming');
+        $this->task($this->marketing, $otherStaff, TaskStatus::OnReview, TaskPriority::Urgent, self::YESTERDAY, 'Overdue urgent QA');
         $this->task($this->marketing, $this->staff, TaskStatus::Done, TaskPriority::Urgent, self::YESTERDAY, 'Done late');
         // Finance
         $this->task($this->finance, null, TaskStatus::Done, TaskPriority::Low, self::TODAY, 'Done today');
@@ -78,8 +78,8 @@ class TaskMonitoringTest extends TestCase
                 'backlog' => 1,
                 'todo' => 2,
                 'on_process' => 1,
-                'ready_for_qa' => 1,
-                'on_qa' => 1,
+                'ready_review' => 1,
+                'on_review' => 1,
                 'completed' => 2,
                 'unfinished' => 6,
                 'overdue' => 3,

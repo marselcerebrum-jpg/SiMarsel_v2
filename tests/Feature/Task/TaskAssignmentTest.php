@@ -241,7 +241,7 @@ class TaskAssignmentTest extends TestCase
 
     public function test_pic_cannot_be_changed_while_the_task_is_in_qa(): void
     {
-        foreach ([TaskStatus::ReadyForQa, TaskStatus::OnQa] as $status) {
+        foreach ([TaskStatus::ReadyReview, TaskStatus::OnReview] as $status) {
             $task = $this->task(['status' => $status]);
 
             $this->actingAs($this->admin)
@@ -255,7 +255,7 @@ class TaskAssignmentTest extends TestCase
 
     public function test_pic_cannot_be_changed_through_the_edit_form_while_in_qa(): void
     {
-        $task = $this->task(['status' => TaskStatus::OnQa]);
+        $task = $this->task(['status' => TaskStatus::OnReview]);
 
         $this->actingAs($this->admin)
             ->patchJson("/api/tasks/{$task->id}", $this->payload(['pic_id' => $this->otherStaff->id]))
@@ -348,7 +348,7 @@ class TaskAssignmentTest extends TestCase
 
     public function test_options_and_flags_report_when_the_pic_is_locked(): void
     {
-        $task = $this->task(['status' => TaskStatus::OnQa]);
+        $task = $this->task(['status' => TaskStatus::OnReview]);
 
         $this->actingAs($this->manager)
             ->getJson("/api/tasks/{$task->id}/assignment-options")

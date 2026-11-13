@@ -8,8 +8,8 @@ export const STATUSES = [
     { key: 'backlog', label: 'Back Log', dot: 'bg-slate-400', badge: 'bg-slate-100 text-slate-700' },
     { key: 'todo', label: 'To Do', dot: 'bg-sky-500', badge: 'bg-sky-50 text-sky-700' },
     { key: 'in_progress', label: 'On Process', dot: 'bg-amber-500', badge: 'bg-amber-50 text-amber-800' },
-    { key: 'ready_for_qa', label: 'Ready for QA', dot: 'bg-violet-500', badge: 'bg-violet-50 text-violet-700' },
-    { key: 'on_qa', label: 'On QA', dot: 'bg-fuchsia-500', badge: 'bg-fuchsia-50 text-fuchsia-700' },
+    { key: 'ready_review', label: 'Ready Review', dot: 'bg-violet-500', badge: 'bg-violet-50 text-violet-700' },
+    { key: 'on_review', label: 'On Review', dot: 'bg-fuchsia-500', badge: 'bg-fuchsia-50 text-fuchsia-700' },
     { key: 'done', label: 'Done', dot: 'bg-emerald-500', badge: 'bg-emerald-50 text-emerald-700' },
 ];
 
@@ -49,7 +49,7 @@ export const managesTask = (task, user) =>
 
 export const canEditTask = (task, user) => managesTask(task, user) && task.status !== 'done';
 
-const LOCKED_ASSIGNMENT = ['ready_for_qa', 'on_qa', 'done'];
+const LOCKED_ASSIGNMENT = ['ready_review', 'on_review', 'done'];
 
 export function assignmentRule(task, user) {
     if (!managesTask(task, user)) return { ok: false, reason: 'Hanya Admin atau Manajer divisi ini yang dapat mengganti PIC.' };
@@ -64,11 +64,11 @@ export function assignmentRule(task, user) {
 export const TRANSITIONS = [
     { from: 'backlog', to: 'todo', actor: 'manager', label: 'Siap Dikerjakan' },
     { from: 'todo', to: 'in_progress', actor: 'pic', label: 'Mulai Kerjakan' },
-    { from: 'in_progress', to: 'ready_for_qa', actor: 'pic', when: 'requires_review', label: 'Kirim ke QA' },
+    { from: 'in_progress', to: 'ready_review', actor: 'pic', when: 'requires_review', label: 'Kirim ke QA' },
     { from: 'in_progress', to: 'done', actor: 'pic', when: 'no_review', label: 'Selesaikan Tugas' },
-    { from: 'ready_for_qa', to: 'on_qa', actor: 'manager', label: 'Mulai Review' },
-    { from: 'on_qa', to: 'done', actor: 'manager', label: 'Setujui', review: 'approve' },
-    { from: 'on_qa', to: 'in_progress', actor: 'manager', label: 'Minta Revisi', review: 'revision' },
+    { from: 'ready_review', to: 'on_review', actor: 'manager', label: 'Mulai Review' },
+    { from: 'on_review', to: 'done', actor: 'manager', label: 'Setujui', review: 'approve' },
+    { from: 'on_review', to: 'in_progress', actor: 'manager', label: 'Minta Revisi', review: 'revision' },
 ];
 
 /**
@@ -85,7 +85,7 @@ export function transitionRule(task, to, user) {
     if (rule.actor === 'manager' && !managesTask(task, user)) return { ok: false, reason: 'Hanya Admin atau Manajer divisi ini yang dapat mengubah status tersebut.' };
 
     if (rule.when === 'requires_review' && !task.requires_review) return { ok: false, reason: 'Tugas ini tidak wajib QA. Gunakan status Done.' };
-    if (rule.when === 'no_review' && task.requires_review) return { ok: false, reason: 'Tugas ini wajib QA. Kirim ke Ready for QA terlebih dahulu.' };
+    if (rule.when === 'no_review' && task.requires_review) return { ok: false, reason: 'Tugas ini wajib QA. Kirim ke Ready Review terlebih dahulu.' };
 
     if (rule.from === 'backlog' && !task.pic) return { ok: false, reason: 'Tetapkan PIC terlebih dahulu sebelum tugas masuk To Do.' };
     if (rule.actor === 'pic' && rule.to !== 'in_progress' && task.evidence_required && !task.evidence_count) {
@@ -146,8 +146,8 @@ export function summarize(tasks, on = today()) {
         backlog: count((task) => task.status === 'backlog'),
         todo: count((task) => task.status === 'todo'),
         in_progress: count((task) => task.status === 'in_progress'),
-        ready_for_qa: count((task) => task.status === 'ready_for_qa'),
-        on_qa: count((task) => task.status === 'on_qa'),
+        ready_review: count((task) => task.status === 'ready_review'),
+        on_review: count((task) => task.status === 'on_review'),
         completed,
         unfinished: total - completed,
         overdue: count((task) => isOverdue(task, on)),
