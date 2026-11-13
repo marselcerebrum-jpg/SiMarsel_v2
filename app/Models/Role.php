@@ -23,6 +23,11 @@ class Role extends Model
 
     public const FREELANCE = 'FRL';
 
+    /**
+     * Roles that can be PIC of a task.
+     */
+    public const PIC_ROLES = [self::EMPLOYEE, self::FREELANCE, self::SUPERVISOR];
+
     public function accounts(): HasMany
     {
         return $this->hasMany(Account::class);

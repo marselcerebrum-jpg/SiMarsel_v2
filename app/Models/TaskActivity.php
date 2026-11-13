@@ -25,6 +25,8 @@ class TaskActivity extends Model
 
     public const REASSIGNED = 'reassigned';
 
+    public const UNASSIGNED = 'unassigned';
+
     public const STATUS_CHANGED = 'status_changed';
 
     public const EVIDENCE_SUBMITTED = 'evidence_submitted';
@@ -43,6 +45,7 @@ class TaskActivity extends Model
         self::UPDATED => 'Informasi tugas diubah',
         self::ASSIGNED => 'PIC ditetapkan',
         self::REASSIGNED => 'PIC diganti',
+        self::UNASSIGNED => 'PIC dilepas',
         self::STATUS_CHANGED => 'Status diubah',
         self::EVIDENCE_SUBMITTED => 'Evidence dikirim',
         self::APPROVED => 'Tugas disetujui',
@@ -57,6 +60,7 @@ class TaskActivity extends Model
         'division' => 'Divisi',
         'platform' => 'Platform',
         'pic' => 'PIC',
+        'pics' => 'PIC',
         'priority' => 'Prioritas',
         'status' => 'Status',
         'start_date' => 'Tanggal mulai',
@@ -162,7 +166,9 @@ class TaskActivity extends Model
     private function formatValue(string $field, mixed $value): string
     {
         return match (true) {
-            $value === null || $value === '' => '-',
+            $value === null || $value === '' || $value === [] => '-',
+            // A list of references, such as the PICs before and after an assignment change.
+            is_array($value) && array_is_list($value) => implode(', ', array_map(fn (mixed $item) => is_array($item) ? (string) ($item['name'] ?? '-') : (string) $item, $value)),
             is_array($value) => (string) ($value['name'] ?? '-'),
             is_bool($value) => $value ? 'Ya' : 'Tidak',
             $field === 'status' => TaskStatus::tryFrom($value)?->label() ?? (string) $value,

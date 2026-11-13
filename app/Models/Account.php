@@ -43,12 +43,13 @@ class Account extends Authenticatable
     }
 
     /**
-     * Accounts that can be PIC of a task in the division: the Staff of that division.
+     * Accounts that can be PIC of a task: active Staff, Freelance, and Supervisors of any division, so a task can
+     * be assigned across divisions.
      */
-    public function scopeAssignableIn(Builder $query, int $divisionId): void
+    public function scopeAssignableAsPic(Builder $query): void
     {
-        $query->where('division_id', $divisionId)
-            ->whereHas('role', fn (Builder $query) => $query->where('code_role', Role::EMPLOYEE));
+        $query->where('is_active', true)
+            ->whereHas('role', fn (Builder $query) => $query->whereIn('code_role', Role::PIC_ROLES));
     }
 
     public function isAdmin(): bool
@@ -59,5 +60,10 @@ class Account extends Authenticatable
     public function isManager(): bool
     {
         return $this->role?->code_role === Role::MANAGER;
+    }
+
+    public function isSupervisor(): bool
+    {
+        return $this->role?->code_role === Role::SUPERVISOR;
     }
 }

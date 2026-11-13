@@ -14,8 +14,12 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
+/**
+ * PICs live in task_assignments. The legacy pic_id column is kept only as migrated data and is not fillable, so the
+ * application never writes it again.
+ */
 #[Fillable([
-    'title', 'description', 'category_id', 'division_id', 'platform_id', 'pic_id', 'creator_id', 'priority', 'status',
+    'title', 'description', 'category_id', 'division_id', 'platform_id', 'creator_id', 'priority', 'status',
     'start_date', 'deadline', 'requires_review', 'evidence_required', 'completed_at', 'deleted_by',
 ])]
 class Task extends Model
@@ -24,10 +28,11 @@ class Task extends Model
     use HasFactory, SoftDeletes;
 
     /**
-     * Fields an Admin or the division's Manager may change through the edit form.
+     * Fields an Admin or the division's Manager may change through the edit form. PICs are changed through the
+     * assignment endpoint, not this form.
      */
     public const EDITABLE_FIELDS = [
-        'title', 'description', 'category_id', 'division_id', 'platform_id', 'pic_id', 'priority', 'status',
+        'title', 'description', 'category_id', 'division_id', 'platform_id', 'priority', 'status',
         'start_date', 'deadline', 'requires_review',
     ];
 
@@ -93,11 +98,6 @@ class Task extends Model
         return $this->belongsTo(Platform::class);
     }
 
-    public function pic(): BelongsTo
-    {
-        return $this->belongsTo(Account::class, 'pic_id');
-    }
-
     public function creator(): BelongsTo
     {
         return $this->belongsTo(Account::class, 'creator_id');
@@ -122,21 +122,35 @@ class Task extends Model
     }
 
     /**
-     * The active PICs.
+     * The active PICs, by name.
      */
     public function pics(): BelongsToMany
     {
         return $this->belongsToMany(Account::class, 'task_assignments')
             ->wherePivotNull('unassigned_at')
-            ->withPivot(['id', 'assigned_by', 'assigned_at']);
+            ->withPivot(['id', 'assigned_by', 'assigned_at'])
+            ->orderBy('accounts.fullname')
+            ->orderBy('accounts.id');
     }
 
     /**
-     * Collaborating divisions, besides the owning division in division_id.
+     * Collaborating divisions, besides the owning division in division_id. Attaching the owning division is
+     * rejected by TaskDivision.
      */
     public function collaboratingDivisions(): BelongsToMany
     {
-        return $this->belongsToMany(Division::class, 'task_divisions')->withPivot(['added_by', 'created_at']);
+        return $this->belongsToMany(Division::class, 'task_divisions')
+            ->using(TaskDivision::class)
+            // created_at is set by TaskDivision; listing it here would make Laravel also write a missing updated_at.
+            ->withPivot(['added_by']);
+    }
+
+    /**
+     * Tasks the account is an active PIC of. A subquery, not a join, so a task with several PICs is listed once.
+     */
+    public function scopeAssignedTo(Builder $query, Account $account): void
+    {
+        $query->whereHas('activeAssignments', fn (Builder $query) => $query->where('account_id', $account->id));
     }
 
     /**
@@ -149,7 +163,7 @@ class Task extends Model
 
     /**
      * Limit tasks to what the account may see: Admin sees every division, a Manager sees the
-     * division they manage, and Staff only sees tasks assigned to them as PIC.
+     * division they manage, and everyone else only sees tasks they are an active PIC of.
      */
     public function scopeVisibleTo(Builder $query, Account $account): void
     {
@@ -163,7 +177,7 @@ class Task extends Model
             return;
         }
 
-        $query->where('pic_id', $account->id);
+        $query->assignedTo($account);
     }
 
     /**
@@ -174,8 +188,19 @@ class Task extends Model
         return match (true) {
             $account->isAdmin() => true,
             $account->isManager() => $this->managedBy($account),
-            default => $this->pic_id === $account->id,
+            default => $this->assignedTo($account),
         };
+    }
+
+    /**
+     * Who may add or release PICs: Admin and Managers for every division, a Supervisor for tasks of their own
+     * division.
+     */
+    public function assignableBy(Account $account): bool
+    {
+        return $account->isAdmin()
+            || $account->isManager()
+            || ($account->isSupervisor() && $account->division_id !== null && $this->division_id === $account->division_id);
     }
 
     /**
@@ -187,9 +212,21 @@ class Task extends Model
             || ($account->isManager() && $account->division_id !== null && $this->division_id === $account->division_id);
     }
 
+    /**
+     * Whether the account is one of the task's active PICs. Every active PIC may run the shared workflow.
+     */
     public function assignedTo(Account $account): bool
     {
-        return $this->pic_id !== null && $this->pic_id === $account->id;
+        if ($this->relationLoaded('pics')) {
+            return $this->pics->contains('id', $account->id);
+        }
+
+        return $this->activeAssignments()->where('account_id', $account->id)->exists();
+    }
+
+    public function hasActivePic(): bool
+    {
+        return $this->relationLoaded('pics') ? $this->pics->isNotEmpty() : $this->activeAssignments()->exists();
     }
 
     /**
@@ -304,10 +341,22 @@ class Task extends Model
 
         if ($this->status->inQa()) {
             $locked['requires_review'] = 'Kewajiban QA tidak dapat diubah setelah tugas masuk tahap QA.';
-            $locked['pic_id'] = 'PIC tidak dapat diganti selama tugas dalam tahap QA.';
         }
 
         return $locked;
+    }
+
+    /**
+     * Why the account may not add or release PICs right now, or null when it may.
+     */
+    public function assignmentLockFor(Account $account): ?string
+    {
+        return match (true) {
+            ! $this->assignableBy($account) => 'Anda tidak berwenang mengatur PIC tugas ini.',
+            $this->status === TaskStatus::Done => 'Tugas yang sudah selesai tidak dapat diubah.',
+            $this->status->inQa() => 'PIC tidak dapat diganti selama tugas dalam tahap QA.',
+            default => null,
+        };
     }
 
     /**
