@@ -79,7 +79,7 @@ class PageAccessTest extends TestCase
             ->assertSee('Manajemen Organisasi')
             ->assertSee('Kelola akun pengguna dan divisi organisasi.')
             ->assertSeeInOrder(['Akun', 'Divisi'])
-            ->assertSeeInOrder(['Total Akun', 'Admin', 'Manager', 'Employee'])
+            ->assertSeeInOrder(['Total Akun', 'Admin', 'Manager', 'Staff', 'Supervisor', 'Freelance'])
             ->assertDontSee('akun tanpa divisi')
             ->assertSeeInOrder(['Daftar Akun', 'Tambah Akun'])
             ->assertSee('@click="openCreate()"', false)
