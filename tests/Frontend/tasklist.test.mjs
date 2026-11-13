@@ -262,8 +262,8 @@ test('Detail status change based on an outdated version is rejected with a clear
     assert.equal(board.tasks[0].version, 5);
 });
 
-test('Dragging On Review back to On Process opens the revision note form instead of changing the status', async () => {
-    const reviewed = task({ status: 'on_review', requires_review: true });
+test('Dragging On QA back to On Process opens the revision note form instead of changing the status', async () => {
+    const reviewed = task({ status: 'on_qa', requires_review: true });
     const { board, requests } = await tasklistPage({
         'GET /api/tasks': () => ({ json: { data: [reviewed], meta: { status_counts: {} } } }),
     }, ADMIN);
@@ -295,7 +295,7 @@ test('Create button follows meta.can_create, falling back to TaskPolicy::create:
 });
 
 test('QA decisions send { decision, note, version } to the review endpoint, from the Board and from the detail', async () => {
-    const reviewed = task({ status: 'on_review', requires_review: true, version: 8 });
+    const reviewed = task({ status: 'on_qa', requires_review: true, version: 8 });
     const { board, detail: createDetail, requests } = await tasklistPage({
         'GET /api/tasks': () => ({ json: { data: [reviewed], meta: { status_counts: {} } } }),
         'GET /api/tasks/7': () => ({ json: { data: reviewed } }),
@@ -394,9 +394,9 @@ test('Create Task shows 422 errors on the fields and the duplicate-submission me
 test('History shows the backend sentence for approval, revision request, and resubmission, never raw codes', async () => {
     const activity = (id, action, action_label, description) => ({ id, action, action_label, description, changes: {}, actor: { id: 1, fullname: 'Admin' }, created_at: '2026-11-10T02:00:00Z' });
     const history = [
-        activity(4, 'approved', 'Tugas disetujui', 'Status: On Review → Done'),
-        activity(3, 'resubmitted', 'Hasil revisi dikirim ulang', 'Status: On Process → Ready Review'),
-        activity(2, 'revision_requested', 'Revisi diminta', 'Status: On Review → On Process; Catatan: Perbaiki warna; ukuran banner.'),
+        activity(4, 'approved', 'Tugas disetujui', 'Status: On QA → Done'),
+        activity(3, 'resubmitted', 'Hasil revisi dikirim ulang', 'Status: On Process → Ready for QA'),
+        activity(2, 'revision_requested', 'Revisi diminta', 'Status: On QA → On Process; Catatan: Perbaiki warna; ukuran banner.'),
         activity(1, 'created', 'Tugas dibuat', 'Membuat tugas.'),
     ];
     const { board, detail: createDetail } = await tasklistPage({
@@ -410,9 +410,9 @@ test('History shows the backend sentence for approval, revision request, and res
     await detail.open(7);
 
     assert.deepEqual([...detail.activities].map((item) => [item.action_label, detail.activityDetail(item)]), [
-        ['Tugas disetujui', 'Status: On Review → Done'],
-        ['Hasil revisi dikirim ulang', 'Status: On Process → Ready Review'],
-        ['Revisi diminta', 'Status: On Review → On Process; Catatan: Perbaiki warna; ukuran banner.'],
+        ['Tugas disetujui', 'Status: On QA → Done'],
+        ['Hasil revisi dikirim ulang', 'Status: On Process → Ready for QA'],
+        ['Revisi diminta', 'Status: On QA → On Process; Catatan: Perbaiki warna; ukuran banner.'],
         ['Tugas dibuat', ''],
     ]);
 });
@@ -507,12 +507,12 @@ test('Detail buttons follow next_statuses, and Approve/Revision only show when t
     await blocked.open(7);
     assert.deepEqual([...blocked.transitions], [], 'no button when the backend offers no next status');
 
-    detail = task({ status: 'on_review', requires_review: true, can_review: false, next_statuses: [] });
+    detail = task({ status: 'on_qa', requires_review: true, can_review: false, next_statuses: [] });
     const notReviewer = createDetail();
     await notReviewer.open(7);
     assert.deepEqual([...notReviewer.transitions], [], 'QA buttons need can_review');
 
-    detail = task({ status: 'on_review', requires_review: true, can_review: true, next_statuses: [] });
+    detail = task({ status: 'on_qa', requires_review: true, can_review: true, next_statuses: [] });
     const reviewer = createDetail();
     await reviewer.open(7);
     assert.deepEqual([...reviewer.transitions].map(({ review }) => review).sort(), ['approve', 'revision']);
@@ -542,7 +542,7 @@ test('A status move rejected in the detail shows the server reason and keeps the
 });
 
 test('With the default config, Approve and Request Revision go to the review endpoint, never the status endpoint, from the Board and the detail', async () => {
-    let current = task({ status: 'on_review', requires_review: true, can_review: true, next_statuses: [], version: 8 });
+    let current = task({ status: 'on_qa', requires_review: true, can_review: true, next_statuses: [], version: 8 });
     const decided = (body) => {
         const approved = body.decision === 'approve';
         const review = { id: 1, task_id: 7, cycle: 1, decision: body.decision, decision_label: approved ? 'Approve' : 'Request Revision', note: body.note, reviewer: { id: ADMIN.id, fullname: 'Admin' }, created_at: '2026-11-11T03:00:00Z' };
@@ -558,11 +558,11 @@ test('With the default config, Approve and Request Revision go to the review end
     await board.load();
     const reviews = () => requests.filter(({ url }) => url === '/api/tasks/7/reviews');
 
-    // Board: On Review → On Process opens the revision form in the detail; the card stays until the note is sent.
+    // Board: On QA → On Process opens the revision form in the detail; the card stays until the note is sent.
     board.draggingId = 7;
     await board.drop('in_progress');
     assert.equal(board.detailId, 7);
-    assert.deepEqual(board.tasksIn('on_review').map(({ id }) => id), [7]);
+    assert.deepEqual(board.tasksIn('on_qa').map(({ id }) => id), [7]);
     const detail = createDetail();
     await detail.open(7);
     assert.equal(detail.reviewMode, 'revision', 'the form opens because the backend sent can_review');
@@ -579,8 +579,8 @@ test('With the default config, Approve and Request Revision go to the review end
     assert.deepEqual(board.tasksIn('in_progress').map(({ id }) => id), [7]);
     assert.equal(board.tasks[0].version, 9);
 
-    // Board: On Review → Done approves through the review endpoint and moves the card with the new version.
-    current = { ...current, status: 'on_review', can_review: true };
+    // Board: On QA → Done approves through the review endpoint and moves the card with the new version.
+    current = { ...current, status: 'on_qa', can_review: true };
     await board.load();
     board.draggingId = 7;
     await board.drop('done');
@@ -590,7 +590,7 @@ test('With the default config, Approve and Request Revision go to the review end
     assert.equal(toasts.at(-1).text, 'Tugas berhasil disetujui.');
 
     // Detail: the Approve button opens the form; without a note it sends note null.
-    current = { ...current, status: 'on_review', can_review: true };
+    current = { ...current, status: 'on_qa', can_review: true };
     await detail.open(7);
     const approve = detail.transitions.find(({ review }) => review === 'approve');
     await detail.runTransition(approve);
@@ -605,7 +605,7 @@ test('With the default config, Approve and Request Revision go to the review end
 });
 
 test('Review rejections show a clear message: a missing note stays in the form, a decided task or a stale version reloads and the card goes back', async () => {
-    let current = task({ status: 'on_review', requires_review: true, can_review: true, next_statuses: [], version: 8 });
+    let current = task({ status: 'on_qa', requires_review: true, can_review: true, next_statuses: [], version: 8 });
     let reply;
     const { board, detail: createDetail, requests, toasts } = await tasklistPage({
         'GET /api/tasks': () => ({ json: { data: [current], meta: { status_counts: {} } } }),
@@ -624,7 +624,7 @@ test('Review rejections show a clear message: a missing note stays in the form, 
     await detail.submitReview();
     assert.equal(detail.reviewMode, 'revision');
     assert.equal(detail.reviewError, 'Catatan review maksimal 2000 karakter.');
-    assert.equal(detail.task.status, 'on_review');
+    assert.equal(detail.task.status, 'on_qa');
 
     // A revision without a note is stopped before any request.
     const sent = requests.length;
@@ -636,19 +636,19 @@ test('Review rejections show a clear message: a missing note stays in the form, 
     // 422 on the decision: another reviewer already decided. The reason is shown and both views reload.
     reply = () => {
         current = { ...current, status: 'done', can_review: false, version: 9 };
-        return { status: 422, json: { message: 'Data tidak valid.', errors: { decision: ['Keputusan review hanya dapat diberikan pada tugas berstatus On Review, bukan Done.'] } } };
+        return { status: 422, json: { message: 'Data tidak valid.', errors: { decision: ['Keputusan review hanya dapat diberikan pada tugas berstatus On QA, bukan Done.'] } } };
     };
     detail.startReview('approve');
     await detail.submitReview();
     await new Promise((resolve) => setTimeout(resolve));
     assert.equal(toasts.at(-1).title, 'Gagal');
-    assert.equal(toasts.at(-1).text, 'Keputusan review hanya dapat diberikan pada tugas berstatus On Review, bukan Done.');
+    assert.equal(toasts.at(-1).text, 'Keputusan review hanya dapat diberikan pada tugas berstatus On QA, bukan Done.');
     assert.equal(detail.reviewMode, null);
     assert.equal(detail.task.status, 'done');
     assert.deepEqual(board.tasksIn('done').map(({ id }) => id), [7]);
 
-    // 409 from the Board: the card stays in On Review, the latest data is loaded and the message is clear.
-    current = { ...current, status: 'on_review', can_review: true, version: 9 };
+    // 409 from the Board: the card stays in On QA, the latest data is loaded and the message is clear.
+    current = { ...current, status: 'on_qa', can_review: true, version: 9 };
     await board.load();
     board.tasks[0].version = 8;
     reply = () => {
@@ -659,21 +659,21 @@ test('Review rejections show a clear message: a missing note stays in the form, 
     await board.drop('done');
     await new Promise((resolve) => setTimeout(resolve));
     assert.match(toasts.at(-1).text, /sudah diperbarui oleh pengguna lain/);
-    assert.deepEqual(board.tasksIn('on_review').map(({ id }) => id), [7]);
+    assert.deepEqual(board.tasksIn('on_qa').map(({ id }) => id), [7]);
     assert.equal(board.tasks[0].version, 10);
 
-    // 403 from the Board: the backend message is shown and the card stays in On Review.
+    // 403 from the Board: the backend message is shown and the card stays in On QA.
     reply = () => ({ status: 403, json: { message: 'This action is unauthorized.' } });
     board.draggingId = 7;
     await board.drop('done');
     assert.equal(toasts.at(-1).title, 'Gagal');
-    assert.deepEqual(board.tasksIn('on_review').map(({ id }) => id), [7]);
+    assert.deepEqual(board.tasksIn('on_qa').map(({ id }) => id), [7]);
 
     assert.equal(requests.some(({ url }) => url.endsWith('/status')), false);
 });
 
-test('Dragging On Review to On Process does not open the revision form when the backend does not send can_review', async () => {
-    const reviewed = task({ status: 'on_review', requires_review: true, can_review: false, next_statuses: [] });
+test('Dragging On QA to On Process does not open the revision form when the backend does not send can_review', async () => {
+    const reviewed = task({ status: 'on_qa', requires_review: true, can_review: false, next_statuses: [] });
     const { board, detail: createDetail, requests, toasts } = await tasklistPage({
         'GET /api/tasks': () => ({ json: { data: [reviewed], meta: { status_counts: {} } } }),
         'GET /api/tasks/7': () => ({ json: { data: reviewed } }),
@@ -687,7 +687,7 @@ test('Dragging On Review to On Process does not open the revision form when the 
 
     assert.equal(detail.reviewMode, null);
     assert.equal(toasts.at(-1).title, 'Revisi tidak dapat diminta');
-    assert.deepEqual(board.tasksIn('on_review').map(({ id }) => id), [7]);
+    assert.deepEqual(board.tasksIn('on_qa').map(({ id }) => id), [7]);
     assert.equal(requests.some(({ method }) => method !== 'GET'), false);
 });
 
