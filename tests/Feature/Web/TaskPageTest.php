@@ -47,8 +47,8 @@ class TaskPageTest extends TestCase
                 ->assertSee('x-data="tasklist"', false)
                 ->assertSeeInOrder(['Total Tugas', 'Sedang Berjalan', 'Terlambat', 'Jatuh Tempo Hari Ini'])
                 ->assertSeeInOrder(['Completed', 'Belum Selesai', 'Urgent', 'Tingkat penyelesaian'])
-                ->assertSee('data-metric="in_progress"', false)
-                ->assertDontSee('data-metric="backlog"', false)
+                ->assertSee('data-metric="on_process"', false)
+                ->assertSee('x-for="item in statusSummary"', false)
                 ->assertSee('Lihat Detail')
                 ->assertSee('Cari judul tugas')
                 ->assertSee('Atur Ulang Filter')
@@ -60,6 +60,24 @@ class TaskPageTest extends TestCase
                 ->assertSee('Tidak ada deadline tugas pada tanggal ini.')
                 ->assertSee('Menunggu pengerjaan Back End');
         }
+    }
+
+    public function test_status_counts_are_in_the_summary_above_every_view(): void
+    {
+        // The summary sits before the view containers, so it stays visible in Board, Table, Timeline, and Calendar.
+        $this->actingAs($this->manager)
+            ->get('/tasks')
+            ->assertOk()
+            ->assertSeeInOrder([
+                'aria-labelledby="task-summary-title"',
+                'data-status-summary',
+                'x-for="item in statusSummary"',
+                'aria-label="Tampilan dan filter tugas"',
+                'x-show="view === \'board\'"',
+                'x-show="view === \'table\'"',
+                'x-show="view === \'timeline\'"',
+                'x-show="view === \'calendar\'"',
+            ], false);
     }
 
     public function test_board_has_six_workflow_columns_and_table_follows_review_column_order(): void

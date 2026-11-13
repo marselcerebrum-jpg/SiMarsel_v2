@@ -952,6 +952,55 @@ test('Removing the PIC or the division reloads the summary, while an update with
     assert.equal(monitoringRequests(requests).length, 3, 'a division set to null is a change');
 });
 
+test('The count of every status is in the summary in every view, zero included', async () => {
+    const { board } = await tasklistPage({
+        'GET /api/tasks': () => ({ json: { data: [task()], meta: { status_counts: {} } } }),
+        'GET /api/tasks/monitoring': () => ({ json: { data: monitoringOf({ total_tasks: 9, backlog: 0, todo: 2, on_process: 3, ready_for_qa: 0, on_qa: 1, completed: 3, unfinished: 6 }) } }),
+    }, ADMIN);
+    await board.load();
+
+    const expected = [['Back Log', 0], ['To Do', 2], ['On Process', 3], ['Ready for QA', 0], ['On QA', 1], ['Done', 3]];
+    for (const view of ['board', 'table', 'timeline', 'calendar']) {
+        board.view = view;
+        assert.deepEqual([...board.statusSummary].map(({ label, value }) => [label, value]), expected, `status counts in the ${view} view`);
+    }
+});
+
+test('While a new filter is loading the summary shows — instead of the previous filter numbers, then the new numbers', async () => {
+    const pending = [];
+    const { board } = await tasklistPage({
+        'GET /api/tasks': () => ({ json: { data: [task()], meta: { status_counts: {} } } }),
+        'GET /api/tasks/monitoring': () => (pending.length || board.filters.division === ''
+            ? { json: { data: monitoringOf({ total_tasks: 100, todo: 40, on_process: 20, completed: 40, unfinished: 60, overdue: 5, completion_rate: 40 }, 'Seluruh divisi') } }
+            : new Promise((resolve) => pending.push(resolve))),
+    }, ADMIN);
+    board.divisions = [{ code_division: 'SLS', name: 'Sales' }];
+    await board.load();
+    assert.equal(board.metric('total_tasks'), 100);
+
+    // Divisi Sales is chosen; the server has not answered yet.
+    board.filters.division = 'SLS';
+    const loading = board.load();
+    await new Promise((resolve) => setTimeout(resolve));
+    assert.equal(board.scopeLabel, 'Divisi Sales');
+    assert.equal(board.summaryState, 'loading');
+    for (const key of ['total_tasks', 'on_process', 'overdue', 'due_today', 'completed', 'unfinished', 'urgent']) {
+        assert.equal(board.metric(key), '—', `${key} hides the number of the previous filter`);
+    }
+    assert.equal(board.completionRateText, '—');
+    assert.ok(board.statusSummary.every(({ value }) => value === '—'));
+
+    // Switching the view while it loads keeps the summary hidden too.
+    board.view = 'table';
+    assert.equal(board.metric('total_tasks'), '—');
+
+    pending[0]({ json: { data: monitoringOf({ total_tasks: 7, todo: 4, on_process: 3, unfinished: 7, completion_rate: 0 }) } });
+    await loading;
+    assert.equal(board.metric('total_tasks'), 7);
+    assert.equal(board.completionRateText, '0%');
+    assert.deepEqual([...board.statusSummary].map(({ value }) => value), [0, 4, 3, 0, 0, 0]);
+});
+
 test('With the default config, the PIC sends a file and a link as evidence and the saved evidence shows again in the detail', async () => {
     const saved = [];
     const evidence = (id, fields) => ({
