@@ -19,6 +19,7 @@ use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Collection as SupportCollection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -44,7 +45,7 @@ class TaskService
         $query = $this->tasks->visible($account, $filters);
         $statusCounts = $this->tasks->countByStatus($query);
 
-        $query = $this->tasks->sort($query, $sort, $direction)->with(['division', 'pic'])->withCount('evidences');
+        $query = $this->tasks->sort($query, $sort, $direction)->with(['division', 'pics'])->withCount('evidences');
 
         return [
             'tasks' => $perPage ? $query->paginate($perPage)->withQueryString() : $query->get(),
@@ -54,13 +55,16 @@ class TaskService
 
     public function detail(Task $task): Task
     {
-        return $task->load(['category', 'division', 'platform', 'pic', 'creator', 'activities.actor', 'evidences.submitter', 'reviews.reviewer'])
-            ->loadCount('evidences');
+        return $task->load([
+            'category', 'division', 'platform', 'pics', 'creator', 'activities.actor', 'evidences.submitter', 'reviews.reviewer',
+            'assignments.account', 'assignments.assigner', 'assignments.unassigner',
+        ])->loadCount('evidences');
     }
 
     /**
      * Create a task from validated input. The creator is the logged-in account, the status starts at
-     * Back Log unless To Do is chosen, and QA is required whenever the category requires it.
+     * Back Log unless To Do is chosen, and QA is required whenever the category requires it. Each chosen PIC gets an
+     * active assignment made by the creator.
      *
      * @param  array<string, mixed>  $data
      *
@@ -72,6 +76,9 @@ class TaskService
      */
     public function create(Account $creator, array $data): Task
     {
+        $picIds = $this->picIds($data['pic_ids'] ?? []);
+        unset($data['pic_ids']);
+
         $attributes = [
             ...$data,
             'creator_id' => $creator->id,
@@ -81,15 +88,23 @@ class TaskService
             'evidence_required' => $this->evidenceRequired($data),
         ];
 
-        $lock = Cache::lock($this->submissionFingerprint($attributes), self::DUPLICATE_WINDOW_SECONDS);
+        $lock = Cache::lock(
+            $this->submissionFingerprint([...$attributes, 'pic_ids' => $picIds->sort()->values()->all()]),
+            self::DUPLICATE_WINDOW_SECONDS,
+        );
 
         if (! $lock->get()) {
             throw new DuplicateTaskSubmissionException;
         }
 
         try {
-            $task = DB::transaction(function () use ($creator, $attributes) {
+            $task = DB::transaction(function () use ($creator, $attributes, $picIds) {
                 $task = Task::create($attributes);
+                $now = now();
+
+                foreach ($picIds as $picId) {
+                    $task->assignments()->create(['account_id' => $picId, 'assigned_by' => $creator->id, 'assigned_at' => $now]);
+                }
 
                 $task->activities()->create(['account_id' => $creator->id, 'action' => TaskActivity::CREATED]);
 
@@ -151,9 +166,14 @@ class TaskService
 
             $resubmitted = $locked->isDirty('status') && $locked->resubmitsTo($locked->status);
             $changes = $this->describeChanges($locked);
+            $divisionMoved = $locked->isDirty('division_id');
 
             $locked->version = $baseVersion + 1;
             $locked->save();
+
+            if ($divisionMoved) {
+                $this->dropOwnerFromCollaborators($locked);
+            }
 
             $locked->activities()->create([
                 'account_id' => $editor->id,
@@ -198,8 +218,8 @@ class TaskService
                 throw ValidationException::withMessages(['status' => $denial]);
             }
 
-            if ($locked->pic_id === null) {
-                throw ValidationException::withMessages(['pic_id' => 'Tetapkan PIC sebelum memindahkan tugas dari Back Log.']);
+            if (! $locked->hasActivePic()) {
+                throw ValidationException::withMessages(['pic_ids' => 'Tetapkan PIC sebelum memindahkan tugas dari Back Log.']);
             }
 
             $resubmitted = $locked->resubmitsTo($status);
@@ -223,57 +243,92 @@ class TaskService
     }
 
     /**
-     * Assign, reassign, or forward the task to a new PIC. Admin may forward to any division; a Manager only
-     * within the division they manage. The status is left as it is, and the change is appended to the history
-     * so earlier assignments stay on record. A rejected change leaves the current PIC untouched.
+     * Set the task's PICs to the given list, and optionally forward it to another division (Admin only). Only the
+     * difference is applied: PICs missing from the list are released (their row is kept with who released them and
+     * when), new ones get an active assignment, and PICs that stay are not touched. The status is left as it is.
      *
-     * @param  array{version: int|string, pic_id: int|string, division_id?: int|string}  $data
+     * The task row is locked for the whole change, so two assignment requests run one after the other; the unique
+     * index on active assignments is the last guard against an account being an active PIC twice.
+     *
+     * @param  array{version: int|string, pic_ids: array<int, int|string>, division_id?: int|string, note?: ?string}  $data
      *
      * @throws TaskVersionConflictException When the task was saved by someone else after the actor loaded it.
-     * @throws ValidationException When the actor may not forward to that division, the PIC is locked by the
-     *                             task's status, or the chosen PIC already holds the task.
+     * @throws ValidationException When the actor may not assign or forward, the PICs are locked by the task's status,
+     *                             nothing would change, or a task past Back Log would be left without a PIC.
      */
     public function assign(Account $actor, Task $task, array $data): Task
     {
         $baseVersion = (int) $data['version'];
+        $picIds = $this->picIds($data['pic_ids']);
 
-        DB::transaction(function () use ($actor, $task, $data, $baseVersion) {
+        DB::transaction(function () use ($actor, $task, $data, $baseVersion, $picIds) {
             $locked = Task::query()->whereKey($task->id)->lockForUpdate()->firstOrFail();
 
             if ($locked->version !== $baseVersion) {
                 throw new TaskVersionConflictException($locked->version);
             }
 
-            $lockedFields = $locked->lockedFieldsFor($actor);
-            $previousPicId = $locked->pic_id;
-
-            $locked->fill([
-                'division_id' => $data['division_id'] ?? $locked->division_id,
-                'pic_id' => $data['pic_id'],
-            ]);
-
-            if (! $locked->isDirty()) {
-                throw ValidationException::withMessages(['pic_id' => 'PIC yang dipilih sudah menjadi PIC tugas ini.']);
+            if ($reason = $locked->assignmentLockFor($actor)) {
+                throw ValidationException::withMessages(['pic_ids' => $reason]);
             }
 
-            if (! $actor->isAdmin() && isset($lockedFields['division_id'])) {
-                $lockedFields['division_id'] = 'Anda tidak dapat meneruskan tugas ke divisi di luar kewenangan Anda.';
+            $active = $locked->activeAssignments()->get()->keyBy('account_id');
+            $released = $active->keys()->diff($picIds)->values();
+            $added = $picIds->diff($active->keys())->values();
+            $divisionId = (int) ($data['division_id'] ?? $locked->division_id);
+            $forwarded = $divisionId !== $locked->division_id;
+
+            if ($forwarded && ! $actor->isAdmin()) {
+                throw ValidationException::withMessages(['division_id' => 'Anda tidak dapat meneruskan tugas ke divisi di luar kewenangan Anda.']);
             }
 
-            $errors = array_intersect_key($lockedFields, $locked->getDirty());
-
-            if ($errors !== []) {
-                throw ValidationException::withMessages($errors);
+            if (! $forwarded && $added->isEmpty() && $released->isEmpty()) {
+                throw ValidationException::withMessages(['pic_ids' => 'Tidak ada perubahan PIC.']);
             }
 
-            $changes = $this->describeChanges($locked);
+            if ($picIds->isEmpty() && $locked->status !== TaskStatus::Backlog) {
+                throw ValidationException::withMessages(['pic_ids' => 'PIC wajib diisi untuk tugas yang tidak berstatus Back Log.']);
+            }
+
+            $changes = [];
+
+            if ($added->isNotEmpty() || $released->isNotEmpty()) {
+                $changes['pics'] = ['old' => $this->picReferences($active->keys()), 'new' => $this->picReferences($picIds)];
+            }
+
+            $now = now();
+
+            foreach ($released as $accountId) {
+                $active[$accountId]->update(['unassigned_by' => $actor->id, 'unassigned_at' => $now]);
+            }
+
+            foreach ($added as $accountId) {
+                $locked->assignments()->create([
+                    'account_id' => $accountId,
+                    'assigned_by' => $actor->id,
+                    'assigned_at' => $now,
+                    'note' => $data['note'] ?? null,
+                ]);
+            }
+
+            $locked->division_id = $divisionId;
+            $changes += $this->describeChanges($locked);
 
             $locked->version = $baseVersion + 1;
             $locked->save();
 
+            if ($forwarded) {
+                $this->dropOwnerFromCollaborators($locked);
+            }
+
             $locked->activities()->create([
                 'account_id' => $actor->id,
-                'action' => $previousPicId === null ? TaskActivity::ASSIGNED : TaskActivity::REASSIGNED,
+                'action' => match (true) {
+                    $added->isNotEmpty() && $released->isNotEmpty() => TaskActivity::REASSIGNED,
+                    $added->isNotEmpty() => TaskActivity::ASSIGNED,
+                    $released->isNotEmpty() => TaskActivity::UNASSIGNED,
+                    default => TaskActivity::UPDATED,
+                },
                 'changes' => $changes,
             ]);
         });
@@ -282,34 +337,46 @@ class TaskService
     }
 
     /**
-     * Choices for the Assign PIC form: the current PIC, the divisions the actor may assign within with each
-     * division's eligible PICs, and the reason the PIC cannot be changed right now, if any.
+     * Choices for the Assign PIC form: the current PICs, the divisions the task may be forwarded to, every account
+     * that may be PIC (from any division), and the reason the PICs cannot be changed right now, if any.
      *
      * @return array<string, mixed>
      */
     public function assignmentOptions(Account $actor, Task $task): array
     {
-        $task->loadMissing(['pic', 'division']);
+        $task->loadMissing(['pics', 'division']);
 
         return [
-            'current_pic' => $task->pic?->only(['id', 'fullname']),
+            'current_pics' => $task->pics->map(fn (Account $pic) => $pic->only(['id', 'fullname']))->values()->all(),
             'current_division' => $task->division->only(['id', 'code_division', 'name']),
             'can_change_division' => $actor->isAdmin(),
-            'locked_reason' => $task->lockedFieldsFor($actor)['pic_id'] ?? null,
-            'divisions' => $this->divisionsWithPics($actor),
+            'locked_reason' => $task->assignmentLockFor($actor),
+            'divisions' => Division::query()
+                ->unless($actor->isAdmin(), fn (Builder $query) => $query->whereKey($task->division_id))
+                ->orderBy('name')
+                ->get(['id', 'code_division', 'name'])
+                ->map(fn (Division $division) => $division->only(['id', 'code_division', 'name']))
+                ->all(),
+            'pics' => $this->picOptions(),
         ];
     }
 
     /**
-     * Options for the Create Task form: the divisions the account may create tasks for with each
-     * division's assignable PICs, task categories with their QA configuration, platforms, and enums.
+     * Options for the Create Task form: the divisions the account may create tasks for, every account that may be
+     * PIC (from any division), task categories with their QA configuration, platforms, and enums.
      *
      * @return array<string, mixed>
      */
     public function createOptions(Account $account): array
     {
         return [
-            'divisions' => $this->divisionsWithPics($account),
+            'divisions' => Division::query()
+                ->taskCreatableBy($account)
+                ->orderBy('name')
+                ->get(['id', 'code_division', 'name'])
+                ->map(fn (Division $division) => $division->only(['id', 'code_division', 'name']))
+                ->all(),
+            'pics' => $this->picOptions(),
             'categories' => TaskCategory::query()
                 ->orderBy('name')
                 ->get(['id', 'name', 'requires_review', 'evidence_required'])
@@ -334,26 +401,59 @@ class TaskService
     }
 
     /**
-     * Divisions the account may create or assign tasks in, each with the Staff eligible to be PIC there.
+     * Every account that may be PIC, from any division, with its role and division so the form can group them.
      *
      * @return array<int, array<string, mixed>>
      */
-    private function divisionsWithPics(Account $account): array
+    private function picOptions(): array
     {
-        return Division::query()
-            ->taskCreatableBy($account)
-            ->orderBy('name')
-            ->get(['id', 'code_division', 'name'])
-            ->map(fn (Division $division) => [
-                ...$division->only(['id', 'code_division', 'name']),
-                'pics' => Account::query()
-                    ->assignableIn($division->id)
-                    ->orderBy('fullname')
-                    ->get(['id', 'fullname'])
-                    ->map(fn (Account $pic) => $pic->only(['id', 'fullname']))
-                    ->all(),
+        return Account::query()
+            ->assignableAsPic()
+            ->with(['role', 'division'])
+            ->orderBy('fullname')
+            ->orderBy('id')
+            ->get()
+            ->map(fn (Account $pic) => [
+                'id' => $pic->id,
+                'fullname' => $pic->fullname,
+                'role' => $pic->role->code_role,
+                'division' => $pic->division?->only(['id', 'code_division', 'name']),
             ])
             ->all();
+    }
+
+    /**
+     * @param  array<int, int|string>  $ids
+     * @return SupportCollection<int, int>
+     */
+    private function picIds(array $ids): SupportCollection
+    {
+        return collect($ids)->map(fn (int|string $id) => (int) $id)->unique()->values();
+    }
+
+    /**
+     * PICs as they are recorded in the history: id and name at the time of the change, by name.
+     *
+     * @param  SupportCollection<int, int>  $ids
+     * @return array<int, array{id: int, name: string}>
+     */
+    private function picReferences(SupportCollection $ids): array
+    {
+        return Account::query()
+            ->whereKey($ids->all())
+            ->orderBy('fullname')
+            ->orderBy('id')
+            ->get(['id', 'fullname'])
+            ->map(fn (Account $pic) => ['id' => $pic->id, 'name' => $pic->fullname])
+            ->all();
+    }
+
+    /**
+     * A task's owning division is never also one of its collaborating divisions.
+     */
+    private function dropOwnerFromCollaborators(Task $task): void
+    {
+        $task->collaboratingDivisions()->detach($task->division_id);
     }
 
     /**
@@ -475,8 +575,8 @@ class TaskService
             throw ValidationException::withMessages(['status' => $statusDenial]);
         }
 
-        if ($task->isDirty(['status', 'pic_id']) && $task->status !== TaskStatus::Backlog && $task->pic_id === null) {
-            throw ValidationException::withMessages(['pic_id' => 'PIC wajib diisi untuk tugas yang tidak berstatus Back Log.']);
+        if ($task->isDirty('status') && $task->status !== TaskStatus::Backlog && ! $task->hasActivePic()) {
+            throw ValidationException::withMessages(['pic_ids' => 'Tetapkan PIC sebelum memindahkan tugas dari Back Log.']);
         }
     }
 
@@ -492,7 +592,6 @@ class TaskService
             'category_id' => ['category', TaskCategory::class, 'name'],
             'division_id' => ['division', Division::class, 'name'],
             'platform_id' => ['platform', Platform::class, 'name'],
-            'pic_id' => ['pic', Account::class, 'fullname'],
         ];
 
         return collect($task->getDirty())

@@ -15,6 +15,11 @@ class TaskListRequest extends FormRequest
     public const MAX_PER_PAGE = 100;
 
     /**
+     * my_tasks: tasks the account is an active PIC of. all_tasks: every task the account may read.
+     */
+    public const SCOPES = ['all_tasks', 'my_tasks'];
+
+    /**
      * Access is decided per row by the visibility scope, so every account may ask for the list.
      */
     public function authorize(): bool
@@ -30,6 +35,7 @@ class TaskListRequest extends FormRequest
     public function rules(): array
     {
         return [
+            'scope' => ['nullable', Rule::in(self::SCOPES)],
             'search' => ['nullable', 'string', 'max:150'],
             'division' => ['nullable', 'string', Rule::exists('divisions', 'code_division')],
             'priority' => ['nullable', Rule::enum(TaskPriority::class)],
@@ -68,6 +74,7 @@ class TaskListRequest extends FormRequest
     public function attributes(): array
     {
         return [
+            'scope' => 'Cakupan',
             'search' => 'Pencarian',
             'division' => 'Divisi',
             'priority' => 'Prioritas',
@@ -80,11 +87,12 @@ class TaskListRequest extends FormRequest
     }
 
     /**
-     * @return array{search: ?string, division: ?string, priority: ?string, status: ?string}
+     * @return array{scope: string, search: ?string, division: ?string, priority: ?string, status: ?string}
      */
     public function filters(): array
     {
         return [
+            'scope' => $this->validated('scope') ?? 'all_tasks',
             'search' => $this->validated('search'),
             'division' => $this->validated('division'),
             'priority' => $this->validated('priority'),

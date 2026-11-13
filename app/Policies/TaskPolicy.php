@@ -40,11 +40,12 @@ class TaskPolicy
     }
 
     /**
-     * Only Admin, or the Manager of the task's division, may assign, reassign, or forward its PIC; Staff never.
+     * Admin and Managers may add or release PICs on tasks of every division, a Supervisor on tasks of their own
+     * division; Staff and Freelance never. Forwarding to another division stays Admin-only (TaskService).
      */
     public function assign(Account $user, Task $task): bool
     {
-        return $task->managedBy($user);
+        return $task->assignableBy($user);
     }
 
     /**

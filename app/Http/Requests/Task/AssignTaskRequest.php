@@ -2,15 +2,15 @@
 
 namespace App\Http\Requests\Task;
 
-use App\Models\Task;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Validation\Rule;
 
 class AssignTaskRequest extends StoreTaskRequest
 {
     /**
-     * pic_id is the new PIC; division_id is sent only when the task is forwarded to another division.
-     * Who may forward where, and the status restrictions, are checked by TaskService.
+     * pic_ids is the full list of PICs the task should have after the request. PICs not in the list are released and
+     * new ones are added; PICs that stay are left untouched. division_id is sent only when Admin forwards the task to
+     * another division. Who may assign, and the status restrictions, are checked by TaskService.
      *
      * @return array<string, ValidationRule|array<mixed>|string>
      */
@@ -19,7 +19,9 @@ class AssignTaskRequest extends StoreTaskRequest
         return [
             'version' => ['required', 'integer', 'min:1'],
             'division_id' => ['sometimes', 'required', 'integer', Rule::exists('divisions', 'id')],
-            'pic_id' => ['required', 'integer', $this->assignablePic()],
+            'pic_ids' => ['present', 'array', 'max:'.self::MAX_PICS],
+            'pic_ids.*' => ['integer', 'distinct', $this->assignablePic()],
+            'note' => ['nullable', 'string', 'max:1000'],
         ];
     }
 
@@ -30,20 +32,21 @@ class AssignTaskRequest extends StoreTaskRequest
     {
         return [
             ...parent::messages(),
-            'pic_id.required' => 'PIC wajib dipilih.',
+            'pic_ids.present' => 'Daftar PIC wajib dikirim.',
             'version.required' => 'Versi tugas wajib dikirim. Muat ulang detail tugas.',
             'version.integer' => 'Versi tugas tidak valid. Muat ulang detail tugas.',
             'version.min' => 'Versi tugas tidak valid. Muat ulang detail tugas.',
         ];
     }
 
-    protected function divisionId(): mixed
+    /**
+     * @return array<string, string>
+     */
+    public function attributes(): array
     {
-        return $this->input('division_id', $this->task()->division_id);
-    }
-
-    private function task(): Task
-    {
-        return $this->route('task');
+        return [
+            ...parent::attributes(),
+            'note' => 'Catatan',
+        ];
     }
 }

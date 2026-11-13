@@ -13,6 +13,8 @@ use Illuminate\Validation\Rule;
 
 class StoreTaskRequest extends FormRequest
 {
+    public const MAX_PICS = 20;
+
     /**
      * Authorization is handled by TaskPolicy on the route.
      */
@@ -34,12 +36,13 @@ class StoreTaskRequest extends FormRequest
             'category_id' => ['nullable', 'integer', Rule::exists('task_categories', 'id')],
             'division_id' => ['required', 'integer', Rule::exists('divisions', 'id'), $this->creatableDivision()],
             'platform_id' => ['nullable', 'integer', Rule::exists('platforms', 'id')],
-            'pic_id' => [
+            'pic_ids' => [
                 'nullable',
                 Rule::requiredIf($this->input('status') === TaskStatus::Todo->value),
-                'integer',
-                $this->assignablePic(),
+                'array',
+                'max:'.self::MAX_PICS,
             ],
+            'pic_ids.*' => ['integer', 'distinct', $this->assignablePic()],
             'priority' => ['nullable', Rule::in(array_column(TaskPriority::cases(), 'value'))],
             'status' => ['nullable', Rule::in(array_column(TaskStatus::initial(), 'value'))],
             'start_date' => ['nullable', 'date_format:Y-m-d'],
@@ -63,7 +66,10 @@ class StoreTaskRequest extends FormRequest
     {
         return [
             'required' => ':attribute wajib diisi.',
-            'pic_id.required' => 'PIC wajib diisi untuk tugas berstatus To Do.',
+            'pic_ids.required' => 'PIC wajib diisi untuk tugas berstatus To Do.',
+            'pic_ids.array' => 'PIC tidak valid.',
+            'pic_ids.max' => 'PIC maksimal :max orang.',
+            'pic_ids.*.distinct' => 'PIC yang sama dipilih lebih dari sekali.',
             'string' => ':attribute harus berupa teks.',
             'max' => ':attribute maksimal :max karakter.',
             'integer' => ':attribute tidak valid.',
@@ -89,7 +95,8 @@ class StoreTaskRequest extends FormRequest
             'category_id' => 'Kategori',
             'division_id' => 'Divisi',
             'platform_id' => 'Platform',
-            'pic_id' => 'PIC',
+            'pic_ids' => 'PIC',
+            'pic_ids.*' => 'PIC',
             'priority' => 'Prioritas',
             'status' => 'Status awal',
             'start_date' => 'Tanggal mulai',
@@ -97,14 +104,6 @@ class StoreTaskRequest extends FormRequest
             'requires_review' => 'Kewajiban QA',
             'evidence_required' => 'Kewajiban evidence',
         ];
-    }
-
-    /**
-     * The division the task belongs to after this request.
-     */
-    protected function divisionId(): mixed
-    {
-        return $this->input('division_id');
     }
 
     /**
@@ -124,19 +123,17 @@ class StoreTaskRequest extends FormRequest
     }
 
     /**
-     * The PIC must be a Staff member of the task's division.
+     * A PIC must be an active Staff, Freelance, or Supervisor account; it may belong to any division.
      */
     protected function assignablePic(): Closure
     {
         return function (string $attribute, mixed $value, Closure $fail) {
-            $divisionId = $this->divisionId();
-
-            if (! is_numeric($value) || ! is_numeric($divisionId)) {
+            if (! is_numeric($value)) {
                 return;
             }
 
-            if (! Account::query()->assignableIn((int) $divisionId)->whereKey($value)->exists()) {
-                $fail('PIC harus Staff dari divisi yang dipilih.');
+            if (! Account::query()->assignableAsPic()->whereKey($value)->exists()) {
+                $fail('PIC harus akun aktif dengan role Staff, Freelance, atau Supervisor.');
             }
         };
     }

@@ -38,6 +38,7 @@ class TaskDetailResource extends TaskResource
                 'id' => $this->creator->id,
                 'fullname' => $this->creator->fullname,
             ] : null,
+            'assignments' => TaskAssignmentResource::collection($this->whenLoaded('assignments', fn () => $this->assignments, [])),
             'evidence' => TaskEvidenceResource::collection($this->whenLoaded('evidences', fn () => $this->evidences, [])),
             'history' => TaskActivityResource::collection($this->whenLoaded('activities', fn () => $this->activities, [])),
             'reviews' => TaskReviewResource::collection($this->whenLoaded('reviews', fn () => $this->reviews, [])),

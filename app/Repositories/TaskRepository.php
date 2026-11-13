@@ -7,6 +7,7 @@ use App\Enums\TaskStatus;
 use App\Models\Account;
 use App\Models\Division;
 use App\Models\Task;
+use App\Models\TaskAssignment;
 use BackedEnum;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Builder;
@@ -30,12 +31,16 @@ class TaskRepository
      * Tasks the account may see, narrowed by the requested filters. The visibility scope is always
      * applied, so a filter can never widen what the account is allowed to see.
      *
-     * @param  array{search: ?string, division: ?string, priority: ?string, status: ?string}  $filters
+     * my_tasks narrows the list to tasks the account is an active PIC of. Both scopes filter with subqueries, never
+     * joins, so a task with several PICs appears once in lists, pages, and counts.
+     *
+     * @param  array{scope?: string, search: ?string, division: ?string, priority: ?string, status: ?string}  $filters
      * @return Builder<Task>
      */
     public function visible(Account $account, array $filters): Builder
     {
-        return $this->filter(Task::query()->visibleTo($account), $filters);
+        return $this->filter(Task::query()->visibleTo($account), $filters)
+            ->when(($filters['scope'] ?? null) === 'my_tasks', fn (Builder $query) => $query->assignedTo($account));
     }
 
     /**
@@ -182,7 +187,7 @@ class TaskRepository
     public function deadlinesBetween(Account $account, CarbonInterface $from, CarbonInterface $to, ?string $division): Collection
     {
         return $this->visible($account, ['search' => null, 'division' => $division, 'priority' => null, 'status' => null])
-            ->with(['division', 'pic'])
+            ->with(['division', 'pics'])
             ->whereBetween('deadline', [$from->copy()->startOfDay()->toDateTimeString(), $to->copy()->endOfDay()->toDateTimeString()])
             ->orderBy('deadline')
             ->orderBy('id')
@@ -221,8 +226,13 @@ class TaskRepository
                 Division::select('name')->whereColumn('divisions.id', 'tasks.division_id'),
                 $direction,
             ),
+            // The first active PIC by name; tasks without a PIC sort as an empty name. One row per task.
             'pic' => $query->orderBy(
-                Account::select('fullname')->whereColumn('accounts.id', 'tasks.pic_id'),
+                TaskAssignment::query()
+                    ->join('accounts', 'accounts.id', '=', 'task_assignments.account_id')
+                    ->whereColumn('task_assignments.task_id', 'tasks.id')
+                    ->whereNull('task_assignments.unassigned_at')
+                    ->selectRaw('min(accounts.fullname)'),
                 $direction,
             ),
             // Tasks without a date always come last, whichever the direction.

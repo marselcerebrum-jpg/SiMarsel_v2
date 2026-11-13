@@ -4,7 +4,6 @@ namespace App\Http\Requests\Task;
 
 use App\Enums\TaskPriority;
 use App\Enums\TaskStatus;
-use App\Models\Account;
 use App\Models\Task;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Validation\Rule;
@@ -27,7 +26,6 @@ class UpdateTaskRequest extends StoreTaskRequest
             'category_id' => ['sometimes', 'nullable', 'integer', Rule::exists('task_categories', 'id')],
             'division_id' => ['sometimes', 'required', 'integer', Rule::exists('divisions', 'id')],
             'platform_id' => ['sometimes', 'nullable', 'integer', Rule::exists('platforms', 'id')],
-            'pic_id' => ['sometimes', 'nullable', 'integer', $this->assignablePic()],
             'priority' => ['sometimes', 'required', Rule::in(array_column(TaskPriority::cases(), 'value'))],
             'status' => ['sometimes', 'required', Rule::in(array_column(TaskStatus::cases(), 'value'))],
             'start_date' => ['sometimes', 'nullable', 'date_format:Y-m-d'],
@@ -87,23 +85,8 @@ class UpdateTaskRequest extends StoreTaskRequest
                         $errors->add('deadline', 'Deadline tidak boleh sebelum tanggal mulai.');
                     }
                 }
-
-                // Moving the task to another division without choosing a new PIC keeps the current PIC,
-                // who must also belong to the new division.
-                if (! $errors->hasAny(['division_id', 'pic_id']) && $this->has('division_id') && ! $this->has('pic_id')) {
-                    $picId = $this->task()->pic_id;
-
-                    if ($picId !== null && ! Account::query()->assignableIn((int) $this->input('division_id'))->whereKey($picId)->exists()) {
-                        $errors->add('pic_id', 'PIC saat ini bukan Staff dari divisi yang dipilih. Pilih PIC baru.');
-                    }
-                }
             },
         ];
-    }
-
-    protected function divisionId(): mixed
-    {
-        return $this->input('division_id', $this->task()->division_id);
     }
 
     private function deadlineChanged(): bool
