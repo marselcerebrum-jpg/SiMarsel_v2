@@ -36,6 +36,7 @@ lintas divisi, dan tampilan read-only untuk tugas di luar kewenangan. Calendar d
 | Hak akses per tugas | `can_view_detail`, `can_edit`, `can_assign`, `can_delete`, `can_review`, `editable_fields`, `next_statuses`; `can_delete` per Evidence | Dihitung backend; FE tidak perlu menghitung ulang |
 | Versi (optimistic locking) | `Task.version` | Kirim di setiap `PATCH`/`POST` perubahan; `409 { current_version }` bila usang |
 | Cakupan daftar | `GET /api/tasks?scope=` | `all_tasks` (default, semua divisi) atau `my_tasks` (PIC aktif) |
+| Filter periode dan PIC | `GET /api/tasks`, `GET /api/tasks/monitoring?scope=tasklist` | `filter_mode`, `date_field`, `date`, `month`, `year`, `start_date`, `end_date`, `pic_id`; monitoring memakai `task_scope` untuk cakupan daftar |
 
 ## 2. Selisih FE saat ini dengan backend
 
@@ -98,6 +99,7 @@ lintas divisi, dan tampilan read-only untuk tugas di luar kewenangan. Calendar d
 | Calendar & Timeline | ✅ Siap | Tidak perlu perubahan FE; tombol tugas terkait di pop-up agenda tidak muncul lagi |
 | Komentar & balasan | ⏳ Tabel siap | Endpoint dibuat di TASK-16 |
 | Hapus Task Card | ✅ Siap (TASK-12) | `DELETE /api/tasks/{id}` dengan `version`; tampilkan tombol bila `can_delete`; tugas Done tidak bisa dihapus (`422`) |
+| Filter tanggal, bulan, tahun, rentang | ✅ Siap (TASK-14) | Kirim parameter yang sama ke daftar dan monitoring agar Board, Table, dan KPI konsisten; kirim hanya parameter mode aktif |
 | Pop-up Calendar | ✅ Siap (TASK-12) | `GET /api/tasks/{id}/preview`: ringkasan terbaru dan flag akses untuk satu tugas |
 | Hapus evidence sendiri | ✅ Siap (TASK-13) | `DELETE /api/tasks/{id}/evidences/{evidence}`; tombol bila `can_delete` pada Evidence |
 | PIC & divisi untuk Supervisor | ✅ Siap (TASK-13) | `pics` di create/assignment-options sudah dibatasi ke divisi Supervisor; `can_change_division` `false` dan `division_id` tidak ada di `editable_fields` untuk Supervisor |

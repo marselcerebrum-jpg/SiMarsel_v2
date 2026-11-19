@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Account;
 use App\Models\Division;
 use App\Repositories\TaskRepository;
+use App\Support\TaskPeriod;
 use Carbon\CarbonImmutable;
 
 class TaskMonitoringService
@@ -26,7 +27,7 @@ class TaskMonitoringService
      * filters. Read-only: seeing a task here grants no right to edit it. The period only decides which tasks
      * are counted; Overdue and Due Today are always judged on the deadline against today.
      *
-     * @param  array{search: ?string, division: ?string, priority: ?string, status: ?string, date_basis: string, date_from: ?string, date_to: ?string}  $filters
+     * @param  array{search: ?string, division: ?string, priority: ?string, status: ?string, task_scope?: string, pic_id?: ?int, period?: ?TaskPeriod, date_basis: string, date_from: ?string, date_to: ?string}  $filters
      * @return array<string, mixed>
      */
     public function summarize(Account $account, string $scope, array $filters): array
@@ -36,9 +37,9 @@ class TaskMonitoringService
         $counts = $this->tasks->monitoringCounts($query, $today);
 
         return [
-            'scope' => $this->scope($account, $scope),
+            'scope' => $this->scope($scope, $filters['task_scope'] ?? null),
             'as_of' => $today->toDateString(),
-            'filters' => $filters,
+            'filters' => [...$filters, 'period' => ($filters['period'] ?? null)?->toArray()],
             'period' => $this->period($filters),
             'metrics' => [
                 ...$counts,
@@ -60,11 +61,21 @@ class TaskMonitoringService
     /**
      * The date the period was matched on, with a label for the page.
      *
-     * @param  array{date_basis: string, date_from: ?string, date_to: ?string}  $filters
+     * @param  array{period?: ?TaskPeriod, date_basis: string, date_from: ?string, date_to: ?string}  $filters
      * @return array{basis: string, label: string, from: ?string, to: ?string, active: bool}
      */
     private function period(array $filters): array
     {
+        if ($period = $filters['period'] ?? null) {
+            return [
+                'basis' => $period->field,
+                'label' => $period->label(),
+                'from' => $period->from->toDateString(),
+                'to' => $period->to->toDateString(),
+                'active' => true,
+            ];
+        }
+
         return [
             'basis' => $filters['date_basis'],
             'label' => $filters['date_basis'] === self::DATE_BASIS_DEADLINE ? 'Deadline' : 'Tanggal dibuat',
@@ -77,10 +88,13 @@ class TaskMonitoringService
     /**
      * @return array{key: string, label: string}
      */
-    private function scope(Account $account, string $scope): array
+    private function scope(string $scope, ?string $taskScope): array
     {
-        // Every active account sees the tasks of every division, so both scopes cover the same tasks.
-        return ['key' => $scope, 'label' => 'Seluruh divisi'];
+        // Every active account sees the tasks of every division, so only my_tasks narrows what is counted.
+        return [
+            'key' => $scope,
+            'label' => $scope === self::SCOPE_TASKLIST && $taskScope === 'my_tasks' ? 'Tugas Saya' : 'Seluruh divisi',
+        ];
     }
 
     /**

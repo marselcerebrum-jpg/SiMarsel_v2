@@ -4,13 +4,17 @@ namespace App\Http\Requests\Task;
 
 use App\Enums\TaskPriority;
 use App\Enums\TaskStatus;
+use App\Http\Requests\Task\Concerns\ValidatesTaskPeriod;
 use App\Services\TaskMonitoringService;
+use App\Support\TaskPeriod;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
 class TaskMonitoringRequest extends FormRequest
 {
+    use ValidatesTaskPeriod;
+
     /**
      * Every role may read the monitoring report; the scope decides which tasks are counted.
      */
@@ -20,11 +24,19 @@ class TaskMonitoringRequest extends FormRequest
     }
 
     /**
+     * The Tasklist KPIs take the same period and PIC filters as the list. The older date_basis period stays for the
+     * monitoring report, but one request cannot carry both.
+     *
      * @return array<string, ValidationRule|array<mixed>|string>
      */
     public function rules(): array
     {
+        $periodRules = $this->periodRules();
+        $periodRules['filter_mode'][] = 'prohibits:date_basis,date_from,date_to';
+
         return [
+            ...$periodRules,
+            'task_scope' => ['nullable', 'prohibited_unless:scope,'.TaskMonitoringService::SCOPE_TASKLIST, Rule::in(TaskListRequest::SCOPES)],
             'scope' => ['nullable', Rule::in([TaskMonitoringService::SCOPE_REPORT, TaskMonitoringService::SCOPE_TASKLIST])],
             'search' => ['nullable', 'string', 'max:150'],
             'division' => ['nullable', 'string', Rule::exists('divisions', 'code_division')],
@@ -42,6 +54,9 @@ class TaskMonitoringRequest extends FormRequest
     public function messages(): array
     {
         return [
+            ...$this->periodMessages(),
+            'filter_mode.prohibits' => 'Filter periode tidak dapat digabung dengan date_basis, date_from, atau date_to.',
+            'task_scope.prohibited_unless' => ':attribute hanya berlaku untuk cakupan Tasklist.',
             'string' => ':attribute harus berupa teks.',
             'exists' => ':attribute tidak ditemukan.',
             'in' => ':attribute tidak valid.',
@@ -58,6 +73,8 @@ class TaskMonitoringRequest extends FormRequest
     public function attributes(): array
     {
         return [
+            ...$this->periodAttributes(),
+            'task_scope' => 'Cakupan tugas',
             'scope' => 'Cakupan',
             'search' => 'Pencarian',
             'division' => 'Divisi',
@@ -78,18 +95,23 @@ class TaskMonitoringRequest extends FormRequest
     }
 
     /**
-     * The period is matched on the deadline unless the creation date is asked for.
+     * The older period is matched on the deadline unless the creation date is asked for.
      *
-     * @return array{search: ?string, division: ?string, priority: ?string, status: ?string, date_basis: string, date_from: ?string, date_to: ?string}
+     * @return array{search: ?string, division: ?string, priority: ?string, status: ?string, task_scope: string, pic_id: ?int, period: ?TaskPeriod, date_basis: string, date_from: ?string, date_to: ?string}
      */
     public function filters(): array
     {
+        $period = $this->period();
+
         return [
             'search' => $this->validated('search'),
             'division' => $this->validated('division'),
             'priority' => $this->validated('priority'),
             'status' => $this->validated('status'),
-            'date_basis' => $this->validated('date_basis') ?? TaskMonitoringService::DATE_BASIS_DEADLINE,
+            'task_scope' => $this->validated('task_scope') ?? 'all_tasks',
+            'pic_id' => $this->picId(),
+            'period' => $period,
+            'date_basis' => $period?->field ?? $this->validated('date_basis') ?? TaskMonitoringService::DATE_BASIS_DEADLINE,
             'date_from' => $this->validated('date_from'),
             'date_to' => $this->validated('date_to'),
         ];

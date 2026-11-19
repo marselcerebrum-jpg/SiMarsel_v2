@@ -13,6 +13,7 @@ use App\Models\Task;
 use App\Models\TaskActivity;
 use App\Models\TaskCategory;
 use App\Repositories\TaskRepository;
+use App\Support\TaskPeriod;
 use BackedEnum;
 use Carbon\CarbonInterface;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
@@ -37,7 +38,7 @@ class TaskService
     /**
      * Tasks for the Board and Table views, plus per-status counts under the same filters.
      *
-     * @param  array{search: ?string, division: ?string, priority: ?string, status: ?string}  $filters
+     * @param  array{scope?: string, search: ?string, division: ?string, priority: ?string, status: ?string, pic_id?: ?int, period?: ?TaskPeriod}  $filters
      * @return array{tasks: Collection<int, Task>|LengthAwarePaginator, status_counts: array<string, int>}
      */
     public function list(Account $account, array $filters, string $sort, string $direction, ?int $perPage): array

@@ -8,6 +8,7 @@ use App\Models\Account;
 use App\Models\Division;
 use App\Models\Task;
 use App\Models\TaskAssignment;
+use App\Support\TaskPeriod;
 use BackedEnum;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Builder;
@@ -34,7 +35,7 @@ class TaskRepository
      * my_tasks narrows the list to tasks the account is an active PIC of. Both scopes filter with subqueries, never
      * joins, so a task with several PICs appears once in lists, pages, and counts.
      *
-     * @param  array{scope?: string, search: ?string, division: ?string, priority: ?string, status: ?string}  $filters
+     * @param  array{scope?: string, search: ?string, division: ?string, priority: ?string, status: ?string, pic_id?: ?int, period?: ?TaskPeriod}  $filters
      * @return Builder<Task>
      */
     public function visible(Account $account, array $filters): Builder
@@ -50,7 +51,10 @@ class TaskRepository
      * The period is matched on the column named by date_basis (created_at or deadline). On the deadline basis a
      * task without a deadline falls outside any period; on the created_at basis every task has a date.
      *
-     * @param  array{search: ?string, division: ?string, priority: ?string, status: ?string, date_basis: string, date_from: ?string, date_to: ?string}  $filters
+     * The Tasklist scope also narrows to the account's own tasks for my_tasks, and takes the list's period and PIC
+     * filters, so the KPIs count exactly the tasks on the Board.
+     *
+     * @param  array{search: ?string, division: ?string, priority: ?string, status: ?string, task_scope?: string, pic_id?: ?int, period?: ?TaskPeriod, date_basis: string, date_from: ?string, date_to: ?string}  $filters
      * @return Builder<Task>
      */
     public function monitored(Account $account, string $scope, array $filters): Builder
@@ -59,6 +63,10 @@ class TaskRepository
         $column = $filters['date_basis'] === 'deadline' ? 'deadline' : 'created_at';
 
         return $this->filter($query, $filters)
+            ->when(
+                $scope === 'tasklist' && ($filters['task_scope'] ?? null) === 'my_tasks',
+                fn (Builder $query) => $query->assignedTo($account),
+            )
             ->when($filters['date_from'], fn (Builder $query, string $date) => $query->whereDate($column, '>=', $date))
             ->when($filters['date_to'], fn (Builder $query, string $date) => $query->whereDate($column, '<=', $date));
     }
@@ -145,7 +153,7 @@ class TaskRepository
 
     /**
      * @param  Builder<Task>  $query
-     * @param  array{search: ?string, division: ?string, priority: ?string, status: ?string}  $filters
+     * @param  array{search: ?string, division: ?string, priority: ?string, status: ?string, pic_id?: ?int, period?: ?TaskPeriod}  $filters
      * @return Builder<Task>
      */
     private function filter(Builder $query, array $filters): Builder
@@ -155,7 +163,10 @@ class TaskRepository
                 ->whereHas('division', fn (Builder $query) => $query->where('code_division', $division)))
             ->when($filters['search'], fn (Builder $query, string $search) => $query->where('title', 'like', "%{$search}%"))
             ->when($filters['priority'], fn (Builder $query, string $priority) => $query->where('priority', $priority))
-            ->when($filters['status'], fn (Builder $query, string $status) => $query->where('status', $status));
+            ->when($filters['status'], fn (Builder $query, string $status) => $query->where('status', $status))
+            ->when($filters['pic_id'] ?? null, fn (Builder $query, int $picId) => $query
+                ->whereHas('activeAssignments', fn (Builder $query) => $query->where('account_id', $picId)))
+            ->when($filters['period'] ?? null, fn (Builder $query, TaskPeriod $period) => $period->apply($query));
     }
 
     /**

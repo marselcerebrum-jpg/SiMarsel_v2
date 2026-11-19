@@ -83,7 +83,7 @@ Backend **wajib** menerapkan aturan ini di setiap endpoint. Aturan di frontend h
 | Method & path | Body / query | Respons |
 |---|---|---|
 | `GET /api/tasks/meta` | – | `{ data: { role, role_code, permissions, division, default_division, can_create, divisions, statuses, priorities } }`. `role` tetap `admin` \| `manager` \| `staff`; `role_code` = kode role akun (`ADM`, `MGR`, `SPV`, `EMP`, `FRL`); `permissions` = kode permission role itu (misalnya `task.view_all`, `task.assign`), urut abjad. Permission hanya menyatakan kewenangan umum; akses per tugas tetap diputuskan backend. |
-| `GET /api/tasks` | `scope` (`all_tasks` default \| `my_tasks`), `search`, `division`, `priority`, `status`, `sort`, `direction`, `per_page`, `page` (semua opsional) | `{ data: [Task], meta: { status_counts } }`, tugas dalam cakupan user. `my_tasks` = hanya tugas yang user menjadi PIC aktifnya. Tugas dengan banyak PIC tetap muncul sekali di daftar, halaman, dan `status_counts`. `sort=pic` memakai nama PIC aktif pertama (abjad). Tanpa `per_page` semua tugas dikembalikan sekaligus; Board/Table mengirim filter ke server dan mengurutkan serta mempaginasi di frontend. |
+| `GET /api/tasks` | `scope` (`all_tasks` default \| `my_tasks`), `search`, `division`, `pic_id`, `priority`, `status`, `filter_mode`, `date_field`, `date`, `month`, `year`, `start_date`, `end_date`, `sort`, `direction`, `per_page`, `page` (semua opsional; lihat [Filter periode](#filter-periode-task-14)) | `{ data: [Task], meta: { status_counts } }`, tugas dalam cakupan user. `my_tasks` = hanya tugas yang user menjadi PIC aktifnya. Tugas dengan banyak PIC tetap muncul sekali di daftar, halaman, dan `status_counts`. `sort=pic` memakai nama PIC aktif pertama (abjad). Tanpa `per_page` semua tugas dikembalikan sekaligus; Board/Table mengirim filter ke server dan mengurutkan serta mempaginasi di frontend. |
 | `GET /api/tasks/create-options` | – | `divisions` (divisi yang boleh dibuatkan tugas), `pics` (semua akun yang dapat menjadi PIC dari semua divisi: `{ id, fullname, role, division: { id, code_division, name } \| null }`), kategori/aturan QA, platform, prioritas, status awal, dan default form. Admin/Manajer saja. |
 | `POST /api/tasks` | `title`*, `description`, `category_id`, `division_id`*, `pic_ids` (array ID akun, maks. 20), `platform_id`, `priority`, `start_date`, `deadline`, `status`, `requires_review`, `evidence_required` | `201 { data: TaskDetail, message }`; Admin/Manajer saja. Field pembuat ditentukan dari akun yang login. Setiap PIC mendapat assignment aktif dengan `assigned_by` = pembuat. |
 | `GET /api/tasks/{id}` | – | `{ data: TaskDetail }` |
@@ -114,6 +114,27 @@ Backend **wajib** menerapkan aturan ini di setiap endpoint. Aturan di frontend h
 - **Event** (Calendar): `{ id, title, division, is_shared, target_divisions, start_date, end_date, description, task_id, can_view_detail }`. `task_id` selalu `null` dan `can_view_detail` selalu `false`: agenda tidak terhubung ke tugas, sehingga tombol "Lihat Detail Tugas Terkait" tidak muncul. `deadlines` hanya berisi tugas dalam cakupan user dan yang memiliki deadline, berupa objek Task ditambah `description` (boleh `null`) dan `is_overdue`. Lihat [Calendar](#calendar-task-11).
 - **Lihat Detail dari Calendar**: frontend berpindah ke Board dan membuka detail lewat `GET /api/tasks/{id}`. Bila tugas tersembunyi oleh filter, filter cari/prioritas/status dikosongkan; Admin juga dipindah ke Semua Divisi. Akses tetap diputuskan backend (`403`/`404`).
 - **Tautan langsung**: `/tasks?task={id}` membuka Board dengan detail tugas tersebut memakai alur yang sama. Parameter `task` diperbarui saat panel detail dibuka dan dihapus saat ditutup.
+
+## Filter periode (TASK-14)
+
+`GET /api/tasks` dan `GET /api/tasks/monitoring?scope=tasklist` menerima parameter periode yang sama. Tanpa `filter_mode` = tanpa filter periode.
+
+| `filter_mode` | Parameter wajib | Periode |
+|---|---|---|
+| `date` | `date` (`YYYY-MM-DD`) | Satu hari |
+| `month` | `month` (1 sampai 12), `year` | Seluruh bulan pada tahun itu |
+| `year` | `year` (2000 sampai 2100) | 1 Januari sampai 31 Desember |
+| `range` | `start_date`, `end_date` (`YYYY-MM-DD`) | Termasuk kedua tanggal; `end_date` tidak boleh sebelum `start_date` |
+
+- `date_field` (`start_date` atau `deadline`) wajib dikirim bersama `filter_mode`.
+- Kirim hanya parameter milik mode yang aktif. Parameter mode lain, atau parameter periode tanpa `filter_mode`, ditolak `422`.
+- Tugas yang tanggalnya kosong pada `date_field` tidak masuk hasil.
+- `pic_id` (ID akun) menyaring tugas dengan akun itu sebagai PIC aktif. PIC yang sudah dilepas tidak cocok.
+- Periode dapat digabung dengan `scope`, `search`, `division`, `pic_id`, `priority`, `status`, `sort`, `direction`, `per_page`, dan `page`. Filter tidak mengubah hak akses.
+- Tugas dengan banyak PIC tetap satu baris dan dihitung satu kali di daftar, `status_counts`, dan KPI.
+- Agar KPI sama dengan Board dan Table, kirim parameter yang sama ke monitoring dengan `scope=tasklist`, dan kirim cakupan daftar sebagai `task_scope` (`all_tasks` atau `my_tasks`).
+
+Contoh: `GET /api/tasks?scope=my_tasks&filter_mode=month&date_field=deadline&month=11&year=2026&status=todo`
 
 ## Timeline (TASK-10)
 
@@ -254,6 +275,9 @@ Tugas tanpa deadline tidak dihitung pada Overdue maupun Due Today.
 | `search` | teks, maks. 150 | Judul tugas, sama seperti Tasklist. |
 | `date_basis` | `deadline` (default) \| `created_at` | Tanggal yang dipakai filter periode. Lihat *Dasar tanggal periode* di bawah. |
 | `date_from`, `date_to` | `YYYY-MM-DD` | Batas periode (inklusif) pada tanggal sesuai `date_basis`. Boleh diisi salah satu. `date_to` ≥ `date_from`. |
+| `task_scope` | `all_tasks` (default) \| `my_tasks` | Hanya untuk `scope=tasklist`. `my_tasks` = tugas dengan user sebagai PIC aktif. |
+| `pic_id` | ID akun | Tugas dengan akun itu sebagai PIC aktif. |
+| `filter_mode`, `date_field`, `date`, `month`, `year`, `start_date`, `end_date` | lihat [Filter periode](#filter-periode-task-14) | Periode yang sama dengan `GET /api/tasks`. Tidak boleh digabung dengan `date_basis`, `date_from`, atau `date_to` (`422`). |
 
 Tanpa parameter = konfigurasi default (Reset Filter): cakupan `report`, semua divisi, `date_basis=deadline`, tanpa periode.
 

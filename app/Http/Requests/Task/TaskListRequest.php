@@ -4,12 +4,16 @@ namespace App\Http\Requests\Task;
 
 use App\Enums\TaskPriority;
 use App\Enums\TaskStatus;
+use App\Http\Requests\Task\Concerns\ValidatesTaskPeriod;
+use App\Support\TaskPeriod;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
 class TaskListRequest extends FormRequest
 {
+    use ValidatesTaskPeriod;
+
     public const SORTS = ['title', 'division', 'pic', 'priority', 'status', 'start_date', 'deadline', 'created_at', 'updated_at'];
 
     public const MAX_PER_PAGE = 100;
@@ -44,6 +48,7 @@ class TaskListRequest extends FormRequest
             'direction' => ['nullable', Rule::in(['asc', 'desc'])],
             'per_page' => ['nullable', 'integer', 'between:1,'.self::MAX_PER_PAGE],
             'page' => ['nullable', 'integer', 'min:1'],
+            ...$this->periodRules(),
         ];
     }
 
@@ -55,6 +60,7 @@ class TaskListRequest extends FormRequest
     public function messages(): array
     {
         return [
+            ...$this->periodMessages(),
             'string' => ':attribute harus berupa teks.',
             'integer' => ':attribute harus berupa angka.',
             'exists' => ':attribute tidak ditemukan.',
@@ -74,6 +80,7 @@ class TaskListRequest extends FormRequest
     public function attributes(): array
     {
         return [
+            ...$this->periodAttributes(),
             'scope' => 'Cakupan',
             'search' => 'Pencarian',
             'division' => 'Divisi',
@@ -87,7 +94,7 @@ class TaskListRequest extends FormRequest
     }
 
     /**
-     * @return array{scope: string, search: ?string, division: ?string, priority: ?string, status: ?string}
+     * @return array{scope: string, search: ?string, division: ?string, priority: ?string, status: ?string, pic_id: ?int, period: ?TaskPeriod}
      */
     public function filters(): array
     {
@@ -97,6 +104,8 @@ class TaskListRequest extends FormRequest
             'division' => $this->validated('division'),
             'priority' => $this->validated('priority'),
             'status' => $this->validated('status'),
+            'pic_id' => $this->picId(),
+            'period' => $this->period(),
         ];
     }
 
