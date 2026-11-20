@@ -5,6 +5,7 @@ namespace Tests\Feature\Task;
 use App\Enums\TaskStatus;
 use App\Models\Account;
 use App\Models\Division;
+use App\Models\Permission;
 use App\Models\Role;
 use App\Models\Task;
 use App\Models\TaskActivity;
@@ -144,6 +145,45 @@ class TaskStatusTransitionTest extends TestCase
             ->patchJson($this->url($task), $this->payload('in_progress'))
             ->assertOk()
             ->assertJsonPath('data.status', 'in_progress');
+    }
+
+    public function test_active_pic_without_the_change_status_permission_cannot_move_the_card(): void
+    {
+        $task = $this->task(TaskStatus::Todo);
+        Role::where('code_role', Role::EMPLOYEE)->first()->permissions()
+            ->detach(Permission::where('code', Permission::TASK_CHANGE_STATUS)->value('id'));
+        $staff = $this->staff->fresh();
+
+        $this->actingAs($staff)
+            ->getJson('/api/tasks?scope=my_tasks')
+            ->assertJsonPath('data.0.id', $task->id)
+            ->assertJsonPath('data.0.can_change_status', false);
+
+        $this->actingAs($staff)
+            ->getJson("/api/tasks/{$task->id}")
+            ->assertJsonPath('data.can_change_status', false)
+            ->assertJsonPath('data.next_statuses', []);
+
+        $this->actingAs($staff)
+            ->patchJson($this->url($task), $this->payload('in_progress'))
+            ->assertForbidden();
+
+        $this->assertSame(TaskStatus::Todo, $task->fresh()->status);
+    }
+
+    public function test_list_tells_the_board_who_may_change_the_status(): void
+    {
+        $task = $this->task(TaskStatus::Todo);
+
+        $this->actingAs($this->staff)
+            ->getJson('/api/tasks?scope=my_tasks')
+            ->assertJsonPath('data.0.id', $task->id)
+            ->assertJsonPath('data.0.can_change_status', true);
+
+        $this->actingAs($this->otherStaff)
+            ->getJson('/api/tasks')
+            ->assertJsonPath('data.0.id', $task->id)
+            ->assertJsonPath('data.0.can_change_status', false);
     }
 
     public function test_manager_and_admin_cannot_start_the_work_for_the_pic(): void

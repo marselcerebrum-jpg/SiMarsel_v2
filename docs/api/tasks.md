@@ -8,7 +8,7 @@ Wajib login. Header dan kode error umum mengikuti [authentication.md](authentica
 
 ## Role & cakupan data
 
-Role dan kewenangan membuat tugas berasal dari `GET /api/tasks/meta`. Jika pemuatan meta gagal, frontend memakai pemetaan role akun `MGR` → `manager`, `EMP` → `staff`, dan `ADM` → `admin`.
+Role dan kewenangan membuat tugas berasal dari `GET /api/tasks/meta`. Jika pemuatan meta gagal, frontend memakai pemetaan role akun `ADM` → `admin`, `MGR` → `manager`, serta `SPV`, `EMP`, dan `FRL` → `staff`.
 
 Semua akun **aktif** melihat daftar dan detail tugas **seluruh divisi** (Board, Table, Calendar, Timeline, histori, evidence, review, monitoring). Melihat tidak memberi hak mengubah; hak mengubah mengikuti permission role (`meta.permissions`), cakupan divisi, dan assignment PIC aktif.
 
@@ -26,6 +26,14 @@ Semua akun **aktif** melihat daftar dan detail tugas **seluruh divisi** (Board, 
 - `meta.role` tetap tiga nilai (`admin`, `manager`, `staff`) agar kode lama tidak rusak; pakai `meta.role_code` untuk membedakan Supervisor dan Freelance, dan `meta.can_create` untuk tombol Buat Tugas.
 
 Backend **wajib** menerapkan aturan ini di setiap endpoint. Aturan di frontend hanya untuk tampilan.
+
+**Frontend (TASK-12)**:
+
+- Nama role (Admin, Manajer, Supervisor, Staff, Freelance) berasal dari `meta.role_code`. Filter divisi tersedia untuk semua role; nilai awalnya mengikuti `meta.default_division`.
+- Papan dan Tabel memiliki cakupan **Semua Tugas** (`scope=all_tasks`) dan **Tugas Saya** (`scope=my_tasks`). Cakupan tersimpan di URL (`?scope=`) dan filter aktif dipertahankan saat berpindah cakupan.
+- `GET /api/tasks/monitoring` belum memiliki cakupan `my_tasks`, sehingga ringkasan pada Tugas Saya dihitung frontend dari daftar `my_tasks` dengan rumus yang sama.
+- Tugas tanpa `can_edit`, `can_assign`, dan `can_delete` diberi tanda **Hanya lihat**. Tombol Ubah, Atur PIC, Hapus, dan keputusan review mengikuti flag backend per tugas.
+- Pemilihan PIC mengirim daftar lengkap `pic_ids`. Tombol Hapus Tugas memakai `DELETE /api/tasks/{id}` dengan `version`.
 
 ## Objek
 
@@ -45,6 +53,7 @@ Backend **wajib** menerapkan aturan ini di setiap endpoint. Aturan di frontend h
   "evidence_required": true,
   "evidence_count": 0,
   "can_view_detail": true,
+  "can_change_status": true,
   "version": 1,
   "updated_at": "2026-10-21T03:00:00Z"
 }
@@ -53,6 +62,7 @@ Backend **wajib** menerapkan aturan ini di setiap endpoint. Aturan di frontend h
 - `priority`: `low` | `medium` | `high` | `urgent`.
 - `status`: `backlog` | `todo` | `in_progress` | `ready_review` | `on_review` | `done` (label: Back Log, To Do, On Process, Ready Review, On Review, Done).
 - `pics`: semua PIC aktif, urut nama; `[]` bila belum ada PIC. Tidak ada Lead PIC. Field `pic` (satu PIC) sudah dihapus.
+- `can_change_status`: `true` bila user boleh memindahkan status tugas ini sekarang lewat endpoint status (permission `task.change_status` serta PIC aktif atau pengelola sesuai status). Board hanya mengizinkan drag bila `true`; keputusan QA dari `on_review` mengikuti `can_review`.
 - `can_assign`: `true` bila user boleh mengatur PIC tugas ini sekarang.
 - `can_delete`: `true` bila user boleh menghapus tugas ini sekarang (Admin dan Manajer semua divisi, Supervisor divisinya; bukan untuk tugas Done).
 - `start_date` dan `deadline` boleh `null`.

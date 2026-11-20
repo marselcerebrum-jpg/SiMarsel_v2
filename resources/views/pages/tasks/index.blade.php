@@ -18,6 +18,10 @@
             <div class="min-w-0">
                 <h1 class="text-2xl font-bold tracking-tight text-ink">Tasklist</h1>
                 <p class="mt-0.5 hidden text-sm text-muted sm:block">Pantau dan kelola tugas berdasarkan status, prioritas, dan deadline.</p>
+                <p class="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted" data-role-access>
+                    <span class="{{ $badge }} bg-primary-soft text-primary" x-text="roleAccess.label"></span>
+                    <span x-text="roleAccess.text"></span>
+                </p>
             </div>
 
             <button x-show="canCreate" x-cloak type="button" class="{{ $primaryButton }}" @click="createOpen = true">

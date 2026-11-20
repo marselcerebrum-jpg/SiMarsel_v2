@@ -5,6 +5,7 @@ import {
     assignTask,
     changeTaskStatus,
     createTask,
+    deleteTask,
     fetchAssignmentOptions,
     fetchCalendar,
     fetchDivisions,
@@ -26,6 +27,8 @@ import {
     assignmentRule,
     availableTransitions,
     canEditTask,
+    isTaskPic,
+    roleAccessOf,
     formatDate,
     formatDateTime,
     isOverdue,
@@ -39,9 +42,11 @@ import {
 } from './workflow';
 
 const VIEWS = ['board', 'table', 'timeline', 'calendar'];
+const TASK_SCOPES = ['all_tasks', 'my_tasks'];
+const MAX_PICS = 20;
 
 // Nama metrik monitoring untuk tiap status Tasklist.
-const STATUS_METRICS = { backlog: 'backlog', todo: 'todo', in_progress: 'on_process', ready_for_qa: 'ready_for_qa', on_qa: 'on_qa', done: 'completed' };
+const STATUS_METRICS = { backlog: 'backlog', todo: 'todo', in_progress: 'on_process', ready_review: 'ready_review', on_review: 'on_review', done: 'completed' };
 
 // Field yang memengaruhi angka ringkasan atau cakupan/filter tugas: perubahannya memuat ulang ringkasan.
 // Field yang tidak dikirim (undefined) diabaikan; PIC atau divisi yang dilepas (null) tetap dihitung sebagai perubahan.
@@ -52,11 +57,36 @@ const SUMMARY_FIELDS = [
     (task) => task.priority,
     (task) => task.title,
     (task) => nested(task.division, 'code_division'),
-    (task) => nested(task.pic, 'id'),
+    (task) => task.pics?.map(({ id }) => id).join(','),
 ];
 
 const affectsSummary = (before, after) => !before || SUMMARY_FIELDS.some((field) => field(after) !== undefined && field(after) !== field(before));
 const PAGE_SIZE = 10;
+
+// Backend mengirim kesalahan PIC di pic_ids atau pic_ids.N; keduanya ditampilkan pada satu field.
+const picError = (errors) => Object.entries(errors).find(([key]) => key === 'pic_ids' || key.startsWith('pic_ids.'))?.[1];
+
+// Ringkasan Tugas Saya dihitung dari daftar my_tasks, karena monitoring hanya mencakup seluruh tugas.
+function myTaskMetrics(tasks, asOf) {
+    const active = tasks.filter((task) => task.status !== 'done');
+    const count = (status) => tasks.filter((task) => task.status === status).length;
+    const completed = count('done');
+
+    return {
+        total_tasks: tasks.length,
+        backlog: count('backlog'),
+        todo: count('todo'),
+        on_process: count('in_progress'),
+        ready_review: count('ready_review'),
+        on_review: count('on_review'),
+        completed,
+        unfinished: active.length,
+        overdue: active.filter((task) => task.deadline && task.deadline.slice(0, 10) < asOf).length,
+        due_today: active.filter((task) => task.deadline?.slice(0, 10) === asOf).length,
+        urgent: active.filter((task) => task.priority === 'urgent').length,
+        completion_rate: tasks.length ? Math.round((completed / tasks.length) * 10000) / 100 : 0,
+    };
+}
 const BACKEND_PENDING = 'Menunggu pengerjaan Back End.';
 const PERIOD_DATE_FORMAT = /^\d{4}-\d{2}-\d{2}$/;
 const PERIOD_YEAR_FORMAT = /^[1-9]\d{3}$/;
@@ -101,7 +131,7 @@ const isValidUrl = (value) => {
 const SORTERS = {
     title: (task) => task.title?.toLowerCase() ?? '',
     division: (task) => task.division?.name?.toLowerCase() ?? '',
-    pic: (task) => task.pic?.fullname?.toLowerCase() ?? '',
+    pic: (task) => task.pics?.[0]?.fullname?.toLowerCase() ?? '',
     priority: (task) => priorityOf(task.priority).rank,
     deadline: (task) => task.deadline ?? '9999-12-31',
     status: (task) => STATUSES.findIndex((status) => status.key === task.status),
@@ -121,6 +151,11 @@ Alpine.data('tasklist', () => ({
         { key: 'calendar', label: 'Kalender' },
     ],
     view: 'board',
+    scopes: [
+        { key: 'all_tasks', label: 'Semua Tugas' },
+        { key: 'my_tasks', label: 'Tugas Saya' },
+    ],
+    taskScope: 'all_tasks',
 
     user: userContext(Alpine.store('session').user),
     meta: null,
@@ -153,6 +188,15 @@ Alpine.data('tasklist', () => ({
     async init() {
         const requested = new URLSearchParams(location.search).get('view');
         if (VIEWS.includes(requested)) this.view = requested;
+        const requestedScope = new URLSearchParams(location.search).get('scope');
+        if (TASK_SCOPES.includes(requestedScope)) this.taskScope = requestedScope;
+        this.$watch('taskScope', (scope) => {
+            const url = new URL(location.href);
+            url.searchParams.set('scope', scope);
+            history.replaceState(null, '', url);
+            this.page = 1;
+            this.load();
+        });
         this.$watch('view', (view) => {
             const url = new URL(location.href);
             url.searchParams.set('view', view);
@@ -201,32 +245,35 @@ Alpine.data('tasklist', () => ({
         }
     },
 
-    // Admin: Semua Divisi. Manajer: divisinya sendiri. Staff: tugas miliknya (tanpa filter divisi).
+    // Awal filter divisi mengikuti backend (Manajer: divisinya); semua role dapat memilih divisi mana pun.
     defaultDivision() {
+        if (this.meta) return this.meta.default_division ?? '';
+
         return this.user.role === 'manager' ? (this.user.division ?? '') : '';
     },
 
     get divisionOptions() {
-        if (this.user.role === 'admin') return this.divisions;
-        if (this.user.role === 'manager') return this.divisions.filter((division) => division.code_division === this.user.division);
-
-        return [];
+        return this.divisions;
     },
 
-    get scopeLabel() {
-        if (this.user.role === 'staff') return 'Tugas yang ditugaskan kepada Anda';
+    get roleAccess() {
+        return roleAccessOf(this.user.roleCode);
+    },
 
+    get divisionScopeLabel() {
         const division = this.divisions.find((item) => item.code_division === this.filters.division);
         if (division) return `Divisi ${division.name}`;
 
-        if (this.user.role === 'admin') return 'Semua Divisi';
+        return this.filters.division ? `Divisi ${this.filters.division}` : 'Semua Divisi';
+    },
 
-        return this.user.division ? 'Divisi Anda' : 'Divisi Anda (belum ditetapkan)';
+    get scopeLabel() {
+        return this.taskScope === 'my_tasks' ? `Tugas Saya · ${this.divisionScopeLabel}` : this.divisionScopeLabel;
     },
 
     get canCreate() {
-        // Diputuskan backend lewat meta; bila meta gagal dimuat, pakai aturan TaskPolicy::create yang sama.
-        return this.meta?.can_create ?? (this.user.role === 'admin' || (this.user.role === 'manager' && Boolean(this.user.division)));
+        // Diputuskan backend lewat meta; bila meta gagal dimuat, tombol hanya tampil untuk Admin dan Manajer.
+        return this.meta?.can_create ?? (this.user.role === 'admin' || this.user.role === 'manager');
     },
 
     get hasActiveFilter() {
@@ -293,12 +340,12 @@ Alpine.data('tasklist', () => ({
     // Daftar tugas dan ringkasan KPI dimuat bersamaan dengan filter yang sama.
     async load() {
         const sequence = ++this.loadSequence;
-        const summary = this.loadSummary();
         this.loading = true;
         this.error = '';
+        const summary = this.loadSummary();
 
         try {
-            const { data } = await fetchTasks(this.requestFilters);
+            const { data } = await fetchTasks({ scope: this.taskScope, ...this.requestFilters });
             if (sequence !== this.loadSequence) return;
 
             this.tasks = data;
@@ -312,6 +359,7 @@ Alpine.data('tasklist', () => ({
         } finally {
             if (sequence === this.loadSequence) {
                 this.loading = false;
+                if (this.taskScope === 'my_tasks') this.loadSummary();
                 if (this.highlightId) this.$nextTick(() => this.revealHighlight());
             }
         }
@@ -323,8 +371,16 @@ Alpine.data('tasklist', () => ({
     // dan filter yang sama dengan Board/Table. Respons lama (filter sudah berubah) diabaikan.
     async loadSummary() {
         const sequence = ++this.summarySequence;
-        this.summaryState = 'loading';
         this.summaryError = '';
+
+        // Tugas Saya: angka mengikuti daftar my_tasks yang sedang dimuat.
+        if (this.taskScope === 'my_tasks') {
+            this.summaryState = this.loading ? 'loading' : (this.status === 'ready' ? 'ready' : 'error');
+            this.summaryError = this.summaryState === 'error' ? this.error : '';
+            return;
+        }
+
+        this.summaryState = 'loading';
 
         try {
             const { data } = await fetchTaskMonitoring(this.requestFilters);
@@ -361,12 +417,15 @@ Alpine.data('tasklist', () => ({
             && (!this.filters.status || !item.status || item.status === this.filters.status);
     },
 
+    // Tugas yang dibuka dari luar daftar atau PIC yang baru dilepas tidak tampil di Tugas Saya.
     get filteredTasks() {
-        return this.tasks.filter((task) => this.matchesFilters(task));
+        return this.tasks.filter((task) => this.matchesFilters(task) && (this.taskScope !== 'my_tasks' || isTaskPic(task, this.user)));
     },
 
     // Tanpa tugas dalam cakupan, backend mengirim semua angka 0.
     get summary() {
+        if (this.taskScope === 'my_tasks') return myTaskMetrics(this.filteredTasks, this.monitoring?.as_of ?? today());
+
         return this.monitoring?.metrics ?? {};
     },
 
@@ -478,6 +537,15 @@ Alpine.data('tasklist', () => ({
         return canEditTask(task, this.user);
     },
 
+    // Tugas terlihat oleh semua akun, tetapi tanpa kewenangan apa pun tampil sebagai hanya-lihat.
+    isReadOnly(task) {
+        return task.status !== 'done' && task.can_edit === false && task.can_assign === false && task.can_delete === false;
+    },
+
+    picNames(task) {
+        return (task.pics ?? []).map(({ fullname }) => fullname).join(', ');
+    },
+
     openTask(task, { focus = null } = {}) {
         if (!this.canOpen(task)) {
             showToast({ type: 'info', title: 'Akses terbatas', text: 'Detail tugas ini hanya dapat dibuka oleh pengguna yang berwenang.' });
@@ -512,7 +580,10 @@ Alpine.data('tasklist', () => ({
             this.filters.priority = '';
             this.filters.status = '';
         }
-        if (!loaded && this.user.role === 'admin') this.filters.division = '';
+        if (!loaded) {
+            this.filters.division = '';
+            this.taskScope = 'all_tasks';
+        }
 
         this.highlightId = task.id;
         this.view = 'board';
@@ -611,7 +682,7 @@ Alpine.data('tasklist', () => ({
         } catch (error) {
             if (error?.status === 422) {
                 const errors = validationErrors(error);
-                notifyFailure({ ...error, data: { ...error.data, message: errors.status ?? errors.decision ?? errors.pic_id } }, 'Status tugas gagal diperbarui.');
+                notifyFailure({ ...error, data: { ...error.data, message: errors.status ?? errors.decision ?? picError(errors) } }, 'Status tugas gagal diperbarui.');
             } else {
                 notifyFailure(error, 'Status tugas gagal diperbarui.');
             }
@@ -631,7 +702,7 @@ const emptyTask = () => ({
     description: '',
     category_id: '',
     division_id: '',
-    pic_id: '',
+    pic_ids: [],
     platform_id: '',
     priority: 'medium',
     start_date: '',
@@ -661,10 +732,6 @@ Alpine.data('taskCreateForm', () => ({
             this.reset();
             this.loadOptions();
         });
-        this.$watch('form.division_id', (divisionId) => {
-            this.form.pic_id = '';
-            this.assignees = this.creatableDivisions.find((division) => String(division.id) === String(divisionId))?.pics ?? [];
-        });
     },
 
     reset() {
@@ -688,12 +755,12 @@ Alpine.data('taskCreateForm', () => ({
             this.divisions = data.divisions;
             this.categories = data.categories;
             this.platforms = data.platforms;
+            this.assignees = data.pics ?? [];
             this.taskPriorities = data.priorities.map(({ value, label }) => ({ key: value, label }));
             this.optionsState = 'ready';
 
-            if (this.user.role === 'manager') {
-                this.form.division_id = this.creatableDivisions.find((division) => division.code_division === this.user.division)?.id ?? '';
-            }
+            // Supervisor hanya memiliki satu divisi tujuan.
+            if (data.divisions.length === 1) this.form.division_id = data.divisions[0].id;
         } catch (error) {
             if (request !== this.optionsRequest) return;
 
@@ -702,16 +769,25 @@ Alpine.data('taskCreateForm', () => ({
         }
     },
 
-    // Admin: semua divisi. Manajer: hanya divisi yang dikelolanya.
+    // Admin dan Manajer: semua divisi. Supervisor: divisi yang dikelolanya.
     get creatableDivisions() {
         return this.divisions;
     },
 
     get assigneeState() {
         if (this.optionsState !== 'ready') return this.optionsState;
-        if (!this.form.division_id) return 'idle';
 
         return this.assignees.length ? 'ready' : 'empty';
+    },
+
+    togglePic(id) {
+        const selected = this.form.pic_ids;
+        this.form.pic_ids = selected.includes(id) ? selected.filter((item) => item !== id) : [...selected, id];
+        this.errors.pic_ids = null;
+    },
+
+    picDisabled(id) {
+        return this.form.pic_ids.length >= MAX_PICS && !this.form.pic_ids.includes(id);
     },
 
     get selectedCategory() {
@@ -725,12 +801,12 @@ Alpine.data('taskCreateForm', () => ({
 
     validate() {
         const errors = {};
-        const { title, division_id, status, pic_id, start_date, deadline } = this.form;
+        const { title, division_id, status, pic_ids, start_date, deadline } = this.form;
 
         if (!title.trim()) errors.title = 'Judul tugas wajib diisi.';
         else if (title.trim().length > 150) errors.title = 'Judul tugas maksimal 150 karakter.';
         if (!division_id) errors.division_id = 'Target divisi wajib dipilih.';
-        if (status === 'todo' && !pic_id) errors.pic_id = 'Tugas berstatus To Do wajib memiliki PIC.';
+        if (status === 'todo' && !pic_ids.length) errors.pic_ids = 'Tugas berstatus To Do wajib memiliki PIC.';
         if (start_date && deadline && deadline < start_date) errors.deadline = 'Deadline tidak boleh sebelum tanggal mulai.';
 
         this.errors = errors;
@@ -757,7 +833,8 @@ Alpine.data('taskCreateForm', () => ({
             showToast({ title: 'Tugas Dibuat', text: message ?? `${data.title} ditambahkan ke ${statusOf(data.status).label}.` });
         } catch (error) {
             if (error?.status === 422) {
-                this.errors = validationErrors(error);
+                const errors = validationErrors(error);
+                this.errors = { ...errors, pic_ids: picError(errors) };
                 this.formError = 'Periksa kembali isian yang ditandai.';
             } else if (error?.status === 409) {
                 // Pengiriman ganda: tugas yang sama sudah tersimpan, jadi muat ulang daftar agar terlihat.
@@ -803,8 +880,13 @@ Alpine.data('taskDetail', () => ({
     assignmentDivisions: [],
     canChangeAssignmentDivision: false,
     assignmentError: '',
-    assignForm: { pic_id: '', division_id: '' },
+    assignForm: { pic_ids: [], division_id: '' },
+    assignmentPics: [],
+    currentAssignment: { pic_ids: [], division_id: '' },
     assigning: false,
+
+    confirmingDelete: false,
+    deleting: false,
 
     evidenceForm: { type: 'file', file: null, url: '', note: '' },
     evidenceErrors: {},
@@ -820,7 +902,7 @@ Alpine.data('taskDetail', () => ({
     },
 
     reset() {
-        Object.assign(this, { task: null, state: 'idle', editing: false, reviewMode: null, reviewNote: '', reviewError: '', evidences: [], activities: [], activityState: 'idle', activityError: '' });
+        Object.assign(this, { task: null, state: 'idle', editing: false, confirmingDelete: false, assigneeState: 'idle', reviewMode: null, reviewNote: '', reviewError: '', evidences: [], activities: [], activityState: 'idle', activityError: '' });
         this.activityRequest += 1;
     },
 
@@ -929,12 +1011,23 @@ Alpine.data('taskDetail', () => ({
     // --- Hak akses pada tugas yang dibuka -----------------------------------------------------
 
     get isPicOfTask() {
-        return this.task?.pic?.id !== undefined && this.task?.pic?.id === this.user.id;
+        return this.task ? isTaskPic(this.task, this.user) : false;
     },
 
     get canEditThis() {
         return Array.isArray(this.task?.editable_fields)
             && this.task.editable_fields.some((field) => field !== 'status');
+    },
+
+    // Tanpa satu pun aksi yang tersedia, panel menjelaskan bahwa tugas hanya dapat dilihat.
+    get isReadOnlyThis() {
+        return Boolean(this.task)
+            && this.task.status !== 'done'
+            && !(this.task.editable_fields?.length)
+            && this.task.can_assign !== true
+            && this.task.can_delete !== true
+            && this.task.can_review !== true
+            && !this.canSubmitEvidence;
     },
 
     isFieldEditable(field) {
@@ -954,17 +1047,31 @@ Alpine.data('taskDetail', () => ({
     },
 
     get canAssignThis() {
-        return this.task?.can_assign === true && this.assignment.ok;
+        return this.task?.can_assign === true;
     },
 
-    get eligibleAssignees() {
-        const division = this.assignmentDivisions.find((item) => String(item.id) === String(this.assignForm.division_id));
-
-        return (division?.pics ?? []).filter((person) => person.id !== this.task?.pic?.id);
+    toggleAssignPic(id) {
+        const selected = this.assignForm.pic_ids;
+        this.assignForm.pic_ids = selected.includes(id) ? selected.filter((item) => item !== id) : [...selected, id];
     },
 
-    changeAssignmentDivision() {
-        this.assignForm.pic_id = '';
+    assignPicDisabled(id) {
+        return this.assignForm.pic_ids.length >= MAX_PICS && !this.assignForm.pic_ids.includes(id);
+    },
+
+    // Daftar PIC adalah susunan lengkap setelah disimpan; hanya Back Log yang boleh tanpa PIC.
+    get assignmentChanged() {
+        const sorted = (ids) => [...ids].sort((a, b) => a - b).join(',');
+
+        return sorted(this.assignForm.pic_ids) !== sorted(this.currentAssignment.pic_ids)
+            || String(this.assignForm.division_id) !== String(this.currentAssignment.division_id);
+    },
+
+    get canSaveAssignment() {
+        return this.assignmentChanged
+            && Boolean(this.assignForm.division_id)
+            && (this.assignForm.pic_ids.length > 0 || this.task?.status === 'backlog')
+            && !this.assigning;
     },
 
     get canSubmitEvidence() {
@@ -1034,7 +1141,7 @@ Alpine.data('taskDetail', () => ({
     // --- Penugasan PIC (TASK-04) ----------------------------------------------------------------
 
     async openAssign() {
-        this.assignForm = { pic_id: '', division_id: '' };
+        this.assignForm = { pic_ids: [], division_id: '' };
         this.assignmentError = '';
         this.assigneeState = 'loading';
 
@@ -1042,7 +1149,9 @@ Alpine.data('taskDetail', () => ({
             const { data } = await fetchAssignmentOptions(this.task.id);
             this.assignmentDivisions = data.divisions ?? [];
             this.canChangeAssignmentDivision = data.can_change_division === true;
-            this.assignForm.division_id = String(data.current_division.id);
+            this.assignmentPics = data.pics ?? [];
+            this.currentAssignment = { pic_ids: (data.current_pics ?? []).map(({ id }) => id), division_id: String(data.current_division.id) };
+            this.assignForm = { pic_ids: [...this.currentAssignment.pic_ids], division_id: this.currentAssignment.division_id };
             if (data.locked_reason) {
                 this.assignmentError = data.locked_reason;
                 this.assigneeState = 'error';
@@ -1057,29 +1166,57 @@ Alpine.data('taskDetail', () => ({
     },
 
     async saveAssign() {
-        if (!this.assignForm.pic_id || !this.assignForm.division_id || this.assigning) return;
+        if (!this.canSaveAssignment) return;
 
         this.assigning = true;
 
         try {
             const { data, message } = await assignTask(this.task.id, {
-                pic_id: this.assignForm.pic_id,
-                division_id: this.assignForm.division_id,
+                pic_ids: this.assignForm.pic_ids,
+                division_id: Number(this.assignForm.division_id),
                 version: this.task.version,
             });
             this.applyTask(data);
             this.assigneeState = 'idle';
-            showToast({ title: 'PIC diperbarui', text: message ?? `Tugas kini ditangani ${data.pic?.fullname ?? 'PIC baru'}.` });
+            showToast({ title: 'PIC diperbarui', text: message ?? 'Penanggung jawab tugas diperbarui.' });
         } catch (error) {
             if (error?.status === 422) {
                 const errors = validationErrors(error);
-                this.assignmentError = errors.pic_id ?? errors.division_id ?? taskErrorMessage(error, 'PIC gagal diperbarui.');
+                this.assignmentError = picError(errors) ?? errors.division_id ?? taskErrorMessage(error, 'PIC gagal diperbarui.');
                 this.assigneeState = 'error';
             } else {
                 await this.handleFailure(error, 'PIC gagal diperbarui.');
             }
         } finally {
             this.assigning = false;
+        }
+    },
+
+    // --- Hapus tugas (TASK-12) -----------------------------------------------------------------
+
+    async removeTask() {
+        if (this.deleting || this.task?.can_delete !== true) return;
+
+        const { id, title, version } = this.task;
+        this.deleting = true;
+
+        try {
+            const { message } = await deleteTask(id, { version });
+            this.tasks = this.tasks.filter((item) => item.id !== id);
+            this.closeTask();
+            this.queueSummary();
+            showToast({ title: 'Tugas dihapus', text: message ?? `${title} dihapus.` });
+        } catch (error) {
+            this.confirmingDelete = false;
+            if (error?.status === 422) {
+                notifyFailure({ ...error, data: { ...error.data, message: validationErrors(error).status } }, 'Tugas gagal dihapus.');
+                await this.reload();
+                this.load();
+            } else {
+                await this.handleFailure(error, 'Tugas gagal dihapus.');
+            }
+        } finally {
+            this.deleting = false;
         }
     },
 
@@ -1116,7 +1253,7 @@ Alpine.data('taskDetail', () => ({
         } catch (error) {
             if (error?.status === 422) {
                 const errors = validationErrors(error);
-                notifyFailure({ ...error, data: { ...error.data, message: errors.status ?? errors.pic_id } }, 'Status tugas gagal diperbarui.');
+                notifyFailure({ ...error, data: { ...error.data, message: errors.status ?? picError(errors) } }, 'Status tugas gagal diperbarui.');
             } else {
                 await this.handleFailure(error, 'Status tugas gagal diperbarui.');
             }
@@ -1408,21 +1545,20 @@ Alpine.data('taskCalendar', () => ({
     init() {
         this.$watch('selected', () => (this.picked = null));
         this.$watch('view', (view) => view === 'calendar' && this.loadPeriod());
-        this.$watch('filters.division', () => this.view === 'calendar' && this.user.role === 'admin' && this.loadPeriod());
+        this.$watch('filters.division', () => this.view === 'calendar' && this.loadPeriod());
         if (this.view === 'calendar') this.loadPeriod();
     },
 
-    // Hanya Admin yang memfokuskan divisi (default Semua Divisi). Manajer dan Staff tidak mengirim divisi agar
-    // agenda bersama lintas divisi tetap tampil; deadline mereka tetap dibatasi backend sesuai cakupannya.
+    // Divisi awal akun tidak dikirim agar agenda bersama lintas divisi tetap tampil; deadline tetap disaring
+    // filter divisi di halaman. Divisi yang dipilih sendiri memfokuskan agenda dan deadline.
     get calendarDivision() {
-        return this.user.role === 'admin' ? this.filters.division : '';
+        return this.filters.division === this.defaultDivision() ? '' : this.filters.division;
     },
 
     get calendarScopeLabel() {
-        if (this.user.role === 'admin') return this.scopeLabel;
-        if (this.user.role === 'staff') return 'Agenda lintas divisi · Deadline tugas yang ditugaskan kepada Anda';
-
-        return `Agenda lintas divisi · Deadline ${this.scopeLabel}`;
+        return this.filters.division && !this.calendarDivision
+            ? `Agenda lintas divisi · Deadline ${this.divisionScopeLabel}`
+            : this.divisionScopeLabel;
     },
 
     get monthLabel() {

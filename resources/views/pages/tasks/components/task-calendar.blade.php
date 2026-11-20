@@ -102,7 +102,7 @@
                                 <span x-show="isOverdue(task)" class="shrink-0 rounded bg-red-50 px-1.5 py-0.5 text-[10px] font-bold text-red-700 uppercase">Terlambat</span>
                             </span>
                             <span class="mt-1 block truncate text-xs text-muted">
-                                <span x-text="task.division?.name ?? '-'"></span> · PIC <span x-text="task.pic?.fullname ?? '-'"></span>
+                                <span x-text="task.division?.name ?? '-'"></span> · PIC <span x-text="picNames(task) || '-'"></span>
                             </span>
                             <span class="mt-2 flex flex-wrap gap-1.5">
                                 <span class="{{ $badge }}" :class="priorityOf(task.priority).badge" x-text="priorityOf(task.priority).label"></span>
@@ -141,7 +141,7 @@
                         <dd><span class="{{ $badge }}" :class="statusOf(picked.item.status).badge" x-text="statusOf(picked.item.status).label"></span></dd>
                     </div>
                     <div class="{{ $summaryRow }}" x-show="picked.kind === 'task'">
-                        <dt class="{{ $summaryLabel }}">PIC</dt><dd class="text-ink" x-text="picked.item.pic?.fullname ?? '-'"></dd>
+                        <dt class="{{ $summaryLabel }}">PIC</dt><dd class="text-ink" x-text="picNames(picked.item) || '-'"></dd>
                     </div>
                     <div class="{{ $summaryRow }}" x-show="picked.kind === 'task'">
                         <dt class="{{ $summaryLabel }}">Prioritas</dt>

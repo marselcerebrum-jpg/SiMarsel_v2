@@ -10,11 +10,12 @@ import vm from 'node:vm';
  * - PATCH /api/tasks/{id}/status (ChangeTaskStatusRequest: status + version) from the Board and the detail;
  * - POST /api/tasks/{id}/reviews (ReviewTaskRequest: decision, note, version) for QA decisions, with the default VITE_TASK_API_READY=false;
  * - POST /api/tasks (StoreTaskRequest) from the Create Task form, until the task shows on the Board and Table;
- * - PATCH /api/tasks/{id}/assignment (AssignTaskRequest: pic_id, division_id, version) from the detail;
+ * - PATCH /api/tasks/{id}/assignment (AssignTaskRequest: pic_ids, division_id, version) from the detail;
  * - POST /api/tasks/{id}/evidences (StoreTaskEvidenceRequest: file or url, note) with the default VITE_TASK_API_READY=false;
  * - GET /api/tasks/{id}/activities for the detail's history, with its loading, error, and empty states;
  * - GET /api/tasks/monitoring?scope=tasklist for the summary KPIs, with the same filters as the list;
- * - GET /api/tasks/schedule for the Timeline, with its own division filter across divisions.
+ * - GET /api/tasks/schedule for the Timeline, with its own division filter across divisions;
+ * - GET /api/tasks?scope=all_tasks|my_tasks and DELETE /api/tasks/{id} for the role-based Tasklist (TASK-12).
  * - GET /api/tasks/calendar for the Calendar, agendas across divisions and deadlines in the user's scope.
  */
 const PIC = { id: 10, role: { code_role: 'EMP' }, division: { code_division: 'MKT' } };
@@ -123,7 +124,7 @@ const task = (overrides = {}) => ({
     id: 7,
     title: 'Konten promo November',
     division: { code_division: 'MKT', name: 'Marketing' },
-    pic: { id: PIC.id, fullname: 'Staff Marketing' },
+    pics: [{ id: PIC.id, fullname: 'Staff Marketing' }],
     priority: 'high',
     status: 'todo',
     start_date: '2026-11-01',
@@ -268,7 +269,7 @@ test('Detail status change based on an outdated version is rejected with a clear
 });
 
 test('Dragging On QA back to On Process opens the revision note form instead of changing the status', async () => {
-    const reviewed = task({ status: 'on_qa', requires_review: true });
+    const reviewed = task({ status: 'on_review', requires_review: true });
     const { board, requests } = await tasklistPage({
         'GET /api/tasks': () => ({ json: { data: [reviewed], meta: { status_counts: {} } } }),
     }, ADMIN);
@@ -282,12 +283,12 @@ test('Dragging On QA back to On Process opens the revision note form instead of 
     assert.equal(statusRequests(requests).length, 0);
 });
 
-test('Create button follows meta.can_create, falling back to TaskPolicy::create: Admin, or a Manager with a division', async () => {
+test('Create button follows meta.can_create, falling back to Admin and Manager when meta is unavailable', async () => {
     const create = async (user) => (await tasklistPage({}, user)).board.canCreate;
 
     assert.equal(await create(ADMIN), true);
     assert.equal(await create({ id: 2, role: { code_role: 'MGR' }, division: { code_division: 'MKT' } }), true);
-    assert.equal(await create({ id: 3, role: { code_role: 'MGR' }, division: null }), false);
+    assert.equal(await create({ id: 3, role: { code_role: 'MGR' }, division: null }), true, 'a Manager covers every division');
     assert.equal(await create(PIC), false);
 
     // Once meta is loaded, the backend's can_create decides.
@@ -300,7 +301,7 @@ test('Create button follows meta.can_create, falling back to TaskPolicy::create:
 });
 
 test('QA decisions send { decision, note, version } to the review endpoint, from the Board and from the detail', async () => {
-    const reviewed = task({ status: 'on_qa', requires_review: true, version: 8 });
+    const reviewed = task({ status: 'on_review', requires_review: true, version: 8 });
     const { board, detail: createDetail, requests } = await tasklistPage({
         'GET /api/tasks': () => ({ json: { data: [reviewed], meta: { status_counts: {} } } }),
         'GET /api/tasks/7': () => ({ json: { data: reviewed } }),
@@ -327,7 +328,8 @@ test('QA decisions send { decision, note, version } to the review endpoint, from
 });
 
 const createOptions = {
-    divisions: [{ id: 3, code_division: 'MKT', name: 'Marketing', pics: [{ id: 10, fullname: 'Staff Marketing' }] }],
+    divisions: [{ id: 3, code_division: 'MKT', name: 'Marketing' }, { id: 4, code_division: 'FIN', name: 'Finance' }],
+    pics: [{ id: 10, fullname: 'Staff Marketing', role: 'EMP', division: { id: 3, code_division: 'MKT', name: 'Marketing' } }, { id: 12, fullname: 'Freelance Finance', role: 'FRL', division: { id: 4, code_division: 'FIN', name: 'Finance' } }],
     categories: [{ id: 5, name: 'Konten', requires_review: true, evidence_required: true }],
     platforms: [{ id: 2, name: 'JadiASN' }],
     priorities: [{ value: 'low', label: 'Low' }, { value: 'medium', label: 'Medium' }],
@@ -352,19 +354,21 @@ test('Create Task posts the StoreTaskRequest fields and the new task appears on 
     const { board, form, requests, toasts } = await createFormPage((body) => ({
         status: 201,
         json: {
-            data: task({ id: 21, title: body.title, status: body.status, pic: { id: 10, fullname: 'Staff Marketing' }, requires_review: true, version: 1 }),
+            data: task({ id: 21, title: body.title, status: body.status, pics: [{ id: 10, fullname: 'Staff Marketing' }], requires_review: true, version: 1 }),
             message: 'Tugas berhasil dibuat.',
         },
     }));
 
     // <select x-model> yields strings, exactly as in the browser.
-    Object.assign(form.form, { title: '  Banner promo November  ', description: '', category_id: '5', division_id: '3', pic_id: '10', platform_id: '', status: 'todo', deadline: '2026-11-30' });
+    Object.assign(form.form, { title: '  Banner promo November  ', description: '', category_id: '5', division_id: '3', platform_id: '', status: 'todo', deadline: '2026-11-30' });
+    form.togglePic(10);
+    form.togglePic(12);
     await form.submit();
 
     const post = requests.find(({ method }) => method === 'POST');
     assert.equal(post.url, '/api/tasks');
     assert.deepEqual(post.body, {
-        title: 'Banner promo November', description: '', category_id: '5', division_id: '3', pic_id: '10', platform_id: '',
+        title: 'Banner promo November', description: '', category_id: '5', division_id: '3', pic_ids: [10, 12], platform_id: '',
         priority: 'medium', start_date: '', deadline: '2026-11-30', status: 'todo', requires_review: true,
     });
     assert.equal(board.createOpen, false);
@@ -376,12 +380,12 @@ test('Create Task posts the StoreTaskRequest fields and the new task appears on 
 test('Create Task shows 422 errors on the fields and the duplicate-submission message on 409', async () => {
     const invalid = await createFormPage(() => ({
         status: 422,
-        json: { message: 'invalid', errors: { deadline: ['Deadline tidak boleh sebelum hari ini.'], pic_id: ['PIC tidak valid.'] } },
+        json: { message: 'invalid', errors: { deadline: ['Deadline tidak boleh sebelum hari ini.'], 'pic_ids.0': ['PIC tidak valid.'] } },
     }));
     Object.assign(invalid.form.form, { title: 'A', division_id: '3' });
     await invalid.form.submit();
     assert.equal(invalid.form.errors.deadline, 'Deadline tidak boleh sebelum hari ini.');
-    assert.equal(invalid.form.errors.pic_id, 'PIC tidak valid.');
+    assert.equal(invalid.form.errors.pic_ids, 'PIC tidak valid.');
     assert.equal(invalid.board.createOpen, true);
 
     const duplicate = await createFormPage(() => ({
@@ -389,7 +393,7 @@ test('Create Task shows 422 errors on the fields and the duplicate-submission me
         json: { message: 'Tugas yang sama baru saja dikirim. Periksa daftar tugas sebelum mengirim ulang.' },
     }));
     Object.assign(duplicate.form.form, { title: 'A', division_id: '3' });
-    const listCalls = () => duplicate.requests.filter(({ url, method }) => url === '/api/tasks' && method === 'GET').length;
+    const listCalls = () => duplicate.requests.filter(({ url, method }) => url.startsWith('/api/tasks?') && method === 'GET').length;
     const listCallsBefore = listCalls();
     await duplicate.form.submit();
     assert.equal(duplicate.form.formError, 'Tugas yang sama baru saja dikirim. Periksa daftar tugas sebelum mengirim ulang.');
@@ -424,19 +428,20 @@ test('History shows the backend sentence for approval, revision request, and res
 
 const MANAGER = { id: 2, role: { code_role: 'MGR' }, division: { code_division: 'MKT' } };
 const assignmentOptions = {
-    current_pic: { id: PIC.id, fullname: 'Staff Marketing' },
+    current_pics: [{ id: PIC.id, fullname: 'Staff Marketing' }],
     current_division: { id: 3, code_division: 'MKT', name: 'Marketing' },
     can_change_division: false,
     locked_reason: null,
-    divisions: [{ id: 3, code_division: 'MKT', name: 'Marketing', pics: [{ id: PIC.id, fullname: 'Staff Marketing' }, { id: 11, fullname: 'Staff Baru' }] }],
+    divisions: [{ id: 3, code_division: 'MKT', name: 'Marketing' }],
+    pics: [{ id: PIC.id, fullname: 'Staff Marketing', role: 'EMP', division: null }, { id: 11, fullname: 'Staff Baru', role: 'FRL', division: null }],
 };
 
-test('Changing the PIC sends { pic_id, division_id, version } to the assignment endpoint and updates the detail and the Board', async () => {
+test('Changing the PICs sends the complete { pic_ids, division_id, version } to the assignment endpoint and updates the detail and the Board', async () => {
     const { board, detail: createDetail, requests, toasts } = await tasklistPage({
         'GET /api/tasks': () => ({ json: { data: [task({ can_assign: true })], meta: { status_counts: {} } } }),
         'GET /api/tasks/7': () => ({ json: { data: task({ can_assign: true, history: [] }) } }),
         'GET /api/tasks/7/assignment-options': () => ({ json: { data: assignmentOptions } }),
-        'PATCH /api/tasks/7/assignment': () => ({ json: { data: task({ can_assign: true, pic: { id: 11, fullname: 'Staff Baru' }, version: 5 }), message: 'PIC berhasil diperbarui.' } }),
+        'PATCH /api/tasks/7/assignment': () => ({ json: { data: task({ can_assign: true, pics: [{ id: 11, fullname: 'Staff Baru' }], version: 5 }), message: 'PIC berhasil diperbarui.' } }),
     }, MANAGER);
     await board.load();
     board.detailId = 7;
@@ -446,17 +451,19 @@ test('Changing the PIC sends { pic_id, division_id, version } to the assignment 
     assert.equal(detail.canAssignThis, true);
     await detail.openAssign();
     assert.equal(detail.assigneeState, 'ready');
-    assert.deepEqual([...detail.eligibleAssignees].map(({ id }) => id), [11], 'the current PIC is not offered again');
+    assert.deepEqual([...detail.assignForm.pic_ids], [PIC.id], 'the active PICs start selected');
+    assert.equal(detail.canSaveAssignment, false, 'nothing changed yet');
 
-    detail.assignForm.pic_id = '11';
+    detail.toggleAssignPic(11);
+    assert.equal(detail.canSaveAssignment, true);
     await detail.saveAssign();
 
     const sent = requests.find((request) => request.method === 'PATCH');
     assert.equal(sent.url, '/api/tasks/7/assignment');
-    assert.deepEqual(sent.body, { pic_id: '11', division_id: '3', version: 4 });
-    assert.equal(detail.task.pic.fullname, 'Staff Baru');
+    assert.deepEqual(sent.body, { pic_ids: [PIC.id, 11], division_id: 3, version: 4 });
+    assert.equal(detail.task.pics[0].fullname, 'Staff Baru');
     assert.equal(detail.task.version, 5);
-    assert.equal(board.tasks[0].pic.fullname, 'Staff Baru');
+    assert.equal(board.tasks[0].pics[0].fullname, 'Staff Baru');
     assert.equal(board.tasks[0].version, 5);
     assert.equal(detail.assigneeState, 'idle');
     assert.equal(toasts.at(-1).text, 'PIC berhasil diperbarui.');
@@ -474,7 +481,7 @@ test('Assignment conflicts reload both views and a rejected PIC shows the server
         'GET /api/tasks/7/assignment-options': () => ({ json: { data: assignmentOptions } }),
         'PATCH /api/tasks/7/assignment': () => (assignStatus === 409
             ? { status: 409, json: { message: 'Tugas telah diubah oleh pengguna lain.', current_version: 6 } }
-            : { status: 422, json: { message: 'PIC tidak valid.', errors: { pic_id: ['PIC harus Staff aktif dari divisi tugas.'] } } }),
+            : { status: 422, json: { message: 'PIC tidak valid.', errors: { 'pic_ids.1': ['PIC harus Staff aktif dari divisi tugas.'] } } }),
     }, MANAGER);
     await board.load();
     board.detailId = 7;
@@ -482,7 +489,7 @@ test('Assignment conflicts reload both views and a rejected PIC shows the server
     await detail.open(7);
 
     await detail.openAssign();
-    detail.assignForm.pic_id = '11';
+    detail.toggleAssignPic(11);
     await detail.saveAssign();
     await new Promise((resolve) => setTimeout(resolve));
     assert.match(toasts.at(-1).text, /sudah diperbarui oleh pengguna lain/);
@@ -491,11 +498,11 @@ test('Assignment conflicts reload both views and a rejected PIC shows the server
 
     assignStatus = 422;
     await detail.openAssign();
-    detail.assignForm.pic_id = '11';
+    detail.toggleAssignPic(11);
     await detail.saveAssign();
     assert.equal(detail.assigneeState, 'error');
     assert.equal(detail.assignmentError, 'PIC harus Staff aktif dari divisi tugas.');
-    assert.equal(detail.task.pic.id, PIC.id, 'a rejected assignment leaves the shown PIC unchanged');
+    assert.equal(detail.task.pics[0].id, PIC.id, 'a rejected assignment leaves the shown PIC unchanged');
 });
 
 test('Detail buttons follow next_statuses, and Approve/Revision only show when the backend sends can_review', async () => {
@@ -512,12 +519,12 @@ test('Detail buttons follow next_statuses, and Approve/Revision only show when t
     await blocked.open(7);
     assert.deepEqual([...blocked.transitions], [], 'no button when the backend offers no next status');
 
-    detail = task({ status: 'on_qa', requires_review: true, can_review: false, next_statuses: [] });
+    detail = task({ status: 'on_review', requires_review: true, can_review: false, next_statuses: [] });
     const notReviewer = createDetail();
     await notReviewer.open(7);
     assert.deepEqual([...notReviewer.transitions], [], 'QA buttons need can_review');
 
-    detail = task({ status: 'on_qa', requires_review: true, can_review: true, next_statuses: [] });
+    detail = task({ status: 'on_review', requires_review: true, can_review: true, next_statuses: [] });
     const reviewer = createDetail();
     await reviewer.open(7);
     assert.deepEqual([...reviewer.transitions].map(({ review }) => review).sort(), ['approve', 'revision']);
@@ -547,7 +554,7 @@ test('A status move rejected in the detail shows the server reason and keeps the
 });
 
 test('With the default config, Approve and Request Revision go to the review endpoint, never the status endpoint, from the Board and the detail', async () => {
-    let current = task({ status: 'on_qa', requires_review: true, can_review: true, next_statuses: [], version: 8 });
+    let current = task({ status: 'on_review', requires_review: true, can_review: true, next_statuses: [], version: 8 });
     const decided = (body) => {
         const approved = body.decision === 'approve';
         const review = { id: 1, task_id: 7, cycle: 1, decision: body.decision, decision_label: approved ? 'Approve' : 'Request Revision', note: body.note, reviewer: { id: ADMIN.id, fullname: 'Admin' }, created_at: '2026-11-11T03:00:00Z' };
@@ -567,7 +574,7 @@ test('With the default config, Approve and Request Revision go to the review end
     board.draggingId = 7;
     await board.drop('in_progress');
     assert.equal(board.detailId, 7);
-    assert.deepEqual(board.tasksIn('on_qa').map(({ id }) => id), [7]);
+    assert.deepEqual(board.tasksIn('on_review').map(({ id }) => id), [7]);
     const detail = createDetail();
     await detail.open(7);
     assert.equal(detail.reviewMode, 'revision', 'the form opens because the backend sent can_review');
@@ -585,7 +592,7 @@ test('With the default config, Approve and Request Revision go to the review end
     assert.equal(board.tasks[0].version, 9);
 
     // Board: On QA → Done approves through the review endpoint and moves the card with the new version.
-    current = { ...current, status: 'on_qa', can_review: true };
+    current = { ...current, status: 'on_review', can_review: true };
     await board.load();
     board.draggingId = 7;
     await board.drop('done');
@@ -595,7 +602,7 @@ test('With the default config, Approve and Request Revision go to the review end
     assert.equal(toasts.at(-1).text, 'Tugas berhasil disetujui.');
 
     // Detail: the Approve button opens the form; without a note it sends note null.
-    current = { ...current, status: 'on_qa', can_review: true };
+    current = { ...current, status: 'on_review', can_review: true };
     await detail.open(7);
     const approve = detail.transitions.find(({ review }) => review === 'approve');
     await detail.runTransition(approve);
@@ -610,7 +617,7 @@ test('With the default config, Approve and Request Revision go to the review end
 });
 
 test('Review rejections show a clear message: a missing note stays in the form, a decided task or a stale version reloads and the card goes back', async () => {
-    let current = task({ status: 'on_qa', requires_review: true, can_review: true, next_statuses: [], version: 8 });
+    let current = task({ status: 'on_review', requires_review: true, can_review: true, next_statuses: [], version: 8 });
     let reply;
     const { board, detail: createDetail, requests, toasts } = await tasklistPage({
         'GET /api/tasks': () => ({ json: { data: [current], meta: { status_counts: {} } } }),
@@ -629,7 +636,7 @@ test('Review rejections show a clear message: a missing note stays in the form, 
     await detail.submitReview();
     assert.equal(detail.reviewMode, 'revision');
     assert.equal(detail.reviewError, 'Catatan review maksimal 2000 karakter.');
-    assert.equal(detail.task.status, 'on_qa');
+    assert.equal(detail.task.status, 'on_review');
 
     // A revision without a note is stopped before any request.
     const sent = requests.length;
@@ -653,7 +660,7 @@ test('Review rejections show a clear message: a missing note stays in the form, 
     assert.deepEqual(board.tasksIn('done').map(({ id }) => id), [7]);
 
     // 409 from the Board: the card stays in On QA, the latest data is loaded and the message is clear.
-    current = { ...current, status: 'on_qa', can_review: true, version: 9 };
+    current = { ...current, status: 'on_review', can_review: true, version: 9 };
     await board.load();
     board.tasks[0].version = 8;
     reply = () => {
@@ -664,7 +671,7 @@ test('Review rejections show a clear message: a missing note stays in the form, 
     await board.drop('done');
     await new Promise((resolve) => setTimeout(resolve));
     assert.match(toasts.at(-1).text, /sudah diperbarui oleh pengguna lain/);
-    assert.deepEqual(board.tasksIn('on_qa').map(({ id }) => id), [7]);
+    assert.deepEqual(board.tasksIn('on_review').map(({ id }) => id), [7]);
     assert.equal(board.tasks[0].version, 10);
 
     // 403 from the Board: the backend message is shown and the card stays in On QA.
@@ -672,13 +679,13 @@ test('Review rejections show a clear message: a missing note stays in the form, 
     board.draggingId = 7;
     await board.drop('done');
     assert.equal(toasts.at(-1).title, 'Gagal');
-    assert.deepEqual(board.tasksIn('on_qa').map(({ id }) => id), [7]);
+    assert.deepEqual(board.tasksIn('on_review').map(({ id }) => id), [7]);
 
     assert.equal(requests.some(({ url }) => url.endsWith('/status')), false);
 });
 
 test('Dragging On QA to On Process does not open the revision form when the backend does not send can_review', async () => {
-    const reviewed = task({ status: 'on_qa', requires_review: true, can_review: false, next_statuses: [] });
+    const reviewed = task({ status: 'on_review', requires_review: true, can_review: false, next_statuses: [] });
     const { board, detail: createDetail, requests, toasts } = await tasklistPage({
         'GET /api/tasks': () => ({ json: { data: [reviewed], meta: { status_counts: {} } } }),
         'GET /api/tasks/7': () => ({ json: { data: reviewed } }),
@@ -692,7 +699,7 @@ test('Dragging On QA to On Process does not open the revision form when the back
 
     assert.equal(detail.reviewMode, null);
     assert.equal(toasts.at(-1).title, 'Revisi tidak dapat diminta');
-    assert.deepEqual(board.tasksIn('on_qa').map(({ id }) => id), [7]);
+    assert.deepEqual(board.tasksIn('on_review').map(({ id }) => id), [7]);
     assert.equal(requests.some(({ method }) => method !== 'GET'), false);
 });
 
@@ -802,7 +809,7 @@ test('History updated by a change is not overwritten by an older history respons
 });
 
 const metrics = (overrides = {}) => ({
-    total_tasks: 0, backlog: 0, todo: 0, on_process: 0, ready_for_qa: 0, on_qa: 0,
+    total_tasks: 0, backlog: 0, todo: 0, on_process: 0, ready_review: 0, on_review: 0,
     completed: 0, unfinished: 0, overdue: 0, due_today: 0, urgent: 0, completion_rate: 0,
     ...overrides,
 });
@@ -828,7 +835,7 @@ test('With the default config, the summary comes from the monitoring API with th
     const summary = monitoringRequests(requests);
     assert.equal(summary.length, 1, 'the summary is requested although VITE_TASK_API_READY is false');
     assert.equal(summary[0].url, '/api/tasks/monitoring?scope=tasklist&search=promo&division=MKT&priority=urgent&status=todo');
-    assert.equal(list.url, '/api/tasks?search=promo&division=MKT&priority=urgent&status=todo', 'the list and the summary use the same filters');
+    assert.equal(list.url, '/api/tasks?scope=all_tasks&search=promo&division=MKT&priority=urgent&status=todo', 'the list and the summary use the same filters');
     assert.equal(summary[0].headers.Accept, 'application/json');
 
     // The numbers are the backend's, not counted from the single task loaded in the list.
@@ -868,6 +875,39 @@ test('Period filter validates its configuration and alerts that the backend is u
     board.resetFilters();
     assert.equal(board.periodFilter.mode, '');
     assert.equal(board.hasPeriodConfiguration, false);
+});
+
+test('Atur Ulang Filter resets the period and every Tasklist filter in the Board and the Table, keeping Tugas Saya', async () => {
+    const { board, requests } = await tasklistPage({
+        'GET /api/tasks': () => ({ json: { data: [], meta: { status_counts: {} } } }),
+        'GET /api/tasks/monitoring': () => ({ json: { data: monitoringOf({}) } }),
+    }, ADMIN);
+
+    for (const view of ['board', 'table']) {
+        board.view = view;
+        board.taskScope = 'my_tasks';
+        board.filters = { search: 'promo', division: 'FIN', priority: 'urgent', status: 'todo' };
+        board.periodFilter.mode = 'month';
+        board.periodFilter.basis = 'start_date';
+        board.periodFilter.month = '2026-11';
+        board.sort = { key: 'priority', dir: 'desc' };
+        assert.equal(board.hasActiveFilter, true, view);
+
+        board.resetFilters();
+        await board.load();
+
+        assert.equal(board.hasActiveFilter, false, view);
+        assert.equal(board.hasPeriodConfiguration, false, view);
+        assert.deepEqual({ ...board.sort }, { key: 'deadline', dir: 'asc' }, view);
+        assert.equal(board.taskScope, 'my_tasks', `${view}: the Semua Tugas / Tugas Saya tab is not a filter`);
+        assert.equal(listRequests(requests).at(-1).url, '/api/tasks?scope=my_tasks', view);
+
+        // Only a period configuration still enables the button.
+        board.periodFilter.basis = 'start_date';
+        assert.equal(board.hasActiveFilter || board.hasPeriodConfiguration, true, view);
+        board.resetFilters();
+        assert.equal(board.hasPeriodConfiguration, false, view);
+    }
 });
 
 test('Period filter rejects a date with a year beyond four digits, whose text order would pass as a valid range', async () => {
@@ -1036,11 +1076,11 @@ test('Removing the PIC or the division reloads the summary, while an update with
     await tick();
     assert.equal(monitoringRequests(requests).length, 1, 'fields the summary does not use change nothing');
 
-    board.syncTask({ ...task(), pic: null });
+    board.syncTask({ ...task(), pics: [] });
     await tick();
     assert.equal(monitoringRequests(requests).length, 2, 'a PIC set to null is a change');
 
-    board.syncTask({ ...task(), pic: null, division: null });
+    board.syncTask({ ...task(), pics: [], division: null });
     await tick();
     assert.equal(monitoringRequests(requests).length, 3, 'a division set to null is a change');
 });
@@ -1048,11 +1088,11 @@ test('Removing the PIC or the division reloads the summary, while an update with
 test('The count of every status is in the summary in every view, zero included', async () => {
     const { board } = await tasklistPage({
         'GET /api/tasks': () => ({ json: { data: [task()], meta: { status_counts: {} } } }),
-        'GET /api/tasks/monitoring': () => ({ json: { data: monitoringOf({ total_tasks: 9, backlog: 0, todo: 2, on_process: 3, ready_for_qa: 0, on_qa: 1, completed: 3, unfinished: 6 }) } }),
+        'GET /api/tasks/monitoring': () => ({ json: { data: monitoringOf({ total_tasks: 9, backlog: 0, todo: 2, on_process: 3, ready_review: 0, on_review: 1, completed: 3, unfinished: 6 }) } }),
     }, ADMIN);
     await board.load();
 
-    const expected = [['Back Log', 0], ['To Do', 2], ['On Process', 3], ['Ready for QA', 0], ['On QA', 1], ['Done', 3]];
+    const expected = [['Back Log', 0], ['To Do', 2], ['On Process', 3], ['Ready Review', 0], ['On Review', 1], ['Done', 3]];
     for (const view of ['board', 'table', 'timeline', 'calendar']) {
         board.view = view;
         assert.deepEqual([...board.statusSummary].map(({ label, value }) => [label, value]), expected, `status counts in the ${view} view`);
@@ -1322,7 +1362,7 @@ test('With the default config, the Calendar loads agendas and deadlines of the m
     assert.equal(calendar.selected, '2026-12-01');
 });
 
-test('Managers and Staff see agendas across divisions: the Tasklist division is not sent, and deadlines stay in their scope', async () => {
+test('Every role sees agendas across divisions: the starting division is not sent, and a chosen division focuses the Calendar', async () => {
     const manager = await calendarPage({ events: [calendarEvent()], deadlines: [] }, MANAGER);
     manager.board.filters.division = 'MKT';
     await manager.calendar.loadPeriod();
@@ -1333,7 +1373,11 @@ test('Managers and Staff see agendas across divisions: the Tasklist division is 
     const staff = await calendarPage({ events: [calendarEvent()], deadlines: [] }, PIC);
     await staff.calendar.loadPeriod();
     assert.equal(calendarRequests(staff.requests).at(-1).url, '/api/tasks/calendar?month=2026-11');
-    assert.equal(staff.calendar.calendarScopeLabel, 'Agenda lintas divisi · Deadline tugas yang ditugaskan kepada Anda');
+    assert.equal(staff.calendar.calendarScopeLabel, 'Semua Divisi');
+    staff.board.filters.division = 'FIN';
+    await staff.calendar.loadPeriod();
+    assert.equal(calendarRequests(staff.requests).at(-1).url, '/api/tasks/calendar?month=2026-11&division=FIN', 'Staff may focus any division');
+    assert.equal(staff.calendar.calendarScopeLabel, 'Divisi Finance');
 });
 
 test('Calendar items open the task detail only when the backend allows it', async () => {
@@ -1425,6 +1469,182 @@ test('The Calendar shows loading and error states, and ignores the response of a
     await older;
     assert.equal(calendar.state, 'ready');
     assert.deepEqual([...calendar.events].map(({ title }) => title), ['Agenda Desember']);
+});
+
+// --- TASK-12: role, Semua Tugas / Tugas Saya, dan tampilan hanya-lihat ---------------------------
+
+const SUPERVISOR = { id: 30, role: { code_role: 'SPV' }, division: { code_division: 'MKT' } };
+const FREELANCE = { id: 40, role: { code_role: 'FRL' }, division: { code_division: 'MKT' } };
+const metaOf = (role, role_code, division, default_division = null) => ({
+    role, role_code, division, default_division, can_create: ['ADM', 'MGR', 'SPV'].includes(role_code), permissions: [],
+    divisions: [{ code_division: 'FIN', name: 'Finance' }, { code_division: 'MKT', name: 'Marketing' }],
+    statuses: [], priorities: [],
+});
+const readOnly = { can_edit: false, can_assign: false, can_delete: false };
+const listRequests = (requests) => requests.filter(({ method, url }) => method === 'GET' && (url === '/api/tasks' || url.startsWith('/api/tasks?')));
+
+test('All five roles are named from the backend role code and every role can choose any division', async () => {
+    const expected = [
+        [ADMIN, metaOf('admin', 'ADM', null), 'Admin'],
+        [MANAGER, metaOf('manager', 'MGR', 'MKT', 'MKT'), 'Manajer'],
+        [SUPERVISOR, metaOf('staff', 'SPV', 'MKT'), 'Supervisor'],
+        [PIC, metaOf('staff', 'EMP', 'MKT'), 'Staff'],
+        [FREELANCE, metaOf('staff', 'FRL', 'MKT'), 'Freelance'],
+    ];
+
+    for (const [user, meta, label] of expected) {
+        const { board } = await tasklistPage({ 'GET /api/tasks/meta': () => ({ json: { data: meta } }) }, user);
+        await board.loadMeta();
+        assert.equal(board.roleAccess.label, label);
+        assert.deepEqual([...board.divisionOptions].map(({ code_division }) => code_division), ['FIN', 'MKT'], `${label} can filter every division`);
+        assert.equal(board.filters.division, meta.default_division ?? '', 'the starting division follows the backend');
+    }
+});
+
+test('Edit and PIC actions follow the management scope: a Supervisor only for their division, Staff and Freelance never', async () => {
+    const own = task({ can_edit: true });
+    const other = task({ division: { code_division: 'FIN', name: 'Finance' }, can_edit: true });
+    const canEdit = async (user, item) => (await tasklistPage({}, user)).board.canEdit(item);
+
+    assert.equal(await canEdit(MANAGER, other), true, 'a Manager covers every division');
+    assert.equal(await canEdit(SUPERVISOR, own), true);
+    assert.equal(await canEdit(SUPERVISOR, other), false);
+    assert.equal(await canEdit(PIC, own), false, 'a PIC only moves the status');
+    assert.equal(await canEdit(FREELANCE, own), false);
+    assert.equal(await canEdit(ADMIN, { ...own, can_edit: false }), false, 'the backend flag always wins');
+});
+
+test('Tugas Saya asks the backend for my_tasks, keeps the filters, counts each task once, and drops a released PIC', async () => {
+    const mine = task({ id: 1, pics: [{ id: PIC.id, fullname: 'Staff Marketing' }, { id: 11, fullname: 'Staff Baru' }], status: 'todo', priority: 'urgent', deadline: '2026-11-10' });
+    const done = task({ id: 2, status: 'done', deadline: '2026-11-10' });
+    const { board, requests } = await tasklistPage({
+        'GET /api/tasks': () => ({ json: { data: board.taskScope === 'my_tasks' ? [mine, done] : [mine, done, task({ id: 3, pics: [] })], meta: { status_counts: {} } } }),
+        'GET /api/tasks/monitoring': () => ({ json: { data: monitoringOf({ total_tasks: 99 }) } }),
+    }, PIC);
+    board.monitoring = { as_of: '2026-11-16' };
+
+    await board.load();
+    assert.equal(listRequests(requests).at(-1).url, '/api/tasks?scope=all_tasks');
+    assert.equal(board.filteredTasks.length, 3, 'Semua Tugas shows every task');
+    assert.equal(board.metric('total_tasks'), 99);
+
+    board.filters.division = 'MKT';
+    board.taskScope = 'my_tasks';
+    const monitoringBefore = monitoringRequests(requests).length;
+    await board.load();
+    assert.equal(listRequests(requests).at(-1).url, '/api/tasks?scope=my_tasks&division=MKT', 'the active filters stay');
+    assert.equal(monitoringRequests(requests).length, monitoringBefore, 'monitoring has no my_tasks scope');
+    assert.deepEqual([...board.filteredTasks].map(({ id }) => id), [1, 2], 'a task with several PICs appears once');
+    assert.deepEqual(['total_tasks', 'todo', 'completed', 'unfinished', 'overdue', 'urgent'].map((key) => board.metric(key)), [2, 1, 1, 1, 1, 1]);
+    assert.equal(board.completionRateText, '50%');
+    assert.equal(board.scopeLabel, 'Tugas Saya · Divisi MKT');
+
+    board.syncTask({ ...mine, pics: [{ id: 11, fullname: 'Staff Baru' }] });
+    assert.deepEqual([...board.filteredTasks].map(({ id }) => id), [2], 'a released PIC no longer sees the task in Tugas Saya');
+});
+
+test('Tasks outside the account authority are read-only: no drag, a clear mark, and every active PIC can still move the task', async () => {
+    const { board } = await tasklistPage({}, PIC);
+    const outside = task({ pics: [{ id: 11, fullname: 'Staff Baru' }], ...readOnly });
+    const shared = task({ pics: [{ id: 11, fullname: 'Staff Baru' }, { id: PIC.id, fullname: 'Staff Marketing' }], can_edit: true, can_assign: false, can_delete: false });
+
+    assert.equal(board.isReadOnly(outside), true);
+    assert.equal(board.canDrag(outside), false);
+    assert.equal(board.isReadOnly(shared), false);
+    assert.equal(board.canDrag(shared), true, 'each active PIC of a Multi-PIC task runs the shared workflow');
+    assert.equal(board.isReadOnly({ ...outside, status: 'done' }), false, 'Done tasks need no mark');
+    assert.equal(board.picNames(shared), 'Staff Baru, Staff Marketing');
+});
+
+test('An active PIC without the status permission cannot drag the card, and a drop sends no request', async () => {
+    const revoked = task({ can_edit: false, can_change_status: false, can_assign: false, can_delete: false });
+    const { board, requests, toasts } = await tasklistPage({
+        'GET /api/tasks': () => ({ json: { data: [revoked], meta: { status_counts: {} } } }),
+    }, PIC);
+    await board.load();
+
+    assert.equal(board.canDrag(revoked), false, 'still the active PIC, but the backend does not allow the status change');
+    assert.equal(board.canDrag({ ...revoked, can_change_status: true }), true);
+
+    board.draggingId = 7;
+    assert.equal(board.dropState('in_progress'), 'denied');
+    assert.equal(board.dropReason('in_progress'), 'Anda tidak memiliki izin untuk mengubah status tugas ini.');
+
+    await board.drop('in_progress');
+    assert.deepEqual(statusRequests(requests), []);
+    assert.equal(toasts.at(-1).title, 'Perpindahan ditolak');
+    assert.deepEqual(board.tasksIn('todo').map(({ id }) => id), [7]);
+});
+
+test('The detail explains a read-only task, and a PIC keeps evidence access while no longer read-only', async () => {
+    let current = task({ pics: [{ id: 11, fullname: 'Staff Baru' }], ...readOnly, can_review: false, editable_fields: [], next_statuses: [] });
+    const { board, detail: createDetail } = await tasklistPage({
+        'GET /api/tasks': () => ({ json: { data: [current], meta: { status_counts: {} } } }),
+        'GET /api/tasks/7': () => ({ json: { data: current } }),
+        'GET /api/tasks/7/activities': () => ({ json: { data: [] } }),
+    }, PIC);
+    board.detailId = 7;
+    const detail = createDetail();
+    await detail.open(7);
+    assert.equal(detail.isReadOnlyThis, true);
+    assert.equal(detail.canAssignThis, false);
+
+    current = { ...current, pics: [{ id: PIC.id, fullname: 'Staff Marketing' }], editable_fields: ['status'] };
+    await detail.open(7);
+    assert.equal(detail.isReadOnlyThis, false);
+    assert.equal(detail.canSubmitEvidence, true);
+});
+
+test('Deleting sends the version, removes the card, and a rejected delete keeps the task with the server reason', async () => {
+    let reply = () => ({ json: { message: 'Tugas berhasil dihapus.' } });
+    const { board, detail: createDetail, requests, toasts } = await tasklistPage({
+        'GET /api/tasks': () => ({ json: { data: [task({ can_delete: true })], meta: { status_counts: {} } } }),
+        'GET /api/tasks/7': () => ({ json: { data: task({ can_delete: true }) } }),
+        'GET /api/tasks/7/activities': () => ({ json: { data: [] } }),
+        'GET /api/tasks/monitoring': () => ({ json: { data: monitoringOf({}) } }),
+        'DELETE /api/tasks/7': () => reply(),
+    }, ADMIN);
+    await board.load();
+    board.detailId = 7;
+    const detail = createDetail();
+    await detail.open(7);
+
+    reply = () => ({ status: 422, json: { message: 'invalid', errors: { status: ['Tugas yang sudah selesai tidak dapat dihapus.'] } } });
+    detail.confirmingDelete = true;
+    await detail.removeTask();
+    assert.equal(toasts.at(-1).text, 'Tugas yang sudah selesai tidak dapat dihapus.');
+    assert.equal(detail.confirmingDelete, false);
+    assert.equal(board.tasks.length, 1);
+
+    reply = () => ({ json: { message: 'Tugas berhasil dihapus.' } });
+    await detail.removeTask();
+    assert.deepEqual(requests.filter(({ method }) => method === 'DELETE').at(-1).body, { version: 4 });
+    assert.equal(board.tasks.length, 0);
+    assert.equal(board.detailId, null);
+    assert.equal(toasts.at(-1).title, 'Tugas dihapus');
+
+    // Without the backend flag nothing is sent.
+    const before = requests.filter(({ method }) => method === 'DELETE').length;
+    detail.task = task({ can_delete: false });
+    await detail.removeTask();
+    assert.equal(requests.filter(({ method }) => method === 'DELETE').length, before);
+});
+
+test('The PIC list may only be empty in Back Log', async () => {
+    const { board, detail: createDetail } = await tasklistPage({
+        'GET /api/tasks/7': () => ({ json: { data: task({ can_assign: true, status: 'todo' }) } }),
+        'GET /api/tasks/7/activities': () => ({ json: { data: [] } }),
+        'GET /api/tasks/7/assignment-options': () => ({ json: { data: assignmentOptions } }),
+    }, MANAGER);
+    board.detailId = 7;
+    const detail = createDetail();
+    await detail.open(7);
+    await detail.openAssign();
+
+    detail.toggleAssignPic(PIC.id);
+    assert.equal(detail.canSaveAssignment, false, 'To Do needs at least one PIC');
+    detail.task = { ...detail.task, status: 'backlog' };
+    assert.equal(detail.canSaveAssignment, true);
 });
 
 test('With the default config, the PIC sends a file and a link as evidence and the saved evidence shows again in the detail', async () => {

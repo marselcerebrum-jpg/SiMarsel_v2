@@ -39,10 +39,11 @@
                                 <tr class="align-top hover:bg-soft/60">
                                     <td class="px-4 py-3">
                                         <span class="line-clamp-2 font-semibold break-words text-ink" x-text="task.title" :title="task.title"></span>
+                                        <span x-show="isReadOnly(task)" class="mt-1 inline-block rounded bg-slate-100 px-1.5 py-0.5 text-[11px] font-semibold text-slate-700" data-read-only>Hanya lihat</span>
                                     </td>
                                     <td class="px-4 py-3"><span class="{{ $badge }}" :class="statusOf(task.status).badge" x-text="statusOf(task.status).label"></span></td>
                                     <td class="px-4 py-3"><span class="{{ $badge }}" :class="priorityOf(task.priority).badge" x-text="priorityOf(task.priority).label"></span></td>
-                                    <td class="truncate px-4 py-3" :class="task.pic ? 'text-ink' : 'italic text-muted'" x-text="task.pic?.fullname ?? 'Belum ada PIC'" :title="task.pic?.fullname"></td>
+                                    <td class="truncate px-4 py-3" :class="task.pics?.length ? 'text-ink' : 'italic text-muted'" x-text="picNames(task) || 'Belum ada PIC'" :title="picNames(task)"></td>
                                     <td class="px-4 py-3 tabular-nums" :class="isOverdue(task) ? 'font-semibold text-red-700' : 'text-ink'">
                                         <span class="block truncate" x-text="formatDate(task.deadline)"></span>
                                         <span x-show="isOverdue(task)" class="mt-0.5 inline-block rounded bg-red-50 px-1.5 py-0.5 text-[10px] font-bold uppercase">Terlambat</span>
