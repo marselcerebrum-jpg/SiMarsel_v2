@@ -58,11 +58,7 @@ final class AggregationFilter
 
     public function availability(): DataAvailability
     {
-        return match (true) {
-            $this->completeUntil === null || $this->completeUntil->lte($this->periodStart()) => DataAvailability::Unavailable,
-            $this->completeUntil->gte($this->periodEnd()) => DataAvailability::Complete,
-            default => DataAvailability::Partial,
-        };
+        return DataAvailability::forCoverage($this->completeUntil, $this->periodStart(), $this->periodEnd());
     }
 
     /**
