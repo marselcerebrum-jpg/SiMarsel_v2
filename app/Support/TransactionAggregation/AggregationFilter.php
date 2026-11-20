@@ -20,6 +20,11 @@ final class AggregationFilter
 
     public readonly ?CarbonImmutable $completeUntil;
 
+    /** Hour-level bounds of a trend bucket; null keeps whole days from date_from to date_to. */
+    private ?CarbonImmutable $windowStart = null;
+
+    private ?CarbonImmutable $windowEnd = null;
+
     /**
      * @param  list<int>  $platformIds  The selected platforms; must not be empty.
      */
@@ -43,26 +48,49 @@ final class AggregationFilter
         }
     }
 
+    /**
+     * A period of [startAt, endAt) in WIB that may start or end within a day, such as one hour of a trend.
+     *
+     * @param  list<int>  $platformIds
+     */
+    public static function forWindow(
+        array $platformIds,
+        CarbonImmutable|string $startAt,
+        CarbonImmutable|string $endAt,
+        TransactionDateBasis $basis,
+        CarbonImmutable|string|null $completeUntil,
+    ): self {
+        $startAt = self::wib($startAt);
+        $endAt = self::wib($endAt);
+
+        if ($endAt->lte($startAt)) {
+            throw new InvalidArgumentException('The aggregation window must end after it starts.');
+        }
+
+        $lastDay = $endAt->eq($endAt->startOfDay()) ? $endAt->subDay() : $endAt;
+        $filter = new self($platformIds, $startAt, $lastDay, $basis, $completeUntil);
+        $filter->windowStart = $startAt;
+        $filter->windowEnd = $endAt;
+
+        return $filter;
+    }
+
     public function periodStart(): CarbonImmutable
     {
-        return $this->dateFrom;
+        return $this->windowStart ?? $this->dateFrom;
     }
 
     /**
-     * The exclusive end of the period: 00.00 WIB after date_to.
+     * The exclusive end of the period: 00.00 WIB after date_to, or the end of the window.
      */
     public function periodEnd(): CarbonImmutable
     {
-        return $this->dateTo->addDay();
+        return $this->windowEnd ?? $this->dateTo->addDay();
     }
 
     public function availability(): DataAvailability
     {
-        return match (true) {
-            $this->completeUntil === null || $this->completeUntil->lte($this->periodStart()) => DataAvailability::Unavailable,
-            $this->completeUntil->gte($this->periodEnd()) => DataAvailability::Complete,
-            default => DataAvailability::Partial,
-        };
+        return DataAvailability::forCoverage($this->completeUntil, $this->periodStart(), $this->periodEnd());
     }
 
     /**

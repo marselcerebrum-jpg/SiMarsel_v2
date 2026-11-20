@@ -82,6 +82,7 @@ class PerformanceExportService
             ['Periode', $this->periodText($summary['filter']['ranges'])],
             ['Periode Sebelumnya', $this->periodText($summary['previous_period']['ranges'])],
             ['Platform', $filter->platforms === [] ? 'Semua platform' : implode(', ', $filter->platforms)],
+            ...$this->periodLimitRows($filter),
             [],
             ['KPI', 'Nilai', 'Nilai Periode Sebelumnya', 'Perubahan (%)', 'Tren'],
         ];
@@ -89,6 +90,32 @@ class PerformanceExportService
         foreach (self::KPI_LABELS as $key => $label) {
             $kpi = $summary['kpis'][$key];
             $rows[] = [$label, $kpi['value'], $kpi['previous_value'], $kpi['change_percentage'], $this->trendText($kpi['trend'])];
+        }
+
+        return $rows;
+    }
+
+    /**
+     * The data limits and the part of each period used for the change, when the shared resolver chose the period.
+     *
+     * @return list<list<string>>
+     */
+    private function periodLimitRows(PerformanceFilter $filter): array
+    {
+        if ($filter->period === null) {
+            return [];
+        }
+
+        $period = $filter->period->toArray();
+        $limit = fn (?array $window) => $window['cutoff_at'] ?? 'Belum tersedia';
+        $rows = [
+            ['Batas Data Aktif', $limit($period['active'])],
+            ['Batas Data Pembanding', $limit($period['comparison'])],
+        ];
+
+        if ($period['change_basis']['is_trimmed'] ?? false) {
+            $rows[] = ['Dasar Perubahan Aktif', $this->periodText($period['change_basis']['active'])];
+            $rows[] = ['Dasar Perubahan Pembanding', $this->periodText($period['change_basis']['comparison'])];
         }
 
         return $rows;
@@ -195,9 +222,10 @@ class PerformanceExportService
         return implode(', ', array_map(fn (array $range) => "{$range['date_from']} s/d {$range['date_to']}", $ranges));
     }
 
-    private function trendText(string $trend): string
+    private function trendText(?string $trend): string
     {
         return match ($trend) {
+            null => 'Tanpa Pembanding',
             PerformanceSummaryService::TREND_UP => 'Naik',
             PerformanceSummaryService::TREND_DOWN => 'Turun',
             default => 'Sama',

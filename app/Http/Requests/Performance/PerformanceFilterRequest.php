@@ -2,7 +2,11 @@
 
 namespace App\Http\Requests\Performance;
 
+use App\Enums\PeriodComparison;
+use App\Enums\PeriodPreset;
+use App\Services\PeriodResolverService;
 use App\Support\PerformanceFilter;
+use App\Support\Period\PeriodSelection;
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
@@ -12,6 +16,7 @@ use Illuminate\Validation\Validator;
 /**
  * The main Ringkasan Performa filter, shared by every performance endpoint.
  * At most one period mode may be used: date range, month, years, or year range; none means the current month.
+ * A `preset` selects the shared period resolver instead; the older period parameters keep working without it.
  */
 class PerformanceFilterRequest extends FormRequest
 {
@@ -28,6 +33,8 @@ class PerformanceFilterRequest extends FormRequest
         PerformanceFilter::MODE_YEARS => ['years'],
         PerformanceFilter::MODE_YEAR_RANGE => ['year_from', 'year_to'],
     ];
+
+    private ?PerformanceFilter $resolvedFilter = null;
 
     /**
      * Every authenticated account may view the performance summary.
@@ -47,8 +54,26 @@ class PerformanceFilterRequest extends FormRequest
         $year = ['integer', 'between:'.self::MIN_YEAR.','.CarbonImmutable::today()->year];
 
         return [
-            'date_from' => ['required_with:date_to', 'nullable', 'date_format:Y-m-d'],
-            'date_to' => ['required_with:date_from', 'nullable', 'date_format:Y-m-d', 'after_or_equal:date_from'],
+            'preset' => ['required_with:comparison,comparison_from,comparison_to', 'nullable', Rule::in(array_column(PeriodPreset::cases(), 'value'))],
+            'comparison' => ['required_with:comparison_from,comparison_to', 'nullable', Rule::in(array_column(PeriodComparison::cases(), 'value'))],
+            'comparison_from' => [
+                'required_if:comparison,'.PeriodComparison::Custom->value,
+                'required_with:comparison_to',
+                'prohibited_unless:comparison,'.PeriodComparison::Custom->value,
+                'nullable',
+                'date_format:Y-m-d',
+            ],
+            'comparison_to' => [
+                'required_if:comparison,'.PeriodComparison::Custom->value,
+                'required_with:comparison_from',
+                'prohibited_unless:comparison,'.PeriodComparison::Custom->value,
+                'nullable',
+                'date_format:Y-m-d',
+                'after_or_equal:comparison_from',
+            ],
+            'dataset' => ['nullable', Rule::in(PeriodSelection::DATASETS)],
+            'date_from' => ['required_if:preset,'.PeriodPreset::DateRange->value, 'required_with:date_to', 'nullable', 'date_format:Y-m-d'],
+            'date_to' => ['required_if:preset,'.PeriodPreset::DateRange->value, 'required_with:date_from', 'nullable', 'date_format:Y-m-d', 'after_or_equal:date_from'],
             'year' => ['required_with:month', 'nullable', ...$year],
             'month' => ['required_with:year', 'nullable', 'integer', 'between:1,12'],
             'years' => ['nullable', 'array', 'max:'.self::MAX_YEARS],
@@ -76,6 +101,10 @@ class PerformanceFilterRequest extends FormRequest
                         'Pilih salah satu filter periode saja: rentang tanggal, bulan, tahun, atau rentang tahun.',
                     );
                 }
+
+                if ($this->presetConflictsWithPeriodMode()) {
+                    $validator->errors()->add('filter', 'Preset periode tidak dapat digabung dengan filter periode lain.');
+                }
             },
         ];
     }
@@ -86,10 +115,13 @@ class PerformanceFilterRequest extends FormRequest
      */
     public function filter(): PerformanceFilter
     {
-        $platforms = array_values(array_unique(array_filter([
-            ...(array) $this->input('platforms', []),
-            $this->input('platform'),
-        ])));
+        if ($this->filled('preset')) {
+            return $this->resolvedFilter ??= PerformanceFilter::fromResolvedPeriod(
+                app(PeriodResolverService::class)->resolve($this->periodSelection()),
+            );
+        }
+
+        $platforms = $this->selectedPlatforms();
 
         return match ($this->selectedPeriodModes()[0] ?? null) {
             PerformanceFilter::MODE_DATE_RANGE => PerformanceFilter::dateRange(
@@ -124,6 +156,11 @@ class PerformanceFilterRequest extends FormRequest
     {
         return [
             'required_with' => ':attribute wajib diisi.',
+            'required_if' => ':attribute wajib diisi.',
+            'prohibited_unless' => ':attribute hanya dipakai untuk rentang pembanding khusus.',
+            'preset.in' => ':attribute tidak valid.',
+            'comparison.in' => ':attribute tidak valid.',
+            'dataset.in' => ':attribute tidak valid.',
             'date_format' => ':attribute harus berformat YYYY-MM-DD.',
             'after_or_equal' => ':attribute tidak boleh sebelum tanggal mulai.',
             'integer' => ':attribute harus berupa angka.',
@@ -145,6 +182,11 @@ class PerformanceFilterRequest extends FormRequest
     public function attributes(): array
     {
         return [
+            'preset' => 'Preset periode',
+            'comparison' => 'Pembanding',
+            'comparison_from' => 'Tanggal mulai pembanding',
+            'comparison_to' => 'Tanggal akhir pembanding',
+            'dataset' => 'Dataset',
             'date_from' => 'Tanggal mulai',
             'date_to' => 'Tanggal akhir',
             'year' => 'Tahun',
@@ -157,6 +199,49 @@ class PerformanceFilterRequest extends FormRequest
             'platforms' => 'Platform',
             'platforms.*' => 'Platform',
         ];
+    }
+
+    private function periodSelection(): PeriodSelection
+    {
+        $date = fn (string $field) => $this->filled($field)
+            ? CarbonImmutable::createFromFormat('!Y-m-d', $this->input($field))
+            : null;
+
+        return new PeriodSelection(
+            PeriodPreset::from($this->input('preset')),
+            PeriodComparison::tryFrom((string) $this->input('comparison')) ?? PeriodComparison::Auto,
+            $this->selectedPlatforms(),
+            $this->input('dataset') ?? PeriodSelection::DATASET_TRANSACTIONS,
+            $date('date_from'),
+            $date('date_to'),
+            $date('comparison_from'),
+            $date('comparison_to'),
+        );
+    }
+
+    /**
+     * Only Rentang Tanggal reads date_from and date_to; every other preset chooses its own dates.
+     */
+    private function presetConflictsWithPeriodMode(): bool
+    {
+        if (! $this->filled('preset')) {
+            return false;
+        }
+
+        $allowed = $this->input('preset') === PeriodPreset::DateRange->value ? [PerformanceFilter::MODE_DATE_RANGE] : [];
+
+        return array_diff($this->selectedPeriodModes(), $allowed) !== [];
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function selectedPlatforms(): array
+    {
+        return array_values(array_unique(array_filter([
+            ...(array) $this->input('platforms', []),
+            $this->input('platform'),
+        ])));
     }
 
     /**

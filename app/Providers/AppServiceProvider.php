@@ -3,6 +3,8 @@
 namespace App\Providers;
 
 use App\Http\Resources\AccountResource;
+use App\Repositories\DashboardSnapshotCoverageRepository;
+use App\Support\Period\PeriodCoverageSource;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
@@ -14,7 +16,7 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        $this->app->bind(PeriodCoverageSource::class, DashboardSnapshotCoverageRepository::class);
     }
 
     /**

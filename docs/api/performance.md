@@ -244,3 +244,130 @@ Selain validasi [filter Ringkasan Performa](performance-filter.md#422-validasi-g
 | Nilai di luar pilihan | `Metric tidak valid.` / `Periode tidak valid.` |
 | Rentang lebih dari 366 hari untuk `daily` atau `weekly` | `Rentang tanggal untuk periode daily maksimal 366 hari.` |
 | Beberapa tahun dipilih dengan `period` selain `monthly` | `Perbandingan beberapa tahun hanya mendukung periode monthly.` |
+| `period=hourly` | `Periode tidak valid.` Tren metrik ini hanya membaca total harian; tren per jam ada di `/trend/sales`. |
+
+## `GET /api/performance/trend/sales`
+
+Dataset grafik gabungan Omzet dan Transaksi (FIX-06). Satu titik berisi sisi aktif dan sisi pembanding, masing-masing dengan waktu aslinya. Wajib login, dan semua role boleh mengakses. Ekspor Laporan Dashboard memakai dataset dan `granularity` yang sama.
+
+### Query parameter
+
+| Parameter | Wajib | Nilai |
+|---|---|---|
+| `preset` dan parameter periode | Ya | Sama seperti resolver periode, lihat [Kontrak Periode](../period-resolver.md#parameter). Tren ini selalu memakai resolver |
+| `platforms[]`, `platform` | Tidak | Slug platform. Kosong berarti semua platform |
+| `granularity` | Tidak | `hourly`, `daily`, `weekly`, `monthly`. Jika kosong, memakai default di bawah |
+
+Contoh: `GET /api/performance/trend/sales?preset=today&platforms[]=app-a`
+
+### Pengelompokan
+
+| Preset | Default |
+|---|---|
+| `today`, `yesterday` | `hourly` |
+| `last_7_days`, `last_30_days` | `daily` |
+| `last_90_days` | `weekly` |
+| `last_year` | `monthly` |
+| `this_month`, `last_month`, `date_range` | 1 hari `hourly`, sampai 31 hari `daily`, sampai 92 hari `weekly`, lebih lama `monthly` |
+
+| `granularity` | Rentang maksimal | Bucket |
+|---|---|---|
+| `hourly` | 31 hari | Satu jam WIB, label `11 Nov 2026 14.00` |
+| `daily` | 366 hari | Satu hari, label `11 Nov 2026` |
+| `weekly` | 366 hari | Senin–Minggu, dipotong ke rentang, label `04 - 08 Nov 2026` |
+| `monthly` | Tanpa batas | Bulan kalender, dipotong ke rentang, label `Nov 2026` |
+
+`granularities` di response berisi pilihan yang boleh dipakai untuk rentang aktif.
+
+Bucket pembanding dipasangkan per posisi. Bulan dipasangkan dengan bulan kalender pembanding. Pengelompokan lain mengambil panjang yang sama (jam atau hari) dari awal periode pembanding, sehingga minggu pertama yang terpotong 4 hari dibandingkan dengan 4 hari. Posisi yang tidak terjangkau periode pembanding bernilai `comparison: null`.
+
+### Nilai per bucket
+
+| Nilai | Dasar tanggal | Isi |
+|---|---|---|
+| `revenue` (Omzet) | Tanggal bayar valid terakhir | Jumlah `net_nominal` pembelian Success, tanpa klaim |
+| `success_payments` (Transaksi Berhasil) | Tanggal bayar valid terakhir | Jumlah pembelian Success, tanpa klaim |
+| `total_checkouts` (Total Transaksi) | `markaz_created_at` | Semua checkout termasuk klaim kupon dan tanpa status |
+
+Pembelian grup dihitung sekali dari baris pembeli. Rumusnya memakai agregasi bersama FIX-02-BE-02 (`TransactionAggregationService`), sehingga jumlah semua bucket satu seri sama dengan agregat periode pada dasar tanggal yang sama (`totals`).
+
+### Kelengkapan bucket
+
+| Keadaan | `availability` | `as_of` | `values` |
+|---|---|---|---|
+| Bucket lengkap | `complete` | Akhir bucket | Angka. Tanpa transaksi bernilai `0` |
+| Batas lengkap jatuh di dalam bucket | `partial` | Batas lengkap | Angka sampai batas itu |
+| Bucket mulai pada atau setelah batas lengkap, atau cakupan belum diketahui | `unavailable` | `null` | `null`, bukan `0` |
+| Pembanding membutuhkan catatan yang tidak ada atau belum lengkap | `unavailable` | `null` | `null` (titik pembanding kosong) |
+
+### Sumber pembanding (`comparison.source`)
+
+| Keadaan periode pembanding | Sumber per bucket |
+|---|---|
+| `state_basis = latest` (Kemarin, 7/30/90 Hari Terakhir, Bulan Lalu) | `latest`: status dan tanggal bayar terbaru |
+| `state_basis = at_cutoff` (Hari Ini, Bulan Ini, Tahun Lalu, rentang yang berakhir hari ini) | Hari penuh sebelum hari batas: `latest`. Jam pada hari batas: `snapshot` |
+
+Bucket `snapshot` dihitung dari catatan `dashboard_snapshots` satu hari (`date_from = date_to` = hari batas) yang lengkap di semua platform terpilih: nilai catatan pada akhir bucket dikurangi nilai catatan pada awal bucket (awal hari = 0). Contoh: pembanding 13.00–14.00 = catatan 14.00 dikurangi catatan 13.00. Payload catatan harus memuat `revenue`, `success_payments`, dan `total_checkouts`. Perubahan status atau tanggal bayar setelahnya hanya mengubah sisi aktif, tidak pernah mengubah bucket `snapshot`.
+
+### 200 OK
+
+```json
+{
+    "data": {
+        "filter": { "mode": "today", "period": { "active": { "availability": "partial", "cutoff_at": "2026-11-11T14:00:00+07:00" } } },
+        "granularity": "hourly",
+        "default_granularity": "hourly",
+        "granularities": ["hourly", "daily", "weekly", "monthly"],
+        "series": [
+            { "key": "revenue", "label": "Omzet", "side": "active", "value": "revenue", "unit": "currency", "axis": "currency", "date_basis": "paid", "visible": true },
+            { "key": "comparison_revenue", "label": "Omzet Pembanding", "side": "comparison", "value": "revenue", "unit": "currency", "axis": "currency", "date_basis": "paid", "visible": true },
+            { "key": "success_payments", "label": "Transaksi Berhasil", "side": "active", "value": "success_payments", "unit": "count", "axis": "count", "date_basis": "paid", "visible": true },
+            { "key": "total_checkouts", "label": "Total Transaksi", "side": "active", "value": "total_checkouts", "unit": "count", "axis": "count", "date_basis": "created", "visible": false }
+        ],
+        "is_empty": false,
+        "message": null,
+        "totals": { "availability": "partial", "as_of": "2026-11-11T14:00:00+07:00", "values": { "revenue": 150000, "success_payments": 1, "total_checkouts": 1 } },
+        "buckets": [
+            {
+                "index": 13,
+                "active": {
+                    "start_at": "2026-11-11T13:00:00+07:00", "end_at": "2026-11-11T14:00:00+07:00", "label": "11 Nov 2026 13.00",
+                    "availability": "complete", "as_of": "2026-11-11T14:00:00+07:00", "source": "latest",
+                    "values": { "revenue": 0, "success_payments": 0, "total_checkouts": 0 }
+                },
+                "comparison": {
+                    "start_at": "2026-11-10T13:00:00+07:00", "end_at": "2026-11-10T14:00:00+07:00", "label": "10 Nov 2026 13.00",
+                    "availability": "complete", "as_of": "2026-11-10T14:00:00+07:00", "source": "snapshot",
+                    "values": { "revenue": 150000, "success_payments": 1, "total_checkouts": 2 }
+                }
+            },
+            {
+                "index": 14,
+                "active": {
+                    "start_at": "2026-11-11T14:00:00+07:00", "end_at": "2026-11-11T15:00:00+07:00", "label": "11 Nov 2026 14.00",
+                    "availability": "unavailable", "as_of": null, "source": "latest", "values": null
+                },
+                "comparison": {
+                    "start_at": "2026-11-10T14:00:00+07:00", "end_at": "2026-11-10T15:00:00+07:00", "label": "10 Nov 2026 14.00",
+                    "availability": "unavailable", "as_of": null, "source": null, "values": null
+                }
+            }
+        ]
+    }
+}
+```
+
+`series` menjelaskan seri awal grafik: `side` dan `value` menunjuk nilai di setiap bucket, `axis` memisahkan sumbu Rupiah dan Jumlah Transaksi, dan `visible = false` berarti seri baru tampil setelah diaktifkan dari legenda.
+
+### 422 Validasi gagal
+
+| Kondisi | Field | Pesan |
+|---|---|---|
+| `preset` kosong | `preset` | `Preset periode wajib diisi.` |
+| Nilai di luar pilihan | `granularity` | `Pengelompokan tidak valid.` |
+| Rentang lebih panjang dari batas pengelompokan | `granularity` | `Rentang tanggal untuk pengelompokan hourly maksimal 31 hari.` |
+
+### Batasan
+
+- Baris `transactions` tanpa `markaz_transaction_id` atau `markaz_created_at` (impor lama sebelum FIX-15) tidak dapat dibaca kontrak tanggal dan tidak dihitung.
+- Batas `hourly` 31 hari dipilih agar satu grafik tidak lebih dari 744 titik. Implementasi lama mendukung `daily`/`weekly` sampai 366 hari dan `monthly` tanpa batas; batas itu dipertahankan.

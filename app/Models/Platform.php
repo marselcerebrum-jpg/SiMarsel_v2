@@ -28,4 +28,9 @@ class Platform extends Model
     {
         return $this->hasMany(SyncLog::class);
     }
+
+    public function dashboardSnapshots(): HasMany
+    {
+        return $this->hasMany(DashboardSnapshot::class);
+    }
 }

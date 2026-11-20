@@ -15,17 +15,32 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 #[Fillable([
     'platform_id',
+    'markaz_transaction_id',
     'markaz_user_id',
+    'markaz_customer_id',
     'trx_id',
+    'markaz_ref_id',
+    'markaz_created_at',
+    'markaz_paid_at',
     'paid_date',
     'paid_time',
+    'source_status',
+    'effective_status',
+    'is_claim_coupon',
     'payment_method',
+    'product_price',
+    'voucher_discount',
+    'admin_fee',
     'nominal',
+    'net_nominal',
     'promo_code',
     'product',
     'product_type',
+    'customer_name',
     'customer_email',
+    'customer_phone',
     'status_message',
+    'synced_at',
 ])]
 #[ObservedBy(TransactionObserver::class)]
 class Transaction extends Model
@@ -47,8 +62,19 @@ class Transaction extends Model
     protected function casts(): array
     {
         return [
+            'markaz_customer_id' => 'integer',
+            'markaz_created_at' => 'datetime',
+            'markaz_paid_at' => 'datetime',
             'paid_date' => 'date',
+            'source_status' => 'integer',
+            'effective_status' => 'integer',
+            'is_claim_coupon' => 'boolean',
+            'product_price' => 'decimal:2',
+            'voucher_discount' => 'decimal:2',
+            'admin_fee' => 'decimal:2',
             'nominal' => 'decimal:2',
+            'net_nominal' => 'decimal:2',
+            'synced_at' => 'datetime',
             'promo_code' => 'array',
             'promo_code_anomaly' => 'boolean',
         ];
@@ -68,10 +94,15 @@ class Transaction extends Model
     }
 
     /**
-     * The moment the transaction was paid; a missing paid_time counts as the start of the day.
+     * The last valid payment moment for reports; a missing paid_time counts as the start of the day.
+     * Null while no valid payment date is known, for example a Pending transaction.
      */
-    public function paidAt(): CarbonImmutable
+    public function paidAt(): ?CarbonImmutable
     {
+        if ($this->paid_date === null) {
+            return null;
+        }
+
         return CarbonImmutable::parse($this->paid_date->toDateString().' '.($this->paid_time ?? '00:00:00'));
     }
 

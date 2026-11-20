@@ -21,7 +21,7 @@ class PromoTrendRequest extends PromoAnalysisFilterRequest
     {
         return [
             ...parent::rules(),
-            'period' => ['nullable', 'string', Rule::in(array_column(TrendPeriod::cases(), 'value'))],
+            'period' => ['nullable', 'string', Rule::in(array_column(TrendPeriod::dailyBased(), 'value'))],
         ];
     }
 

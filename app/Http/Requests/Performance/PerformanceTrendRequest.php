@@ -20,7 +20,7 @@ class PerformanceTrendRequest extends PerformanceFilterRequest
         return [
             ...parent::rules(),
             'metric' => ['required', Rule::in(array_column(TrendMetric::cases(), 'value'))],
-            'period' => ['nullable', Rule::in(array_column(TrendPeriod::cases(), 'value'))],
+            'period' => ['nullable', Rule::in(array_column(TrendPeriod::dailyBased(), 'value'))],
         ];
     }
 

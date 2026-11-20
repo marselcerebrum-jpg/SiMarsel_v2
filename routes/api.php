@@ -5,6 +5,7 @@ use App\Http\Controllers\Auth\AuthController;
 use App\Http\Controllers\Division\DivisionController;
 use App\Http\Controllers\Performance\PaymentMethodDistributionController;
 use App\Http\Controllers\Performance\PerformanceExportController;
+use App\Http\Controllers\Performance\PerformanceSalesTrendController;
 use App\Http\Controllers\Performance\PerformanceSummaryController;
 use App\Http\Controllers\Performance\PerformanceTrendController;
 use App\Http\Controllers\Performance\PlatformContributionController;
@@ -148,6 +149,8 @@ Route::middleware('auth')->group(function () {
 
     Route::get('/performance/summary', PerformanceSummaryController::class)
         ->name('api.performance.summary');
+    Route::get('/performance/trend/sales', PerformanceSalesTrendController::class)
+        ->name('api.performance.trend.sales');
     Route::get('/performance/trend', PerformanceTrendController::class)
         ->name('api.performance.trend');
     Route::get('/performance/payment-methods', PaymentMethodDistributionController::class)

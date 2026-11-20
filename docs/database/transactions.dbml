@@ -1,0 +1,107 @@
+// SiMarsel - transaksi Markaz dan pemakaian promo
+// Sesuai migration sampai FIX-15-BE-02:
+//   2026_11_17_135819_add_dashboard_fields_and_source_identity_to_transactions_table
+// Baseline ERD: https://dbdiagram.io/d/SiMarcel-6abb3d735869425612c21263
+// Kontrak baca: docs/transaction-dates-coverage.md (FIX-02-BE-01)
+
+Table platforms {
+  id bigint [pk, increment]
+  slug varchar(50) [not null, unique]
+  name varchar(100) [not null]
+  created_at timestamp
+  updated_at timestamp
+}
+
+Table transactions {
+  id bigint [pk, increment, note: 'PK lokal, tetap dipakai FK transaction_promo_codes']
+  platform_id bigint [not null, ref: > platforms.id]
+  markaz_transaction_id varchar(64) [note: 'FIX-15-BE-02. ID transaksi Markaz. NULL pada histori tanpa ID sumber terverifikasi']
+  markaz_user_id bigint [not null, note: 'Legacy. Pemetaan ke akun pembayar belum diverifikasi; pakai markaz_customer_id']
+  markaz_customer_id bigint [note: 'FIX-15-BE-02. ID akun pembayar dari API Markaz']
+  trx_id varchar(255) [not null, note: 'FIX-15-BE-02: tidak lagi unik global. Nomor tampilan dan pencocokan']
+  markaz_ref_id varchar(64) [note: 'FIX-15-BE-02. Terisi = anggota grup; berisi markaz_transaction_id pembeli pada platform yang sama']
+  markaz_created_at datetime [note: 'FIX-15-BE-02. Waktu transaksi dibuat di Markaz (WIB)']
+  markaz_paid_at datetime [note: 'FIX-15-BE-02. paid_date terbaru dari API apa adanya; NULL jika belum dikirim']
+  paid_date date [note: 'FIX-15-BE-02: nullable. Tanggal bayar valid terakhir untuk laporan']
+  paid_time time [note: 'Jam bayar valid terakhir untuk laporan']
+  source_status tinyint [note: 'FIX-15-BE-02. Field status API: 0 Pending, 1 Success, 2 Expired, 3 Failed, 4 Canceled']
+  effective_status tinyint [note: 'FIX-15-BE-02. Pengganti source_status untuk laporan (0 tetap dipakai)']
+  is_claim_coupon boolean [not null, default: false, note: 'FIX-15-BE-02. Checkout klaim kupon']
+  payment_method varchar(100)
+  product_price decimal(15,2) [note: 'FIX-15-BE-02. Harga paket setelah diskon paket']
+  voucher_discount decimal(15,2) [note: 'FIX-15-BE-02. Potongan voucher']
+  admin_fee decimal(15,2) [note: 'FIX-15-BE-02. Biaya admin']
+  nominal decimal(15,2) [not null, note: 'Tagihan']
+  net_nominal decimal(15,2) [note: 'FIX-15-BE-02. Dasar kontribusi omzet']
+  promo_code json
+  product varchar(255)
+  product_type varchar(100)
+  customer_name varchar(255) [note: 'FIX-15-BE-02']
+  customer_email varchar(255)
+  customer_phone varchar(30) [note: 'FIX-15-BE-02']
+  status_message varchar(100)
+  synced_at datetime [note: 'FIX-15-BE-02. Waktu SiMarsel terakhir mengambil transaksi ini; bukan waktu kejadian']
+  created_at timestamp
+  updated_at timestamp
+  promo_code_anomaly boolean [not null, default: false]
+
+  indexes {
+    (platform_id, markaz_transaction_id) [unique, name: 'transactions_platform_id_markaz_transaction_id_unique']
+    trx_id [name: 'transactions_trx_id_index']
+    (platform_id, markaz_ref_id) [name: 'transactions_platform_id_markaz_ref_id_index']
+    markaz_created_at [name: 'transactions_markaz_created_at_index']
+    (paid_date, paid_time) [name: 'transactions_paid_date_paid_time_index']
+  }
+}
+
+Table funnels {
+  id bigint [pk, increment]
+  name varchar(100) [not null, unique]
+  created_at timestamp
+  updated_at timestamp
+}
+
+Table promo_sources {
+  id bigint [pk, increment]
+  name varchar(100) [not null, unique]
+  created_at timestamp
+  updated_at timestamp
+}
+
+Table promo_codes {
+  id bigint [pk, increment]
+  platform_id bigint [not null, ref: > platforms.id]
+  code varchar(255) [not null]
+  funnel_id bigint [ref: > funnels.id]
+  source_id bigint [ref: > promo_sources.id]
+  created_at timestamp
+  updated_at timestamp
+
+  indexes {
+    (platform_id, code) [unique]
+  }
+}
+
+Table transaction_promo_codes {
+  id bigint [pk, increment]
+  transaction_id bigint [not null, note: 'FK ke transactions.id, ON DELETE CASCADE']
+  promo_code_id bigint [note: 'ON DELETE RESTRICT']
+  raw_code varchar(255) [not null]
+  code_position tinyint [not null]
+  platform_id_snapshot bigint [not null, ref: > platforms.id]
+  code_snapshot varchar(255) [not null]
+  funnel_id_snapshot bigint [ref: > funnels.id]
+  funnel_name_snapshot varchar(100)
+  source_id_snapshot bigint [ref: > promo_sources.id]
+  source_name_snapshot varchar(100)
+  created_at timestamp
+  updated_at timestamp
+
+  indexes {
+    (transaction_id, code_position) [unique]
+    (platform_id_snapshot, raw_code)
+  }
+}
+
+Ref: transaction_promo_codes.transaction_id > transactions.id [delete: cascade]
+Ref: transaction_promo_codes.promo_code_id > promo_codes.id [delete: restrict]

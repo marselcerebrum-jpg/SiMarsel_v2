@@ -15,13 +15,14 @@ class MarkazSchemaTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_transaction_trx_id_must_be_unique(): void
+    public function test_transaction_source_id_must_be_unique_per_platform(): void
     {
-        Transaction::factory()->create(['trx_id' => 'TRX-001']);
+        $platform = Platform::factory()->create();
+        Transaction::factory()->for($platform)->create(['markaz_transaction_id' => '1001', 'trx_id' => 'TRX-001']);
 
         $this->expectException(UniqueConstraintViolationException::class);
 
-        Transaction::factory()->create(['trx_id' => 'TRX-001']);
+        Transaction::factory()->for($platform)->create(['markaz_transaction_id' => '1001', 'trx_id' => 'TRX-002']);
     }
 
     public function test_downloader_platform_and_date_must_be_unique(): void
