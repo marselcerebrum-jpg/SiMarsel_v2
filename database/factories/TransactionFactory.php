@@ -2,6 +2,7 @@
 
 namespace Database\Factories;
 
+use App\Enums\MarkazTransactionStatus;
 use App\Models\Platform;
 use App\Models\Transaction;
 use Illuminate\Database\Eloquent\Factories\Factory;
@@ -43,8 +44,8 @@ class TransactionFactory extends Factory
     {
         return [
             'platform_id' => Platform::factory(),
+            ...$this->markazIdentity('markaz'),
             'markaz_user_id' => fake()->numberBetween(100000, 999999),
-            'trx_id' => 'markaz-'.$this->markazId(),
             'paid_date' => fake()->dateTimeBetween('-6 months')->format('Y-m-d'),
             'paid_time' => fake()->time(),
             'payment_method' => fake()->randomElement(self::PAYMENT_METHODS),
@@ -72,7 +73,7 @@ class TransactionFactory extends Factory
     {
         return $this->state(fn () => [
             'platform_id' => $platform->id,
-            'trx_id' => $platform->slug.'-'.$this->markazId(),
+            ...$this->markazIdentity($platform->slug),
             'product' => $this->product($platform->slug),
         ]);
     }
@@ -85,6 +86,30 @@ class TransactionFactory extends Factory
     public function failed(): static
     {
         return $this->state(fn () => ['status_message' => 'failed']);
+    }
+
+    /**
+     * A Markaz Pending transaction: stored before Markaz sends any payment date.
+     */
+    public function pending(): static
+    {
+        return $this->state(fn () => [
+            'paid_date' => null,
+            'paid_time' => null,
+            'markaz_paid_at' => null,
+            'source_status' => MarkazTransactionStatus::Pending->value,
+            'status_message' => MarkazTransactionStatus::Pending->label(),
+        ]);
+    }
+
+    /**
+     * @return array{markaz_transaction_id: int, trx_id: string}
+     */
+    private function markazIdentity(string $prefix): array
+    {
+        $markazId = $this->markazId();
+
+        return ['markaz_transaction_id' => $markazId, 'trx_id' => $prefix.'-'.$markazId];
     }
 
     private function markazId(): int

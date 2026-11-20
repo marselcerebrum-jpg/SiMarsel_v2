@@ -276,4 +276,4 @@ Pembacaan catatan memerlukan satu catatan untuk setiap platform terpilih dengan 
 - Waktu dari API Markaz (`created_at`, `paid_date`) dikirim dalam WIB. Jika tidak, epic Pengambilan Data Markaz mengonversinya ke WIB sebelum disimpan.
 - Tipe `markaz_customer_id` (integer) mengikuti kolom `markaz_user_id` yang ada sekarang dan dikonfirmasi di FIX-15.
 - Contoh nilai uang memenuhi `nominal = product_price − voucher_discount + admin_fee` dan `net_nominal = nominal − admin_fee`. Kontrak tidak menghitung ulang nilai ini; nilainya dibaca dari sumber.
-- Skema saat ini mewajibkan `paid_date` dan hanya menyimpan Success. Perubahan ke kolom nullable dan seluruh status menjadi bagian FIX-15.
+- FIX-15-BE-02 menjadikan `paid_date` nullable dan menambah kolom kontrak di `transactions` (lihat [database.md](database.md#kolom-transaksi-dashboard-fix-15-be-02)). Kolom yang wajib di kontrak tetap nullable di database karena histori belum punya nilai sumbernya. Penyimpanan seluruh status dari Markaz tetap milik epic Pengambilan Data Markaz.
