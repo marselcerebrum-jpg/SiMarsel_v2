@@ -205,6 +205,7 @@ class TaskListingTest extends TestCase
                 'evidence_count' => 0,
                 'can_view_detail' => true,
                 'can_edit' => true,
+                'can_change_status' => true,
                 'can_assign' => false,
                 'can_delete' => false,
                 'version' => 1,

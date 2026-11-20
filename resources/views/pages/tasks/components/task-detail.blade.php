@@ -69,7 +69,7 @@
                             </div>
                             <div class="min-w-0 bg-surface px-3 py-2.5">
                                 <dt class="{{ $dt }}">PIC</dt>
-                                <dd class="mt-1 truncate text-sm" :class="task.pic ? 'font-semibold text-ink' : @js($empty)" x-text="task.pic?.fullname ?? 'Belum ada PIC'" :title="task.pic?.fullname"></dd>
+                                <dd class="mt-1 truncate text-sm" :class="task.pics?.length ? 'font-semibold text-ink' : @js($empty)" x-text="picNames(task) || 'Belum ada PIC'" :title="picNames(task)"></dd>
                             </div>
                         </dl>
 
@@ -84,9 +84,23 @@
                                 </button>
                             </template>
                             <button x-show="canEditThis && !editing" type="button" class="{{ $button }}" @click="startEdit()">Ubah Tugas</button>
-                            <p x-show="!transitions.length && task.status !== 'done'" class="self-center text-xs text-muted">
+                            <button x-show="task.can_delete === true && !confirmingDelete" type="button" class="{{ $button }} border-red-200! text-red-700!" @click="confirmingDelete = true">Hapus Tugas</button>
+                            <p x-show="!transitions.length && task.status !== 'done' && !isReadOnlyThis" class="self-center text-xs text-muted">
                                 Tidak ada perubahan status yang dapat Anda lakukan pada tahap ini.
                             </p>
+                        </div>
+
+                        <p x-show="isReadOnlyThis" class="rounded-lg border border-line bg-soft px-3 py-2 text-xs text-muted" role="status" data-read-only-notice>
+                            <span class="font-semibold text-ink">Hanya lihat.</span> Anda dapat melihat tugas ini, tetapi tidak memiliki kewenangan untuk mengubahnya.
+                        </p>
+
+                        <div x-show="confirmingDelete" x-cloak class="rounded-lg border border-red-200 bg-red-50 p-3" role="alertdialog" aria-label="Konfirmasi hapus tugas">
+                            <p class="text-sm font-semibold text-red-800">Hapus tugas ini?</p>
+                            <p class="mt-0.5 text-xs text-red-700">Tugas hilang dari Tasklist, sedangkan histori tetap tersimpan.</p>
+                            <div class="mt-3 flex justify-end gap-2">
+                                <button type="button" class="{{ $button }}" :disabled="deleting" @click="confirmingDelete = false">Batal</button>
+                                <button type="button" class="{{ $button }} border-red-600! bg-red-600! text-white! hover:bg-red-700!" :disabled="deleting" @click="removeTask()" x-text="deleting ? 'Menghapus…' : 'Ya, Hapus'"></button>
+                            </div>
                         </div>
                     </header>
 
@@ -198,11 +212,11 @@
                             <div class="flex items-center justify-between gap-3">
                                 <span class="inline-flex items-center gap-2 text-sm">
                                     <x-icon name="user" class="size-4 text-label" />
-                                    <span :class="task.pic ? 'font-semibold text-ink' : @js($empty)" x-text="task.pic?.fullname ?? 'Belum ada PIC'"></span>
+                                    <span :class="task.pics?.length ? 'font-semibold text-ink' : @js($empty)" x-text="picNames(task) || 'Belum ada PIC'"></span>
                                 </span>
-                                <button x-show="canAssignThis && assigneeState === 'idle'" type="button" class="{{ $button }}" @click="openAssign()" x-text="task.pic ? 'Ganti / Teruskan PIC' : 'Tetapkan PIC'"></button>
+                                <button x-show="canAssignThis && assigneeState === 'idle'" type="button" class="{{ $button }}" @click="openAssign()" x-text="task.pics?.length ? 'Atur / Teruskan PIC' : 'Tetapkan PIC'"></button>
                             </div>
-                            <p x-show="!assignment.ok && user.role !== 'staff'" class="text-xs text-muted" x-text="assignment.reason"></p>
+                            <p x-show="!canAssignThis && task.status !== 'done'" class="text-xs text-muted" x-text="assignment.reason"></p>
 
                             <div x-show="assigneeState !== 'idle'" x-cloak class="flex flex-col gap-3 border-t border-line pt-3">
                                 <div x-show="assigneeState === 'loading'" class="h-9 animate-pulse rounded-lg bg-soft"></div>
@@ -211,7 +225,7 @@
                                     <form class="flex flex-col gap-3" @submit.prevent="saveAssign()">
                                         <div x-show="canChangeAssignmentDivision">
                                             <label for="assign-division" class="{{ $labelClass }}">Divisi tujuan</label>
-                                            <select id="assign-division" x-model="assignForm.division_id" class="{{ $inputClass }}" @change="changeAssignmentDivision()">
+                                            <select id="assign-division" x-model="assignForm.division_id" class="{{ $inputClass }}">
                                                 <template x-for="division in assignmentDivisions" :key="division.id">
                                                     <option :value="String(division.id)" x-text="division.name"></option>
                                                 </template>
@@ -220,20 +234,24 @@
                                         <p x-show="!canChangeAssignmentDivision" class="text-xs text-muted">
                                             Divisi: <span class="font-semibold text-ink" x-text="task.division?.name"></span>
                                         </p>
-                                        <div>
-                                            <label for="assign-pic" class="{{ $labelClass }}">PIC baru</label>
-                                            <select id="assign-pic" x-model="assignForm.pic_id" class="{{ $inputClass }}" :disabled="!eligibleAssignees.length">
-                                                <option value="">Pilih PIC</option>
-                                                <template x-for="person in eligibleAssignees" :key="person.id">
-                                                    <option :value="String(person.id)" x-text="person.fullname"></option>
+                                        <div role="group" aria-labelledby="assign-pic-label">
+                                            <span id="assign-pic-label" class="{{ $labelClass }}">PIC aktif <span class="font-normal">(dapat lebih dari satu)</span></span>
+                                            <div class="max-h-44 divide-y divide-line overflow-y-auto rounded-lg border border-line">
+                                                <template x-for="person in assignmentPics" :key="person.id">
+                                                    <label class="flex cursor-pointer items-center gap-2.5 px-3 py-2 text-sm hover:bg-soft">
+                                                        <input type="checkbox" class="accent-primary" :checked="assignForm.pic_ids.includes(person.id)" :disabled="assignPicDisabled(person.id)" @change="toggleAssignPic(person.id)">
+                                                        <span class="min-w-0 flex-1 truncate font-medium text-ink" x-text="person.fullname"></span>
+                                                        <span class="shrink-0 text-xs text-muted" x-text="person.division?.name ?? 'Tanpa divisi'"></span>
+                                                    </label>
                                                 </template>
-                                            </select>
-                                            <p x-show="!eligibleAssignees.length" class="mt-1.5 text-xs text-muted">Tidak ada Staff lain yang memenuhi kriteria penugasan di divisi ini.</p>
+                                            </div>
+                                            <p x-show="!assignmentPics.length" class="mt-1.5 text-xs text-muted">Belum ada akun yang dapat menjadi PIC.</p>
+                                            <p x-show="!assignForm.pic_ids.length && task.status !== 'backlog'" class="mt-1.5 text-xs text-red-600">Tugas pada status ini wajib memiliki PIC.</p>
                                         </div>
-                                        <p class="text-xs text-muted">Mengganti PIC tidak mengubah status tugas. PIC lama dan baru tercatat di histori.</p>
+                                        <p class="text-xs text-muted">Mengatur PIC tidak mengubah status tugas. PIC yang ditambah dan dilepas tercatat di histori.</p>
                                         <div class="flex justify-end gap-2">
                                             <button type="button" class="{{ $button }}" :disabled="assigning" @click="assigneeState = 'idle'">Batal</button>
-                                            <button type="submit" class="{{ $primaryButton }}" :disabled="!assignForm.pic_id || !assignForm.division_id || assigning" x-text="assigning ? 'Menyimpan…' : 'Simpan PIC'"></button>
+                                            <button type="submit" class="{{ $primaryButton }}" :disabled="!canSaveAssignment" x-text="assigning ? 'Menyimpan…' : 'Simpan PIC'"></button>
                                         </div>
                                     </form>
                                 </template>
@@ -253,8 +271,10 @@
                             <span x-show="task.evidence_required" class="text-xs font-semibold text-amber-700">Wajib sebelum submission</span>
                         </div>
 
+                        {{-- Penolakan dari backend untuk kirim maupun hapus evidence; tetap terlihat saat form kirim tidak tersedia. --}}
+                        <p x-show="evidenceErrors.evidence" x-cloak x-text="evidenceErrors.evidence" class="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700" role="alert"></p>
+
                         <form x-show="canSubmitEvidence" class="mt-3 flex flex-col gap-3 rounded-lg border border-line p-4" novalidate @submit.prevent="sendEvidence()">
-                            <p x-show="evidenceErrors.evidence" x-text="evidenceErrors.evidence" class="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700" role="alert"></p>
                             <div class="inline-flex self-start rounded-lg border border-line bg-soft p-1" role="group" aria-label="Jenis evidence">
                                 <button type="button" class="rounded-md px-3 py-1 text-xs font-semibold" :class="evidenceForm.type === 'file' ? 'bg-white text-ink shadow-sm' : 'text-muted'" @click="evidenceForm.type = 'file'; evidenceErrors = {}">File</button>
                                 <button type="button" class="rounded-md px-3 py-1 text-xs font-semibold" :class="evidenceForm.type === 'link' ? 'bg-white text-ink shadow-sm' : 'text-muted'" @click="evidenceForm.type = 'link'; evidenceErrors = {}">Tautan</button>
@@ -291,7 +311,17 @@
                                             <a :href="evidence.url ?? evidence.file_url" target="_blank" rel="noopener noreferrer" class="block truncate text-sm font-semibold text-primary hover:underline" x-text="evidence.file_name ?? evidence.url"></a>
                                             <p x-show="evidence.note" class="mt-0.5 text-sm text-ink" x-text="evidence.note"></p>
                                             <p class="mt-0.5 text-xs text-muted"><span x-text="evidence.submitter?.fullname ?? '-'"></span> · <span x-text="formatDateTime(evidence.created_at)"></span></p>
+                                            <div x-show="confirmingEvidenceId === evidence.id && evidence.can_delete === true" x-cloak class="mt-2 rounded-lg border border-red-200 bg-red-50 p-2.5" role="alertdialog" :aria-label="`Konfirmasi hapus evidence ${evidence.file_name ?? evidence.url}`">
+                                                <p class="text-xs font-semibold text-red-800">Hapus evidence ini?</p>
+                                                <p class="mt-0.5 text-xs text-red-700">Evidence hilang dari tugas dan tercatat di histori. Tugas dan evidence lain tidak berubah.</p>
+                                                <div class="mt-2 flex justify-end gap-2">
+                                                    <button type="button" class="{{ $button }}" :disabled="deletingEvidenceId !== null" @click="confirmingEvidenceId = null">Batal</button>
+                                                    <button type="button" class="{{ $button }} border-red-600! bg-red-600! text-white! hover:bg-red-700!" :disabled="deletingEvidenceId !== null" @click="removeEvidence(evidence)" x-text="deletingEvidenceId === evidence.id ? 'Menghapus…' : 'Ya, Hapus'"></button>
+                                                </div>
+                                            </div>
                                         </div>
+                                        <button x-show="evidence.can_delete === true && confirmingEvidenceId !== evidence.id" type="button" class="shrink-0 rounded-md px-2 py-1 text-xs font-semibold text-red-700 hover:bg-red-50 focus-visible:outline-2 focus-visible:outline-primary"
+                                            :aria-label="`Hapus evidence ${evidence.file_name ?? evidence.url}`" @click="confirmingEvidenceId = evidence.id" data-delete-evidence>Hapus</button>
                                     </li>
                                 </template>
                             </ul>

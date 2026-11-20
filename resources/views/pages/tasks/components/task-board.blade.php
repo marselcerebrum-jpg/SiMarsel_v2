@@ -47,7 +47,10 @@
                                     <button type="button" class="block w-full text-left focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary" @click="openTask(task)" :title="task.title">
                                         <span class="line-clamp-2 text-sm font-semibold break-words text-ink" x-text="task.title"></span>
                                     </button>
-                                    <p class="mt-0.5 truncate text-[11px] text-label" x-text="task.division?.name ?? 'Tanpa divisi'" :title="task.division?.name"></p>
+                                    <p class="mt-0.5 flex min-w-0 items-center justify-between gap-2 text-[11px] text-label">
+                                        <span class="truncate" x-text="task.division?.name ?? 'Tanpa divisi'" :title="task.division?.name"></span>
+                                        <span x-show="isReadOnly(task)" class="shrink-0 rounded bg-slate-100 px-1.5 py-0.5 font-semibold text-slate-700" data-read-only>Hanya lihat</span>
+                                    </p>
 
                                     <div class="mt-2.5 flex items-center justify-between gap-2 text-xs">
                                         <span class="{{ $badge }}" :class="priorityOf(task.priority).badge" x-text="priorityOf(task.priority).label"></span>
@@ -59,9 +62,9 @@
                                         <span x-show="!task.deadline" class="text-[11px] text-label">Tanpa deadline</span>
                                     </div>
 
-                                    <p class="mt-2 flex min-w-0 items-center gap-1.5 border-t border-line pt-2 text-xs" :title="task.pic?.fullname">
+                                    <p class="mt-2 flex min-w-0 items-center gap-1.5 border-t border-line pt-2 text-xs" :title="picNames(task)">
                                         <x-icon name="user" class="size-3.5 shrink-0 text-label" />
-                                        <span class="truncate" :class="task.pic ? 'text-ink' : 'italic text-muted'" x-text="task.pic?.fullname ?? 'Belum ada PIC'"></span>
+                                        <span class="truncate" :class="task.pics?.length ? 'text-ink' : 'italic text-muted'" x-text="picNames(task) || 'Belum ada PIC'"></span>
                                     </p>
 
                                     <span x-show="movingId === task.id" class="absolute inset-0 grid place-items-center rounded-lg bg-white/70 text-xs font-semibold text-muted">Menyimpan…</span>

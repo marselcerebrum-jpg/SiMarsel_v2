@@ -79,27 +79,31 @@
 
                 <div>
                     <label for="create-task-division" class="{{ $labelClass }}">Target Divisi {!! $required !!}</label>
-                    <select id="create-task-division" x-model="form.division_id" class="{{ $inputClass }}" :class="errors.division_id && 'border-red-500!'" :disabled="optionsState !== 'ready' || user.role === 'manager'" @change="errors.division_id = null">
+                    <select id="create-task-division" x-model="form.division_id" class="{{ $inputClass }}" :class="errors.division_id && 'border-red-500!'" :disabled="optionsState !== 'ready' || creatableDivisions.length === 1" @change="errors.division_id = null">
                         <option value="">Pilih divisi</option>
                         <template x-for="division in creatableDivisions" :key="division.id">
                             <option :value="division.id" x-text="division.name"></option>
                         </template>
                     </select>
                     <p x-show="!errors.division_id" class="{{ $helperClass }}"
-                        :class="user.role === 'manager' && !creatableDivisions.length && 'text-amber-800'"
-                        x-text="user.role === 'admin' ? 'Admin dapat memilih semua divisi.' : (creatableDivisions.length ? 'Manajer hanya membuat tugas untuk divisinya.' : 'Akun Anda belum memiliki divisi. Hubungi Admin untuk menetapkan divisi.')"></p>
+                        :class="optionsState === 'ready' && !creatableDivisions.length && 'text-amber-800'"
+                        x-text="creatableDivisions.length > 1 ? 'Pilih divisi tujuan tugas.' : (creatableDivisions.length ? 'Tugas dibuat untuk divisi yang Anda kelola.' : 'Akun Anda belum memiliki divisi. Hubungi Admin untuk menetapkan divisi.')"></p>
                     <p x-show="errors.division_id" x-text="errors.division_id" class="{{ $errorClass }}"></p>
                 </div>
 
-                <div>
-                    <label for="create-task-pic" class="{{ $labelClass }}">PIC</label>
-                    <select id="create-task-pic" x-model="form.pic_id" class="{{ $inputClass }}" :class="errors.pic_id && 'border-red-500!'" :disabled="assigneeState !== 'ready'" @change="errors.pic_id = null">
-                        <option value="" x-text="{ idle: 'Pilih divisi terlebih dahulu', loading: 'Memuat pilihan…', error: 'Pilihan gagal dimuat', ready: 'Pilih PIC', empty: 'Belum ada Staff di divisi ini' }[assigneeState]"></option>
+                <div class="sm:col-span-2" role="group" aria-labelledby="create-task-pic-label">
+                    <span id="create-task-pic-label" class="{{ $labelClass }}">PIC <span class="font-normal">(dapat lebih dari satu)</span></span>
+                    <p x-show="assigneeState !== 'ready'" class="{{ $helperClass }}" x-text="{ idle: 'Memuat pilihan…', loading: 'Memuat pilihan…', error: 'Pilihan gagal dimuat', empty: 'Belum ada akun yang dapat menjadi PIC' }[assigneeState]"></p>
+                    <div x-show="assigneeState === 'ready'" class="max-h-44 divide-y divide-line overflow-y-auto rounded-lg border" :class="errors.pic_ids ? 'border-red-500' : 'border-line'">
                         <template x-for="person in assignees" :key="person.id">
-                            <option :value="person.id" x-text="person.fullname"></option>
+                            <label class="flex cursor-pointer items-center gap-2.5 px-3 py-2 text-sm hover:bg-soft">
+                                <input type="checkbox" class="accent-primary" :checked="form.pic_ids.includes(person.id)" :disabled="picDisabled(person.id)" @change="togglePic(person.id)">
+                                <span class="min-w-0 flex-1 truncate font-medium text-ink" x-text="person.fullname"></span>
+                                <span class="shrink-0 text-xs text-muted" x-text="person.division?.name ?? 'Tanpa divisi'"></span>
+                            </label>
                         </template>
-                    </select>
-                    <p x-show="errors.pic_id" x-text="errors.pic_id" class="{{ $errorClass }}"></p>
+                    </div>
+                    <p x-show="errors.pic_ids" x-text="errors.pic_ids" class="{{ $errorClass }}"></p>
                 </div>
 
                 <div>
@@ -121,7 +125,7 @@
                             <span><span class="block text-sm font-semibold text-ink">Back Log</span><span class="text-xs text-muted">Tugas belum siap dikerjakan.</span></span>
                         </label>
                         <label class="flex cursor-pointer gap-3 rounded-lg border p-3" :class="form.status === 'todo' ? 'border-primary bg-primary-soft' : 'border-line'">
-                            <input type="radio" value="todo" x-model="form.status" class="mt-0.5 accent-primary" @change="errors.pic_id = null">
+                            <input type="radio" value="todo" x-model="form.status" class="mt-0.5 accent-primary" @change="errors.pic_ids = null">
                             <span><span class="block text-sm font-semibold text-ink">To Do</span><span class="text-xs text-muted">Siap dikerjakan, wajib memiliki PIC.</span></span>
                         </label>
                     </div>

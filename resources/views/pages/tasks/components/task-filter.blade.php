@@ -19,6 +19,20 @@
         </template>
     </div>
 
+    {{-- Cakupan Papan dan Tabel: seluruh tugas lintas divisi, atau tugas dengan akun ini sebagai PIC aktif. --}}
+    <div x-show="view === 'board' || view === 'table'" class="inline-flex shrink-0 self-start rounded-lg border border-line bg-soft p-1" role="group" aria-label="Cakupan tugas" data-task-scope>
+        <template x-for="item in scopes" :key="item.key">
+            <button
+                type="button"
+                class="rounded-md px-3.5 py-1 text-sm font-semibold whitespace-nowrap focus-visible:outline-2 focus-visible:outline-primary"
+                :class="taskScope === item.key ? 'bg-white text-ink shadow-sm' : 'text-muted hover:text-ink'"
+                :aria-pressed="taskScope === item.key"
+                @click="taskScope = item.key"
+                x-text="item.label"
+            ></button>
+        </template>
+    </div>
+
     {{-- Lebar tiap filter mengikuti isinya agar teks tidak terpotong; baris membungkus bila tidak muat. --}}
     <div class="flex min-w-0 flex-1 flex-wrap items-center gap-2">
         <label class="relative block min-w-0 basis-full sm:min-w-48 sm:flex-1 sm:basis-auto">
@@ -28,18 +42,17 @@
                 class="h-9 w-full rounded-lg border border-line bg-white pr-3 pl-9 text-sm text-ink placeholder:text-label focus:border-primary focus:ring-2 focus:ring-primary/20 focus:outline-none">
         </label>
 
-        <label x-show="user.role !== 'staff' && view !== 'timeline'" class="block min-w-0 flex-1 sm:max-w-60 sm:flex-none">
+        <label x-show="view !== 'timeline'" class="block min-w-0 basis-full sm:max-w-60 sm:flex-none sm:basis-auto">
             <span class="sr-only">Divisi</span>
-            <select id="task-division" x-model="filters.division" class="{{ $selectClass }}" :disabled="user.role === 'manager'" title="Divisi">
-                <template x-if="user.role === 'admin'"><option value="">Semua Divisi</option></template>
-                <template x-if="user.role === 'manager' && !divisionOptions.length"><option value="">Divisi belum ditetapkan</option></template>
+            <select id="task-division" x-model="filters.division" class="{{ $selectClass }}" title="Divisi">
+                <option value="">Semua Divisi</option>
                 <template x-for="division in divisionOptions" :key="division.code_division">
                     <option :value="division.code_division" x-text="division.name" :selected="filters.division === division.code_division"></option>
                 </template>
             </select>
         </label>
 
-        <label class="block flex-1 sm:flex-none">
+        <label class="block min-w-36 flex-1 sm:min-w-0 sm:flex-none">
             <span class="sr-only">Prioritas</span>
             <select id="task-priority" x-model="filters.priority" class="{{ $selectClass }}" title="Prioritas">
                 <option value="">Semua Prioritas</option>
@@ -49,7 +62,7 @@
             </select>
         </label>
 
-        <label class="block flex-1 sm:flex-none">
+        <label class="block min-w-36 flex-1 sm:min-w-0 sm:flex-none">
             <span class="sr-only">Status</span>
             <select id="task-status" x-model="filters.status" class="{{ $selectClass }}" title="Status">
                 <option value="">Semua Status</option>
@@ -59,7 +72,7 @@
             </select>
         </label>
 
-        <button type="button" class="{{ $button }} shrink-0" :disabled="!hasActiveFilter && !hasPeriodConfiguration" @click="resetFilters()">Atur Ulang Filter</button>
+        <button type="button" class="{{ $button }} shrink-0 basis-full sm:basis-auto" :disabled="!hasActiveFilter && !hasPeriodConfiguration" @click="resetFilters()">Atur Ulang Filter</button>
     </div>
 </div>
 

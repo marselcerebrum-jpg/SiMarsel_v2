@@ -5,17 +5,19 @@ import { http } from '../http';
  * Endpoint Tasklist lain yang belum terintegrasi tetap menunggu VITE_TASK_API_READY=true.
  * Kontrak lengkap ada di docs/api/tasks.md.
  *
- * GET    /api/tasks/meta                       → { data: { role, division, default_division, can_create, divisions, statuses, priorities } }
- * GET    /api/tasks?search&division&priority&status → { data: [Task], meta: { status_counts } }
+ * GET    /api/tasks/meta                       → { data: { role, role_code, permissions, division, default_division, can_create, divisions, statuses, priorities } }
+ * GET    /api/tasks?scope&search&division&priority&status → { data: [Task], meta: { status_counts } }   (scope: all_tasks | my_tasks)
  * GET    /api/tasks/monitoring?scope&search&division&priority&status → { data: { scope, as_of, metrics, by_priority, by_division } }
  * POST   /api/tasks                            → { data: Task, message }
  * GET    /api/tasks/{id}                       → { data: TaskDetail }
  * PATCH  /api/tasks/{id}                       → { data: TaskDetail, message }         (kirim version)
+ * DELETE /api/tasks/{id}                       → { message }                           (kirim version)
  * PATCH  /api/tasks/{id}/status                → { data: TaskDetail, message }         (kirim status, version)
- * GET    /api/tasks/{id}/assignment-options    → { data: { current_division, can_change_division, locked_reason, divisions } }
- * PATCH  /api/tasks/{id}/assignment            → { data: TaskDetail, message }         (kirim pic_id, version, division_id opsional)
+ * GET    /api/tasks/{id}/assignment-options    → { data: { current_pics, current_division, can_change_division, locked_reason, divisions, pics } }
+ * PATCH  /api/tasks/{id}/assignment            → { data: TaskDetail, message }         (kirim pic_ids, version, division_id opsional)
  * GET    /api/tasks/{id}/evidences             → { data: [Evidence] }
  * POST   /api/tasks/{id}/evidences             → { data: Evidence, message }           (multipart: file atau url, note)
+ * DELETE /api/tasks/{id}/evidences/{evidence}  → { message }                           (hanya evidence dengan can_delete)
  * POST   /api/tasks/{id}/reviews               → { data: TaskDetail, message }         (kirim decision, note, version)
  * GET    /api/tasks/{id}/activities            → { data: [Activity] }                  (terbaru lebih dulu)
  * GET    /api/tasks/schedule?from&to&division  → { data: [ScheduleItem] }
@@ -48,6 +50,8 @@ export const fetchTask = (id) => http(`/api/tasks/${id}`);
 
 export const updateTask = (id, body) => http(`/api/tasks/${id}`, { method: 'PATCH', body });
 
+export const deleteTask = (id, body) => http(`/api/tasks/${id}`, { method: 'DELETE', body });
+
 export const changeTaskStatus = (id, body) => http(`/api/tasks/${id}/status`, { method: 'PATCH', body });
 
 export const fetchAssignmentOptions = (id) => http(`/api/tasks/${id}/assignment-options`);
@@ -56,6 +60,9 @@ export const assignTask = (id, body) => http(`/api/tasks/${id}/assignment`, { me
 
 // Evidence tidak bergantung pada VITE_TASK_API_READY: API-nya sudah tersedia.
 export const fetchEvidences = (id) => http(`/api/tasks/${id}/evidences`);
+
+// Hanya PIC aktif yang mengunggahnya yang boleh menghapus (flag can_delete per evidence); soft delete di backend.
+export const deleteEvidence = (taskId, evidenceId) => http(`/api/tasks/${taskId}/evidences/${evidenceId}`, { method: 'DELETE' });
 
 // Keputusan QA (approve/revisi) tidak bergantung pada VITE_TASK_API_READY: API-nya sudah tersedia.
 export const reviewTask = (id, body) => http(`/api/tasks/${id}/reviews`, { method: 'POST', body });

@@ -57,7 +57,8 @@
 
 <div x-show="!loading && emptyKind === 'none'" x-cloak class="flex flex-col items-center gap-1 rounded-lg border border-dashed border-line bg-soft px-4 py-12 text-center">
     <p class="text-sm font-semibold text-ink">Belum ada tugas yang tersedia.</p>
-    <p x-show="canCreate" class="text-sm text-muted">Buat tugas pertama melalui tombol Buat Tugas.</p>
+    <p x-show="taskScope === 'my_tasks'" class="text-sm text-muted">Anda belum menjadi PIC aktif pada tugas apa pun.</p>
+    <p x-show="canCreate && taskScope !== 'my_tasks'" class="text-sm text-muted">Buat tugas pertama melalui tombol Buat Tugas.</p>
 </div>
 
 <div x-show="emptyKind === 'filtered'" x-cloak class="flex flex-col items-center gap-3 rounded-lg border border-dashed border-line bg-soft px-4 py-12 text-center">

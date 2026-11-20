@@ -8,8 +8,8 @@ export const STATUSES = [
     { key: 'backlog', label: 'Back Log', dot: 'bg-slate-400', badge: 'bg-slate-100 text-slate-700' },
     { key: 'todo', label: 'To Do', dot: 'bg-sky-500', badge: 'bg-sky-50 text-sky-700' },
     { key: 'in_progress', label: 'On Process', dot: 'bg-amber-500', badge: 'bg-amber-50 text-amber-800' },
-    { key: 'ready_for_qa', label: 'Ready for QA', dot: 'bg-violet-500', badge: 'bg-violet-50 text-violet-700' },
-    { key: 'on_qa', label: 'On QA', dot: 'bg-fuchsia-500', badge: 'bg-fuchsia-50 text-fuchsia-700' },
+    { key: 'ready_review', label: 'Ready Review', dot: 'bg-violet-500', badge: 'bg-violet-50 text-violet-700' },
+    { key: 'on_review', label: 'On Review', dot: 'bg-fuchsia-500', badge: 'bg-fuchsia-50 text-fuchsia-700' },
     { key: 'done', label: 'Done', dot: 'bg-emerald-500', badge: 'bg-emerald-50 text-emerald-700' },
 ];
 
@@ -26,34 +26,47 @@ export const priorityOf = (key) => PRIORITIES.find((priority) => priority.key ==
 
 /**
  * Role dari meta API bila tersedia; sebelum itu diturunkan dari role akun yang login.
- * Kode ADM disiapkan untuk role Admin yang belum ada di tabel roles.
+ * meta.role tetap tiga nilai; roleCode membedakan Supervisor dan Freelance dari Staff.
  */
-const ROLE_BY_CODE = { ADM: 'admin', MGR: 'manager', EMP: 'staff' };
+const ROLE_BY_CODE = { ADM: 'admin', MGR: 'manager', SPV: 'staff', EMP: 'staff', FRL: 'staff' };
+
+// Ringkasan kewenangan untuk ditampilkan; keputusan per tugas tetap dari flag backend.
+const ROLE_ACCESS = {
+    ADM: { label: 'Admin', text: 'Melihat dan mengelola tugas seluruh divisi.' },
+    MGR: { label: 'Manajer', text: 'Melihat dan mengelola tugas seluruh divisi, termasuk penugasan PIC dan review.' },
+    SPV: { label: 'Supervisor', text: 'Melihat tugas seluruh divisi; mengelola dan me-review tugas divisi yang dikelola.' },
+    EMP: { label: 'Staff', text: 'Melihat tugas seluruh divisi; mengerjakan tugas dengan Anda sebagai PIC aktif.' },
+    FRL: { label: 'Freelance', text: 'Melihat tugas seluruh divisi; mengerjakan tugas dengan Anda sebagai PIC aktif.' },
+};
+
+export const roleAccessOf = (roleCode) => ROLE_ACCESS[roleCode] ?? { label: 'Pengguna', text: 'Melihat tugas seluruh divisi.' };
 
 export function userContext(sessionUser, meta = null) {
     return {
         id: sessionUser?.id ?? null,
         role: meta?.role ?? ROLE_BY_CODE[sessionUser?.role?.code_role] ?? 'staff',
+        roleCode: meta?.role_code ?? sessionUser?.role?.code_role ?? null,
         // Divisi yang dikelola: dari meta backend bila ada, selain itu divisi akun.
         division: meta?.division ?? sessionUser?.division?.code_division ?? null,
     };
 }
 
-export const isReviewer = (user) => user.role === 'admin' || user.role === 'manager';
+// PIC aktif sebuah tugas: satu tugas dapat memiliki beberapa PIC.
+export const isTaskPic = (task, user) => (task.pics ?? []).some(({ id }) => id === user.id);
 
-const isPic = (task, user) => task.pic?.id !== undefined && task.pic?.id === user.id;
-
-// Admin berwenang atas semua divisi; Manajer hanya atas divisinya sendiri.
+// Admin dan Manajer berwenang atas semua divisi; Supervisor atas divisi yang dikelolanya.
 export const managesTask = (task, user) =>
-    user.role === 'admin' || (user.role === 'manager' && task.division?.code_division === user.division);
+    user.role === 'admin'
+    || user.role === 'manager'
+    || (user.roleCode === 'SPV' && Boolean(user.division) && task.division?.code_division === user.division);
 
-export const canEditTask = (task, user) => managesTask(task, user) && task.status !== 'done';
+export const canEditTask = (task, user) => task.can_edit !== false && managesTask(task, user) && task.status !== 'done';
 
-const LOCKED_ASSIGNMENT = ['ready_for_qa', 'on_qa', 'done'];
+const LOCKED_ASSIGNMENT = ['ready_review', 'on_review', 'done'];
 
 export function assignmentRule(task, user) {
-    if (!managesTask(task, user)) return { ok: false, reason: 'Hanya Admin atau Manajer divisi ini yang dapat mengganti PIC.' };
-    if (LOCKED_ASSIGNMENT.includes(task.status)) return { ok: false, reason: `PIC tidak dapat diganti saat status ${statusOf(task.status).label}.` };
+    if (!managesTask(task, user)) return { ok: false, reason: 'Hanya Admin, Manajer, atau Supervisor divisi ini yang dapat mengatur PIC.' };
+    if (LOCKED_ASSIGNMENT.includes(task.status)) return { ok: false, reason: `PIC tidak dapat diubah saat status ${statusOf(task.status).label}.` };
 
     return { ok: true, reason: '' };
 }
@@ -64,11 +77,11 @@ export function assignmentRule(task, user) {
 export const TRANSITIONS = [
     { from: 'backlog', to: 'todo', actor: 'manager', label: 'Siap Dikerjakan' },
     { from: 'todo', to: 'in_progress', actor: 'pic', label: 'Mulai Kerjakan' },
-    { from: 'in_progress', to: 'ready_for_qa', actor: 'pic', when: 'requires_review', label: 'Kirim ke QA' },
+    { from: 'in_progress', to: 'ready_review', actor: 'pic', when: 'requires_review', label: 'Kirim ke QA' },
     { from: 'in_progress', to: 'done', actor: 'pic', when: 'no_review', label: 'Selesaikan Tugas' },
-    { from: 'ready_for_qa', to: 'on_qa', actor: 'manager', label: 'Mulai Review' },
-    { from: 'on_qa', to: 'done', actor: 'manager', label: 'Setujui', review: 'approve' },
-    { from: 'on_qa', to: 'in_progress', actor: 'manager', label: 'Minta Revisi', review: 'revision' },
+    { from: 'ready_review', to: 'on_review', actor: 'manager', label: 'Mulai Review' },
+    { from: 'on_review', to: 'done', actor: 'manager', label: 'Setujui', review: 'approve' },
+    { from: 'on_review', to: 'in_progress', actor: 'manager', label: 'Minta Revisi', review: 'revision' },
 ];
 
 /**
@@ -81,13 +94,15 @@ export function transitionRule(task, to, user) {
     const rule = TRANSITIONS.find((item) => item.from === task.status && item.to === to);
     if (!rule) return { ok: false, reason: `Perpindahan dari ${statusOf(task.status).label} ke ${statusOf(to).label} tidak diizinkan.` };
 
-    if (rule.actor === 'pic' && !isPic(task, user)) return { ok: false, reason: 'Hanya PIC tugas ini yang dapat mengubah status tersebut.' };
-    if (rule.actor === 'manager' && !managesTask(task, user)) return { ok: false, reason: 'Hanya Admin atau Manajer divisi ini yang dapat mengubah status tersebut.' };
+    if (rule.actor === 'pic' && !isTaskPic(task, user)) return { ok: false, reason: 'Hanya PIC tugas ini yang dapat mengubah status tersebut.' };
+    if (rule.actor === 'manager' && !managesTask(task, user)) return { ok: false, reason: 'Hanya Admin, Manajer, atau Supervisor divisi ini yang dapat mengubah status tersebut.' };
+    // Permission ubah status ditentukan backend (can_change_status); keputusan QA mengikuti can_review di detail.
+    if (!rule.review && task.can_change_status === false) return { ok: false, reason: 'Anda tidak memiliki izin untuk mengubah status tugas ini.' };
 
     if (rule.when === 'requires_review' && !task.requires_review) return { ok: false, reason: 'Tugas ini tidak wajib QA. Gunakan status Done.' };
-    if (rule.when === 'no_review' && task.requires_review) return { ok: false, reason: 'Tugas ini wajib QA. Kirim ke Ready for QA terlebih dahulu.' };
+    if (rule.when === 'no_review' && task.requires_review) return { ok: false, reason: 'Tugas ini wajib QA. Kirim ke Ready Review terlebih dahulu.' };
 
-    if (rule.from === 'backlog' && !task.pic) return { ok: false, reason: 'Tetapkan PIC terlebih dahulu sebelum tugas masuk To Do.' };
+    if (rule.from === 'backlog' && !task.pics?.length) return { ok: false, reason: 'Tetapkan PIC terlebih dahulu sebelum tugas masuk To Do.' };
     if (rule.actor === 'pic' && rule.to !== 'in_progress' && task.evidence_required && !task.evidence_count) {
         return { ok: false, reason: 'Tambahkan evidence terlebih dahulu sebelum mengirim hasil pekerjaan.' };
     }
