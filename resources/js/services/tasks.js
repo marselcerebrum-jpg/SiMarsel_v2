@@ -20,6 +20,8 @@ import { http } from '../http';
  * DELETE /api/tasks/{id}/evidences/{evidence}  → { message }                           (hanya evidence dengan can_delete)
  * POST   /api/tasks/{id}/reviews               → { data: TaskDetail, message }         (kirim decision, note, version)
  * GET    /api/tasks/{id}/activities            → { data: [Activity] }                  (terbaru lebih dulu)
+ * GET    /api/tasks/{id}/comments              → { data: [Comment] }                   (terlama lebih dulu)
+ * POST   /api/tasks/{id}/comments              → { data: Comment, message }            (kirim content, client_request_id, parent_comment_id opsional)
  * GET    /api/tasks/schedule?from&to&division  → { data: [ScheduleItem] }
  * GET    /api/tasks/calendar?month&division    → { data: { events: [Event], deadlines: [Task] } }
  */
@@ -69,6 +71,11 @@ export const reviewTask = (id, body) => http(`/api/tasks/${id}/reviews`, { metho
 
 // Histori aktivitas tidak bergantung pada VITE_TASK_API_READY: API-nya sudah tersedia.
 export const fetchActivities = (id) => http(`/api/tasks/${id}/activities`);
+
+// Komentar dan balasan (TASK-16) tidak bergantung pada VITE_TASK_API_READY: API-nya sudah tersedia.
+export const fetchComments = (id) => http(`/api/tasks/${id}/comments`);
+
+export const postComment = (id, body) => http(`/api/tasks/${id}/comments`, { method: 'POST', body });
 
 // Jadwal Timeline tidak bergantung pada VITE_TASK_API_READY: API-nya sudah tersedia.
 export const fetchSchedule = (params) => http(`/api/tasks/schedule${query(params)}`);

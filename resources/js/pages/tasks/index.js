@@ -7,11 +7,13 @@ import {
     createTask,
     deleteEvidence,
     deleteTask,
+    postComment,
     fetchAssignmentOptions,
     fetchCalendar,
     fetchDivisions,
     fetchSchedule,
     fetchActivities,
+    fetchComments,
     fetchTask,
     fetchTaskMonitoring,
     fetchTaskCreateOptions,
@@ -64,6 +66,27 @@ const SUMMARY_FIELDS = [
 
 const affectsSummary = (before, after) => !before || SUMMARY_FIELDS.some((field) => field(after) !== undefined && field(after) !== field(before));
 const PAGE_SIZE = 10;
+const COMMENT_MAX = 2000;
+
+// Gabungan komentar berdasarkan ID (data backend menang), berurutan waktu seperti GET comments.
+const mergeComments = (shown, loaded) => [...new Map([...shown, ...loaded].map((comment) => [comment.id, comment])).values()]
+    .sort((a, b) => (a.created_at ?? '').localeCompare(b.created_at ?? '') || a.id - b.id);
+
+// client_request_id untuk satu pengiriman komentar. crypto.randomUUID hanya ada di konteks aman (HTTPS/localhost),
+// jadi di HTTP biasa UUID v4 disusun dari getRandomValues.
+function newRequestId() {
+    const api = globalThis.crypto;
+    if (typeof api?.randomUUID === 'function') return api.randomUUID();
+
+    const bytes = typeof api?.getRandomValues === 'function'
+        ? api.getRandomValues(new Uint8Array(16))
+        : Uint8Array.from({ length: 16 }, () => Math.floor(Math.random() * 256));
+    bytes[6] = (bytes[6] & 0x0f) | 0x40;
+    bytes[8] = (bytes[8] & 0x3f) | 0x80;
+    const hex = [...bytes].map((byte) => byte.toString(16).padStart(2, '0')).join('');
+
+    return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
 
 // Backend mengirim kesalahan PIC di pic_ids atau pic_ids.N; keduanya ditampilkan pada satu field.
 const picError = (errors) => Object.entries(errors).find(([key]) => key === 'pic_ids' || key.startsWith('pic_ids.'))?.[1];
@@ -1002,13 +1025,25 @@ Alpine.data('taskDetail', () => ({
     reviewError: '',
     acting: null,
 
+    // Diskusi (TASK-16): satu thread per tugas; balasan menunjuk komentar induknya.
+    comments: [],
+    commentState: 'idle',
+    commentError: '',
+    commentRequest: 0,
+    commentForm: { content: '', parentId: null },
+    commentFormError: '',
+    // ID pengiriman yang sedang diupayakan: { key, id }. Kirim ulang isi yang sama memakai ID yang sama.
+    commentSend: null,
+    sendingComment: false,
+
     init() {
         this.$watch('detailId', (id) => (id ? this.open(id) : this.reset()));
     },
 
     reset() {
-        Object.assign(this, { task: null, state: 'idle', editing: false, confirmingDelete: false, assigneeState: 'idle', reviewMode: null, reviewNote: '', reviewError: '', evidences: [], evidenceErrors: {}, confirmingEvidenceId: null, activities: [], activityState: 'idle', activityError: '' });
+        Object.assign(this, { task: null, state: 'idle', editing: false, confirmingDelete: false, assigneeState: 'idle', reviewMode: null, reviewNote: '', reviewError: '', evidences: [], evidenceErrors: {}, confirmingEvidenceId: null, activities: [], activityState: 'idle', activityError: '', comments: [], commentState: 'idle', commentError: '', commentForm: { content: '', parentId: null }, commentFormError: '', commentSend: null, sendingComment: false });
         this.activityRequest += 1;
+        this.commentRequest += 1;
     },
 
     async open(id) {
@@ -1029,7 +1064,7 @@ Alpine.data('taskDetail', () => ({
                 else showToast({ type: 'info', title: 'Revisi tidak dapat diminta', text: 'Anda tidak dapat memberi keputusan QA untuk tugas ini saat ini.', duration: 5000 });
             }
             if (this.detailFocus === 'edit' && this.canEditThis) this.startEdit();
-            await this.loadActivities();
+            await Promise.all([this.loadActivities(), this.loadComments()]);
         } catch (error) {
             if (this.highlightId === id) this.highlightId = null;
             this.state = error?.unavailable ? 'unavailable' : { 403: 'forbidden', 404: 'not_found' }[error?.status] ?? 'error';
@@ -1083,6 +1118,151 @@ Alpine.data('taskDetail', () => ({
             if (request !== this.activityRequest) return;
             this.activityState = 'error';
             this.activityError = taskErrorMessage(error, 'Histori aktivitas gagal dimuat.');
+        }
+    },
+
+    // --- Diskusi (TASK-16) ----------------------------------------------------------------------
+
+    // Thread dimuat dari API komentar dengan state loading dan error sendiri; respons tugas lain diabaikan.
+    // quiet: muat ulang setelah kirim tanpa skeleton; hasilnya digabung dengan yang sudah tampil, dan kegagalannya
+    // tidak menimpa thread yang ada.
+    async loadComments({ quiet = false } = {}) {
+        const id = this.task?.id;
+        if (!id) return;
+
+        const request = ++this.commentRequest;
+        if (!quiet) {
+            this.commentState = 'loading';
+            this.commentError = '';
+        }
+
+        try {
+            const { data } = await fetchComments(id);
+            if (request !== this.commentRequest || this.task?.id !== id) return;
+            this.comments = quiet ? mergeComments(this.comments, data) : data;
+            this.commentState = 'ready';
+            this.commentError = '';
+        } catch (error) {
+            if (request !== this.commentRequest || this.task?.id !== id || quiet) return;
+            this.commentState = 'error';
+            this.commentError = taskErrorMessage(error, 'Komentar gagal dimuat.');
+        }
+    },
+
+    /**
+     * Komentar utama berurutan waktu, masing-masing dengan seluruh balasannya (termasuk balasan atas balasan)
+     * berurutan waktu di bawahnya. Balasan yang induknya tidak ada di daftar tampil sebagai komentar utama.
+     */
+    get commentThreads() {
+        const byId = new Map(this.comments.map((comment) => [comment.id, comment]));
+        const rootOf = (comment) => {
+            const seen = new Set();
+            let current = comment;
+            while (current.parent_comment_id && byId.has(current.parent_comment_id) && !seen.has(current.id)) {
+                seen.add(current.id);
+                current = byId.get(current.parent_comment_id);
+            }
+
+            return current;
+        };
+        const threads = new Map();
+
+        for (const comment of this.comments) {
+            const root = rootOf(comment);
+            if (!threads.has(root.id)) threads.set(root.id, { root, replies: [] });
+            if (root.id !== comment.id) threads.get(root.id).replies.push(comment);
+        }
+
+        return [...threads.values()];
+    },
+
+    // Mengikuti can_comment dari backend: Done, akses baca saja, atau PIC yang sudah dilepas tidak dapat mengirim.
+    get canComment() {
+        return this.task?.can_comment === true;
+    },
+
+    get commentReadOnlyNote() {
+        if (this.canComment || !this.task) return '';
+        if (this.task.status === 'done') return 'Tugas sudah selesai. Diskusi tetap dapat dibaca, tetapi komentar baru tidak dapat ditambahkan.';
+
+        return 'Anda dapat membaca diskusi ini. Komentar hanya dapat dikirim oleh Admin, Manajer, Supervisor divisi tugas, dan PIC aktif.';
+    },
+
+    get replyTarget() {
+        return this.comments.find((comment) => comment.id === this.commentForm.parentId) ?? null;
+    },
+
+    startReply(comment) {
+        this.commentForm.parentId = comment.id;
+        this.commentFormError = '';
+        this.$nextTick(() => this.$refs.commentInput?.focus());
+    },
+
+    cancelReply() {
+        this.commentForm.parentId = null;
+        this.commentFormError = '';
+    },
+
+    /**
+     * Komentar baru tampil hanya setelah backend menyimpannya. Isi dan balasan yang sama dikirim ulang dengan
+     * client_request_id yang sama, sehingga kegagalan jaringan tidak menghasilkan komentar ganda; isi atau komentar
+     * induk yang diubah adalah pengiriman baru. Komentar tidak mengubah status, review, atau PIC.
+     */
+    async sendComment() {
+        if (this.sendingComment || !this.canComment) return;
+
+        const content = this.commentForm.content.trim();
+        const parentId = this.commentForm.parentId;
+        if (!content) {
+            this.commentFormError = 'Komentar tidak boleh kosong.';
+            return;
+        }
+        if (content.length > COMMENT_MAX) {
+            this.commentFormError = `Komentar maksimal ${COMMENT_MAX} karakter.`;
+            return;
+        }
+
+        const id = this.task.id;
+        const key = JSON.stringify([id, parentId, content]);
+        if (this.commentSend?.key !== key) this.commentSend = { key, id: newRequestId() };
+
+        this.sendingComment = true;
+        this.commentFormError = '';
+
+        try {
+            const { data } = await postComment(id, {
+                content,
+                client_request_id: this.commentSend.id,
+                ...(parentId ? { parent_comment_id: parentId } : {}),
+            });
+            if (this.task?.id !== id) return;
+
+            if (!this.comments.some((comment) => comment.id === data.id)) this.comments = [...this.comments, data];
+            this.commentForm = { content: '', parentId: null };
+            this.commentSend = null;
+            // Thread disamakan dengan backend: komentar yang tersimpan saat respons sebelumnya tidak sampai, atau
+            // komentar akun lain, ikut tampil.
+            this.loadComments({ quiet: true });
+            // Histori mencatat komentar ini; can_comment ikut diperbarui.
+            this.refreshDetail('Komentar tersimpan, tetapi histori aktivitas gagal diperbarui.');
+        } catch (error) {
+            if (this.task?.id !== id) return;
+
+            const errors = error?.status === 422 ? validationErrors(error) : {};
+            if (errors.parent_comment_id) {
+                this.commentForm.parentId = null;
+                this.loadComments();
+            }
+            // ID yang ditolak tidak dapat dipakai lagi; pengiriman berikutnya memakai ID baru.
+            if (errors.client_request_id) this.commentSend = null;
+            this.commentFormError = errors.content ?? errors.parent_comment_id ?? errors.client_request_id
+                ?? (error?.status === 403
+                    ? 'Anda tidak lagi dapat mengirim komentar pada tugas ini.'
+                    : taskErrorMessage(error, 'Komentar gagal dikirim. Periksa koneksi Anda, lalu kirim lagi.'));
+            // Status atau PIC mungkin sudah berubah sejak detail dibuka: ambil can_comment terbaru.
+            if (error?.status === 403 || errors.content) this.refreshDetail('Histori aktivitas gagal diperbarui.');
+        } finally {
+            this.sendingComment = false;
         }
     },
 
