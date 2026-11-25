@@ -35,8 +35,8 @@ const ROLE_ACCESS = {
     ADM: { label: 'Admin', text: 'Melihat dan mengelola tugas seluruh divisi.' },
     MGR: { label: 'Manajer', text: 'Melihat dan mengelola tugas seluruh divisi, termasuk penugasan PIC dan review.' },
     SPV: { label: 'Supervisor', text: 'Melihat tugas seluruh divisi; mengelola dan me-review tugas divisi yang dikelola.' },
-    EMP: { label: 'Staff', text: 'Melihat tugas seluruh divisi; mengerjakan tugas dengan Anda sebagai PIC aktif.' },
-    FRL: { label: 'Freelance', text: 'Melihat tugas seluruh divisi; mengerjakan tugas dengan Anda sebagai PIC aktif.' },
+    EMP: { label: 'Staff', text: 'Melihat tugas seluruh divisi; mengerjakan tugas dengan Anda sebagai PIC aktif sampai Ready Review.' },
+    FRL: { label: 'Freelance', text: 'Melihat tugas seluruh divisi; mengerjakan tugas dengan Anda sebagai PIC aktif sampai Ready Review.' },
 };
 
 export const roleAccessOf = (roleCode) => ROLE_ACCESS[roleCode] ?? { label: 'Pengguna', text: 'Melihat tugas seluruh divisi.' };
@@ -48,6 +48,8 @@ export function userContext(sessionUser, meta = null) {
         roleCode: meta?.role_code ?? sessionUser?.role?.code_role ?? null,
         // Divisi yang dikelola: dari meta backend bila ada, selain itu divisi akun.
         division: meta?.division ?? sessionUser?.division?.code_division ?? null,
+        // Kode permission dari meta; null sampai meta dimuat.
+        permissions: Array.isArray(meta?.permissions) ? meta.permissions : null,
     };
 }
 
@@ -72,17 +74,23 @@ export function assignmentRule(task, user) {
 }
 
 /**
- * Transition matrix TASK-05. `actor`: siapa yang boleh memindahkan; `when`: syarat tambahan.
+ * Transition matrix TASK-05, diperbarui TASK-17. `actor`:
+ * - `worker`: PIC aktif, atau Admin/Manajer/Supervisor divisi yang mengelola tugas (Back Log sampai Ready Review);
+ * - `reviewer`: hanya Admin/Manajer/Supervisor divisi dengan izin review (On Review dan Done, termasuk self-approval).
+ * `when`: syarat kewajiban review. `review`: keputusan formal lewat endpoint review, bukan endpoint status.
  */
 export const TRANSITIONS = [
-    { from: 'backlog', to: 'todo', actor: 'manager', label: 'Siap Dikerjakan' },
-    { from: 'todo', to: 'in_progress', actor: 'pic', label: 'Mulai Kerjakan' },
-    { from: 'in_progress', to: 'ready_review', actor: 'pic', when: 'requires_review', label: 'Kirim ke QA' },
-    { from: 'in_progress', to: 'done', actor: 'pic', when: 'no_review', label: 'Selesaikan Tugas' },
-    { from: 'ready_review', to: 'on_review', actor: 'manager', label: 'Mulai Review' },
-    { from: 'on_review', to: 'done', actor: 'manager', label: 'Setujui', review: 'approve' },
-    { from: 'on_review', to: 'in_progress', actor: 'manager', label: 'Minta Revisi', review: 'revision' },
+    { from: 'backlog', to: 'todo', actor: 'worker', label: 'Siap Dikerjakan' },
+    { from: 'todo', to: 'in_progress', actor: 'worker', label: 'Mulai Kerjakan' },
+    { from: 'in_progress', to: 'ready_review', actor: 'worker', when: 'requires_review', label: 'Kirim ke Review' },
+    { from: 'in_progress', to: 'done', actor: 'reviewer', when: 'no_review', label: 'Selesaikan Tugas' },
+    { from: 'ready_review', to: 'on_review', actor: 'reviewer', label: 'Mulai Review' },
+    { from: 'on_review', to: 'done', actor: 'reviewer', label: 'Setujui', review: 'approve' },
+    { from: 'on_review', to: 'backlog', actor: 'reviewer', label: 'Minta Revisi', review: 'revision' },
 ];
+
+// Izin review dari meta (task.review); sebelum meta dimuat, kewenangan dianggap ada dan backend yang memutuskan.
+const hasReviewPermission = (user) => !Array.isArray(user.permissions) || user.permissions.includes('task.review');
 
 /**
  * Apakah user boleh memindahkan tugas ke status `to`. Mengembalikan alasan penolakan
@@ -94,17 +102,23 @@ export function transitionRule(task, to, user) {
     const rule = TRANSITIONS.find((item) => item.from === task.status && item.to === to);
     if (!rule) return { ok: false, reason: `Perpindahan dari ${statusOf(task.status).label} ke ${statusOf(to).label} tidak diizinkan.` };
 
-    if (rule.actor === 'pic' && !isTaskPic(task, user)) return { ok: false, reason: 'Hanya PIC tugas ini yang dapat mengubah status tersebut.' };
-    if (rule.actor === 'manager' && !managesTask(task, user)) return { ok: false, reason: 'Hanya Admin, Manajer, atau Supervisor divisi ini yang dapat mengubah status tersebut.' };
-    // Permission ditentukan backend: ubah status lewat can_change_status, keputusan QA (Approve/Revisi) lewat can_review.
-    if (!rule.review && task.can_change_status === false) return { ok: false, reason: 'Anda tidak memiliki izin untuk mengubah status tugas ini.' };
-    if (rule.review && task.can_review !== true) return { ok: false, reason: 'Anda tidak memiliki izin untuk memberi keputusan QA pada tugas ini.' };
+    if (rule.when === 'requires_review' && !task.requires_review) return { ok: false, reason: 'Tugas ini tidak wajib review. Admin, Manajer, atau Supervisor divisi dapat menyelesaikannya langsung.' };
+    if (rule.when === 'no_review' && task.requires_review) return { ok: false, reason: 'Tugas ini wajib review. Kirim ke Ready Review terlebih dahulu.' };
 
-    if (rule.when === 'requires_review' && !task.requires_review) return { ok: false, reason: 'Tugas ini tidak wajib QA. Gunakan status Done.' };
-    if (rule.when === 'no_review' && task.requires_review) return { ok: false, reason: 'Tugas ini wajib QA. Kirim ke Ready Review terlebih dahulu.' };
+    if (rule.actor === 'worker' && !isTaskPic(task, user) && !managesTask(task, user)) {
+        return { ok: false, reason: 'Hanya PIC aktif, Admin, Manajer, atau Supervisor divisi ini yang dapat mengubah status tersebut.' };
+    }
+    if (rule.actor === 'reviewer' && !managesTask(task, user)) {
+        return { ok: false, reason: `Hanya Admin, Manajer, atau Supervisor divisi ini yang dapat memindahkan tugas ke ${statusOf(to).label}.` };
+    }
+    if (rule.actor === 'reviewer' && !hasReviewPermission(user)) return { ok: false, reason: 'Anda tidak memiliki izin review untuk tugas ini.' };
+    // Permission ditentukan backend: ubah status lewat can_change_status, keputusan review (Approve/Revisi) lewat can_review.
+    if (!rule.review && task.can_change_status === false) return { ok: false, reason: 'Anda tidak memiliki izin untuk mengubah status tugas ini.' };
+    if (rule.review && task.can_review !== true) return { ok: false, reason: 'Anda tidak memiliki izin untuk memberi keputusan review pada tugas ini.' };
 
     if (rule.from === 'backlog' && !task.pics?.length) return { ok: false, reason: 'Tetapkan PIC terlebih dahulu sebelum tugas masuk To Do.' };
-    if (rule.actor === 'pic' && rule.to !== 'in_progress' && task.evidence_required && !task.evidence_count) {
+    // Backend menolak keluar dari On Process tanpa evidence wajib, siapa pun yang memindahkan.
+    if (rule.from === 'in_progress' && task.evidence_required && !task.evidence_count) {
         return { ok: false, reason: 'Tambahkan evidence terlebih dahulu sebelum mengirim hasil pekerjaan.' };
     }
 

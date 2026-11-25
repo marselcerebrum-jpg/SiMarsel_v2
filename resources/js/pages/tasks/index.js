@@ -772,7 +772,7 @@ Alpine.data('tasklist', () => ({
         await this.moveTask(task, rule);
     },
 
-    // Approve lewat drag-and-drop (On QA → Done) memakai endpoint review; transisi lain memakai endpoint status.
+    // Approve lewat drag-and-drop (On Review → Done) memakai endpoint review; transisi lain memakai endpoint status.
     async moveTask(task, transition) {
         this.movingId = task.id;
 
@@ -897,7 +897,7 @@ Alpine.data('taskCreateForm', () => ({
         return this.categories.find((category) => String(category.id) === String(this.form.category_id)) ?? null;
     },
 
-    // Kewajiban QA ditentukan oleh kategori tugas, bukan dipilih manual.
+    // Kewajiban review ditentukan oleh kategori tugas, bukan dipilih manual.
     get requiresReview() {
         return this.selectedCategory ? Boolean(this.selectedCategory.requires_review) : null;
     },
@@ -1023,10 +1023,10 @@ Alpine.data('taskDetail', () => ({
             this.syncDetailCollections(data, { history: false });
             // Tugas yang belum ada di daftar baru masuk Board setelah detailnya dimuat.
             if (this.highlightId === data.id) this.$nextTick(() => this.revealHighlight());
-            // Form revisi dari Board hanya dibuka bila backend mengizinkan user memberi keputusan QA saat ini.
+            // Form revisi dari Board hanya dibuka bila backend mengizinkan user memberi keputusan review saat ini.
             if (this.detailFocus === 'revision') {
                 if (data.can_review === true) this.startReview('revision');
-                else showToast({ type: 'info', title: 'Revisi tidak dapat diminta', text: 'Anda tidak dapat memberi keputusan QA untuk tugas ini saat ini.', duration: 5000 });
+                else showToast({ type: 'info', title: 'Revisi tidak dapat diminta', text: 'Anda tidak dapat memberi keputusan review untuk tugas ini saat ini.', duration: 5000 });
             }
             if (this.detailFocus === 'edit' && this.canEditThis) this.startEdit();
             await this.loadActivities();
@@ -1180,7 +1180,8 @@ Alpine.data('taskDetail', () => ({
     },
 
     get canSubmitEvidence() {
-        return this.isPicOfTask && ['todo', 'in_progress'].includes(this.task?.status);
+        // Sama dengan SUBMITTABLE_STATUSES backend: setelah revisi tugas kembali ke Back Log dan PIC dapat langsung menambah evidence.
+        return this.isPicOfTask && ['backlog', 'todo', 'in_progress'].includes(this.task?.status);
     },
 
     // --- Edit informasi utama (TASK-03 C) -----------------------------------------------------
@@ -1448,7 +1449,7 @@ Alpine.data('taskDetail', () => ({
                 if (errors.note) {
                     this.reviewError = errors.note;
                 } else {
-                    // Tugas sudah tidak di On QA (misalnya diputuskan reviewer lain): tutup form dan muat data terbaru.
+                    // Tugas sudah tidak di On Review (misalnya diputuskan reviewer lain): tutup form dan muat data terbaru.
                     notifyFailure({ ...error, data: { ...error.data, message: errors.decision ?? errors.version } }, 'Keputusan review gagal disimpan.');
                     this.reviewMode = null;
                     await this.reload();

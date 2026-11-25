@@ -47,7 +47,7 @@
                     <header class="flex flex-col gap-4">
                         <div>
                             <div class="flex flex-wrap items-center gap-1.5" x-show="task.requires_review || isOverdue(task)">
-                                <span x-show="task.requires_review" class="{{ $badge }} bg-violet-50 text-violet-700">Wajib QA</span>
+                                <span x-show="task.requires_review" class="{{ $badge }} bg-violet-50 text-violet-700">Wajib Review</span>
                                 <span x-show="isOverdue(task)" class="{{ $badge }} bg-red-50 text-red-700">Terlambat</span>
                             </div>
                             <h2 id="task-detail-title" class="mt-1.5 text-xl font-bold break-words text-ink" x-text="task.title"></h2>
@@ -107,7 +107,7 @@
                     {{-- Keputusan review (TASK-07) --}}
                     <section x-show="reviewMode" x-cloak class="rounded-lg border p-4" :class="reviewMode === 'revision' ? 'border-amber-200 bg-amber-50/60' : 'border-primary/30 bg-primary-soft'">
                         <h3 class="{{ $sectionTitle }}" x-text="reviewMode === 'revision' ? 'Minta Revisi' : 'Setujui Tugas'"></h3>
-                        <p class="mt-1 text-xs text-muted" x-text="reviewMode === 'revision' ? 'Tugas kembali ke On Process. Jelaskan apa yang perlu diperbaiki PIC.' : 'Tugas akan ditandai Done dan waktu penyelesaian dicatat.'"></p>
+                        <p class="mt-1 text-xs text-muted" x-text="reviewMode === 'revision' ? 'Tugas kembali ke Back Log. Alasan revisi wajib diisi dan dicatat sebagai keputusan review.' : 'Tugas akan ditandai Done dan waktu penyelesaian dicatat.'"></p>
                         <label for="review-note" class="{{ $labelClass }} mt-3">Catatan <span x-show="reviewMode === 'revision'" class="text-red-500">*</span><span x-show="reviewMode !== 'revision'">(opsional)</span></label>
                         <textarea id="review-note" x-ref="reviewNote" x-model="reviewNote" rows="3" class="{{ $textareaClass }}" @input="reviewError = ''" maxlength="2000"
                             :placeholder="reviewMode === 'revision' ? 'Contoh: lampirkan versi final desain dan perbaiki ukuran banner.' : 'Catatan untuk PIC'"></textarea>
@@ -126,6 +126,20 @@
                         <p class="mt-1 text-xs text-muted"><span x-text="task.last_review?.reviewer?.fullname ?? '-'"></span> · <span x-text="formatDateTime(task.last_review?.created_at)"></span></p>
                     </section>
 
+                    {{-- Riwayat keputusan review (TASK-17): tetap tersedia setelah revisi, kirim ulang, atau Done --}}
+                    <section x-show="(task.reviews ?? []).length > 1" data-review-history>
+                        <h3 class="{{ $sectionTitle }}">Riwayat Review</h3>
+                        <ol class="mt-2 flex flex-col gap-2">
+                            <template x-for="review in task.reviews ?? []" :key="review.id">
+                                <li class="rounded-lg border border-line px-3 py-2">
+                                    <p class="text-xs font-semibold" :class="review.decision === 'revision' ? 'text-amber-800' : 'text-emerald-700'" x-text="`Siklus ${review.cycle} · ${review.decision_label}`"></p>
+                                    <p x-show="review.note" class="mt-0.5 text-sm break-words text-ink" x-text="review.note"></p>
+                                    <p class="mt-0.5 text-xs text-muted"><span x-text="review.reviewer?.fullname ?? '-'"></span> · <span x-text="formatDateTime(review.created_at)"></span></p>
+                                </li>
+                            </template>
+                        </ol>
+                    </section>
+
                     {{-- Informasi tugas / form edit (TASK-03) --}}
                     <section>
                         <h3 class="{{ $sectionTitle }}">Informasi Tugas</h3>
@@ -139,7 +153,7 @@
                             <div><dt class="{{ $dt }}">Divisi</dt><dd class="{{ $dd }}" x-text="task.division?.name ?? '-'"></dd></div>
                             <div><dt class="{{ $dt }}">Platform</dt><dd class="{{ $dd }}" :class="!task.platform && @js($empty)" x-text="task.platform?.name ?? 'Tidak terkait platform'"></dd></div>
                             <div><dt class="{{ $dt }}">Tanggal Mulai</dt><dd class="{{ $dd }}" :class="!task.start_date && @js($empty)" x-text="task.start_date ? formatDate(task.start_date) : 'Belum ditentukan'"></dd></div>
-                            <div><dt class="{{ $dt }}">Kewajiban QA</dt><dd class="{{ $dd }}" x-text="task.requires_review ? 'Ya, wajib melewati QA sebelum Done' : 'Tidak, PIC dapat langsung menyelesaikan'"></dd></div>
+                            <div><dt class="{{ $dt }}">Kewajiban Review</dt><dd class="{{ $dd }}" x-text="task.requires_review ? 'Ya, wajib melewati Ready Review dan On Review sebelum Done' : 'Tidak, Admin, Manajer, atau Supervisor divisi dapat menyelesaikannya dari On Process'"></dd></div>
                             <div><dt class="{{ $dt }}">Dibuat oleh</dt><dd class="{{ $dd }}"><span x-text="task.creator?.fullname ?? '-'"></span> <span class="text-muted" x-show="task.created_at" x-text="`· ${formatDateTime(task.created_at)}`"></span></dd></div>
                             <div x-show="task.completed_at"><dt class="{{ $dt }}">Selesai</dt><dd class="{{ $dd }}" x-text="formatDateTime(task.completed_at)"></dd></div>
                         </dl>
@@ -167,7 +181,7 @@
                                         <option :value="category.id" x-text="category.name" :selected="String(editForm.category_id) === String(category.id)"></option>
                                     </template>
                                 </select>
-                                <p class="mt-1.5 text-xs text-muted">Mengubah kategori dapat mengubah kewajiban QA.</p>
+                                <p class="mt-1.5 text-xs text-muted">Mengubah kategori dapat mengubah kewajiban review.</p>
                             </div>
                             <div>
                                 <label for="edit-platform" class="{{ $labelClass }}">Platform</label>

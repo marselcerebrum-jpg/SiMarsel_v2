@@ -45,10 +45,10 @@
                 </div>
 
                 <div>
-                    <span class="{{ $labelClass }}">Kewajiban QA</span>
+                    <span class="{{ $labelClass }}">Kewajiban Review</span>
                     <p class="flex h-9 items-center rounded-lg border border-line bg-soft px-3 text-sm"
                         :class="requiresReview === null ? 'text-muted' : 'font-semibold text-ink'"
-                        x-text="requiresReview === null ? 'Ditentukan dari kategori' : (requiresReview ? 'Wajib QA' : 'Tidak wajib QA')"></p>
+                        x-text="requiresReview === null ? 'Ditentukan dari kategori' : (requiresReview ? 'Wajib review' : 'Tidak wajib review')"></p>
                     <p class="{{ $helperClass }}">Otomatis mengikuti kategori yang dipilih.</p>
                 </div>
 

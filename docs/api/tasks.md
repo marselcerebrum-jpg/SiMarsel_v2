@@ -199,12 +199,12 @@ Contoh: `GET /api/tasks?scope=my_tasks&filter_mode=month&date_field=deadline&mon
 | `todo` | `in_progress` | PIC aktif mana pun, Admin/Manajer, atau Supervisor divisinya |
 | `in_progress` | `ready_review` | PIC aktif mana pun, Admin/Manajer, atau Supervisor divisinya, jika `requires_review = true` |
 | `in_progress` | `done` | Admin/Manajer, atau Supervisor divisinya, jika `requires_review = false`. PIC Staff/Freelance tidak pernah ke `done` |
-
-Semua PIC aktif menjalankan workflow bersama; satu PIC dapat memindahkan status tanpa persetujuan PIC lain.
 | `ready_review` | `on_review` | Admin/Manajer, atau Supervisor divisinya |
 | `on_review` | `done` | Admin/Manajer, atau Supervisor divisinya (via `reviews`, `decision=approve`) |
 | `on_review` | `backlog` | Admin/Manajer, atau Supervisor divisinya (via `reviews`, `decision=revision`, `note` wajib) |
 
+- Semua PIC aktif menjalankan workflow bersama; satu PIC dapat memindahkan status tanpa persetujuan PIC lain.
+- **Frontend (TASK-17)**: Board dan tombol status di detail memakai matrix yang sama. Kolom yang tidak boleh dituju menolak drop dan menampilkan alasannya; kartu tetap di kolom asal, juga bila backend menolak (`403`/`409`/`422`). Staff/Freelance hanya menggeser kartu dengan dirinya sebagai PIC aktif sampai Ready Review. Langkah ke On Review dan Done hanya untuk Admin, Manajer, atau Supervisor divisinya yang memiliki `task.review` (dari `meta.permissions`) dan mengikuti `can_change_status`; drag On Review → Done menjalankan Approve dan On Review → Back Log membuka form Request Revision dengan alasan wajib, keduanya mengikuti `can_review`. Detail menampilkan Riwayat Review dari `reviews` (siklus, keputusan, reviewer, waktu, alasan).
 - Pengelola (Admin, Manajer, Supervisor divisinya) memindahkan status sampai `ready_review` dan memulai review. Hanya pengelola dengan permission `task.review` yang dapat memindahkan ke `on_review` atau `done`, termasuk bila dia juga PIC aktif (self-approval). `next_statuses` hanya memuat langkah yang boleh dilakukan user tersebut.
 - Keluar dari `on_review` hanya lewat `POST /api/tasks/{id}/reviews`. `PATCH /status` dan `PATCH /api/tasks/{id}` ke `done`/`backlog` dari `on_review` ditolak `422`, dan `next_statuses` untuk `on_review` selalu `[]` (pakai `can_review`).
 

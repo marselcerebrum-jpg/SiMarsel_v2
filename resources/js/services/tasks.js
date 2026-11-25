@@ -64,7 +64,7 @@ export const fetchEvidences = (id) => http(`/api/tasks/${id}/evidences`);
 // Hanya PIC aktif yang mengunggahnya yang boleh menghapus (flag can_delete per evidence); soft delete di backend.
 export const deleteEvidence = (taskId, evidenceId) => http(`/api/tasks/${taskId}/evidences/${evidenceId}`, { method: 'DELETE' });
 
-// Keputusan QA (approve/revisi) tidak bergantung pada VITE_TASK_API_READY: API-nya sudah tersedia.
+// Keputusan review (approve/revisi) tidak bergantung pada VITE_TASK_API_READY: API-nya sudah tersedia.
 export const reviewTask = (id, body) => http(`/api/tasks/${id}/reviews`, { method: 'POST', body });
 
 // Histori aktivitas tidak bergantung pada VITE_TASK_API_READY: API-nya sudah tersedia.

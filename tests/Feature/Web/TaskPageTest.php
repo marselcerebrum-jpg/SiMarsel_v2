@@ -68,6 +68,11 @@ class TaskPageTest extends TestCase
                 ->assertSee('data-role-access', false)
                 ->assertSee('data-task-scope', false)
                 ->assertSee('data-read-only-notice', false)
+                ->assertSee('data-review-history', false)
+                ->assertSee('Riwayat Review')
+                ->assertSee('Tugas kembali ke Back Log.', false)
+                ->assertDontSee('Wajib QA')
+                ->assertDontSee('Tugas kembali ke On Process', false)
                 ->assertSee('Hapus Tugas')
                 ->assertSee('x-show="evidence.can_delete === true && confirmingEvidenceId !== evidence.id"', false)
                 ->assertSee('@click="removeEvidence(evidence)"', false)
@@ -120,7 +125,7 @@ class TaskPageTest extends TestCase
             ->assertOk()
             ->assertSee('Buat Tugas')
             ->assertSee('x-data="taskCreateForm"', false)
-            ->assertSeeInOrder(['Judul Tugas', 'Deskripsi', 'Kategori / Jenis Tugas', 'Kewajiban QA', 'Platform', 'Prioritas', 'Target Divisi', 'PIC', 'Tanggal Mulai', 'Deadline', 'Status Awal'])
+            ->assertSeeInOrder(['Judul Tugas', 'Deskripsi', 'Kategori / Jenis Tugas', 'Kewajiban Review', 'Platform', 'Prioritas', 'Target Divisi', 'PIC', 'Tanggal Mulai', 'Deadline', 'Status Awal'])
             ->assertDontSee('Poin');
     }
 

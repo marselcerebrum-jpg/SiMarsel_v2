@@ -142,8 +142,8 @@ const statusRequests = (requests) => requests.filter((request) => request.method
 
 test('Board drag sends exactly { status, version } to the status endpoint and moves the card with the new version', async () => {
     const { board, requests, toasts } = await tasklistPage({
-        'GET /api/tasks': () => ({ json: { data: [task()], meta: { status_counts: {} } } }),
-        'PATCH /api/tasks/7/status': (body) => ({ json: { data: task({ status: body.status, version: body.version + 1 }), message: 'Status tugas berhasil diperbarui.' } }),
+        'GET /api/tasks': () => ({ json: { data: [task({ requires_review: true })], meta: { status_counts: {} } } }),
+        'PATCH /api/tasks/7/status': (body) => ({ json: { data: task({ requires_review: true, status: body.status, version: body.version + 1 }), message: 'Status tugas berhasil diperbarui.' } }),
     });
     await board.load();
 
@@ -163,9 +163,9 @@ test('Board drag sends exactly { status, version } to the status endpoint and mo
 
     // The next move is based on the version the server returned, not the one first loaded.
     board.draggingId = 7;
-    await board.drop('done');
-    assert.deepEqual(statusRequests(requests)[1].body, { status: 'done', version: 5 });
-    assert.deepEqual(board.tasksIn('done').map(({ id }) => id), [7]);
+    await board.drop('ready_review');
+    assert.deepEqual(statusRequests(requests)[1].body, { status: 'ready_review', version: 5 });
+    assert.deepEqual(board.tasksIn('ready_review').map(({ id }) => id), [7]);
 });
 
 test('Board drag based on an outdated version keeps the card, explains the conflict, and reloads the list', async () => {
@@ -197,18 +197,18 @@ test('Board drag based on an outdated version keeps the card, explains the confl
 
 test('Board drag rejected by a backend business rule shows the server reason and leaves the card in place', async () => {
     const { board, toasts } = await tasklistPage({
-        'GET /api/tasks': () => ({ json: { data: [task({ status: 'in_progress' })], meta: { status_counts: {} } } }),
+        'GET /api/tasks': () => ({ json: { data: [task({ status: 'in_progress', requires_review: true })], meta: { status_counts: {} } } }),
         'PATCH /api/tasks/7/status': () => ({
             status: 422,
-            json: { message: 'Unggah evidence terlebih dahulu sebelum mengubah status ke Done.', errors: { status: ['Unggah evidence terlebih dahulu sebelum mengubah status ke Done.'] } },
+            json: { message: 'Unggah evidence terlebih dahulu sebelum mengubah status ke Ready Review.', errors: { status: ['Unggah evidence terlebih dahulu sebelum mengubah status ke Ready Review.'] } },
         }),
     });
     await board.load();
 
     board.draggingId = 7;
-    await board.drop('done');
+    await board.drop('ready_review');
 
-    assert.equal(toasts.at(-1).text, 'Unggah evidence terlebih dahulu sebelum mengubah status ke Done.');
+    assert.equal(toasts.at(-1).text, 'Unggah evidence terlebih dahulu sebelum mengubah status ke Ready Review.');
     assert.deepEqual(board.tasksIn('in_progress').map(({ id }) => id), [7]);
 });
 
@@ -268,7 +268,7 @@ test('Detail status change based on an outdated version is rejected with a clear
     assert.equal(board.tasks[0].version, 5);
 });
 
-test('Dragging On QA back to On Process opens the revision note form instead of changing the status', async () => {
+test('Dragging On Review back to Back Log opens the revision note form instead of changing the status', async () => {
     const reviewed = task({ status: 'on_review', requires_review: true, can_review: true });
     const { board, requests } = await tasklistPage({
         'GET /api/tasks': () => ({ json: { data: [reviewed], meta: { status_counts: {} } } }),
@@ -276,7 +276,7 @@ test('Dragging On QA back to On Process opens the revision note form instead of 
     await board.load();
 
     board.draggingId = 7;
-    await board.drop('in_progress');
+    await board.drop('backlog');
 
     assert.equal(board.detailId, 7);
     assert.equal(board.detailFocus, 'revision');
@@ -531,23 +531,23 @@ test('Detail buttons follow next_statuses, and Approve/Revision only show when t
 });
 
 test('A status move rejected in the detail shows the server reason and keeps the task where it was', async () => {
-    const working = task({ status: 'in_progress', next_statuses: [{ value: 'done', label: 'Done' }] });
+    const working = task({ status: 'in_progress', requires_review: true, next_statuses: [{ value: 'ready_review', label: 'Ready Review' }] });
     const { board, detail: createDetail, toasts, requests } = await tasklistPage({
         'GET /api/tasks': () => ({ json: { data: [working], meta: { status_counts: {} } } }),
         'GET /api/tasks/7': () => ({ json: { data: working } }),
-        'PATCH /api/tasks/7/status': () => ({ status: 422, json: { message: 'Data tidak valid.', errors: { status: ['Unggah evidence terlebih dahulu sebelum mengubah status ke Done.'] } } }),
+        'PATCH /api/tasks/7/status': () => ({ status: 422, json: { message: 'Data tidak valid.', errors: { status: ['Unggah evidence terlebih dahulu sebelum mengubah status ke Ready Review.'] } } }),
     });
     await board.load();
     board.detailId = 7;
     const detail = createDetail();
     await detail.open(7);
 
-    assert.deepEqual([...detail.transitions].map(({ to }) => to), ['done']);
+    assert.deepEqual([...detail.transitions].map(({ to }) => to), ['ready_review']);
     await detail.runTransition(detail.transitions[0]);
 
-    assert.deepEqual(statusRequests(requests)[0].body, { status: 'done', version: 4 });
+    assert.deepEqual(statusRequests(requests)[0].body, { status: 'ready_review', version: 4 });
     assert.equal(toasts.at(-1).title, 'Gagal');
-    assert.equal(toasts.at(-1).text, 'Unggah evidence terlebih dahulu sebelum mengubah status ke Done.');
+    assert.equal(toasts.at(-1).text, 'Unggah evidence terlebih dahulu sebelum mengubah status ke Ready Review.');
     assert.equal(detail.task.status, 'in_progress');
     assert.deepEqual(board.tasksIn('in_progress').map(({ id }) => id), [7]);
     assert.equal(detail.acting, null);
@@ -559,7 +559,7 @@ test('With the default config, Approve and Request Revision go to the review end
         const approved = body.decision === 'approve';
         const review = { id: 1, task_id: 7, cycle: 1, decision: body.decision, decision_label: approved ? 'Approve' : 'Request Revision', note: body.note, reviewer: { id: ADMIN.id, fullname: 'Admin' }, created_at: '2026-11-11T03:00:00Z' };
         const history = [{ id: 9, action: approved ? 'approved' : 'revision_requested', action_label: review.decision_label, description: body.note ?? '', changes: {}, actor: null, created_at: review.created_at }];
-        current = { ...current, status: approved ? 'done' : 'in_progress', version: body.version + 1, can_review: false, last_review: review, history };
+        current = { ...current, status: approved ? 'done' : 'backlog', version: body.version + 1, can_review: false, last_review: review, history };
         return current;
     };
     const { board, detail: createDetail, requests, toasts } = await tasklistPage({
@@ -570,9 +570,9 @@ test('With the default config, Approve and Request Revision go to the review end
     await board.load();
     const reviews = () => requests.filter(({ url }) => url === '/api/tasks/7/reviews');
 
-    // Board: On QA → On Process opens the revision form in the detail; the card stays until the note is sent.
+    // Board: On Review → Back Log opens the revision form in the detail; the card stays until the note is sent.
     board.draggingId = 7;
-    await board.drop('in_progress');
+    await board.drop('backlog');
     assert.equal(board.detailId, 7);
     assert.deepEqual(board.tasksIn('on_review').map(({ id }) => id), [7]);
     const detail = createDetail();
@@ -582,16 +582,16 @@ test('With the default config, Approve and Request Revision go to the review end
     await detail.submitReview();
     assert.deepEqual(reviews()[0].body, { decision: 'revision', note: 'Perbaiki ukuran banner.', version: 8 });
     assert.equal(reviews()[0].headers['X-CSRF-TOKEN'], 'csrf-test');
-    assert.equal(detail.task.status, 'in_progress');
+    assert.equal(detail.task.status, 'backlog');
     assert.equal(detail.task.last_review.note, 'Perbaiki ukuran banner.');
     assert.deepEqual(detail.activities.map(({ action }) => action), ['revision_requested']);
     assert.equal(detail.reviewMode, null);
     assert.equal(toasts.at(-1).title, 'Revisi diminta');
     assert.equal(toasts.at(-1).text, 'Permintaan revisi berhasil dikirim.');
-    assert.deepEqual(board.tasksIn('in_progress').map(({ id }) => id), [7]);
+    assert.deepEqual(board.tasksIn('backlog').map(({ id }) => id), [7]);
     assert.equal(board.tasks[0].version, 9);
 
-    // Board: On QA → Done approves through the review endpoint and moves the card with the new version.
+    // Board: On Review → Done approves through the review endpoint and moves the card with the new version.
     current = { ...current, status: 'on_review', can_review: true };
     await board.load();
     board.draggingId = 7;
@@ -684,7 +684,7 @@ test('Review rejections show a clear message: a missing note stays in the form, 
     assert.equal(requests.some(({ url }) => url.endsWith('/status')), false);
 });
 
-test('Dragging On QA to On Process does not open the revision form when the backend does not send can_review', async () => {
+test('Dragging On Review to Back Log does not open the revision form when the backend does not send can_review', async () => {
     const reviewed = task({ status: 'on_review', requires_review: true, can_review: false, next_statuses: [] });
     const { board, requests, toasts } = await tasklistPage({
         'GET /api/tasks': () => ({ json: { data: [reviewed], meta: { status_counts: {} } } }),
@@ -692,7 +692,7 @@ test('Dragging On QA to On Process does not open the revision form when the back
     await board.load();
 
     board.draggingId = 7;
-    await board.drop('in_progress');
+    await board.drop('backlog');
 
     assert.equal(board.detailId, null, 'the Board does not open the revision form');
     assert.equal(toasts.at(-1).title, 'Perpindahan ditolak');
@@ -709,7 +709,7 @@ test('A revision dragged on a list that still allowed it is refused when the fre
     await board.load();
 
     board.draggingId = 7;
-    await board.drop('in_progress');
+    await board.drop('backlog');
     const detail = createDetail();
     await detail.open(7);
 
@@ -1830,7 +1830,7 @@ test('An active PIC without the status permission cannot drag the card, and a dr
     assert.deepEqual(board.tasksIn('todo').map(({ id }) => id), [7]);
 });
 
-test('A Manager or Supervisor who sees an On QA task without the review permission cannot drag it to Approve or Revision, and no review is sent', async () => {
+test('A Manager or Supervisor who sees an On Review task without the review permission cannot drag it to Approve or Revision, and no review is sent', async () => {
     for (const user of [MANAGER, SUPERVISOR]) {
         const reviewed = task({ status: 'on_review', requires_review: true, can_edit: true, can_change_status: false, can_review: false });
         const { board, requests, toasts } = await tasklistPage({
@@ -1842,14 +1842,14 @@ test('A Manager or Supervisor who sees an On QA task without the review permissi
         assert.equal(board.canDrag({ ...reviewed, can_review: true }), true, `${user.role.code_role}: the review permission allows the drag`);
 
         board.draggingId = 7;
-        for (const status of ['done', 'in_progress']) {
+        for (const status of ['done', 'backlog']) {
             assert.equal(board.dropState(status), 'denied');
-            assert.equal(board.dropReason(status), 'Anda tidak memiliki izin untuk memberi keputusan QA pada tugas ini.');
+            assert.equal(board.dropReason(status), 'Anda tidak memiliki izin untuk memberi keputusan review pada tugas ini.');
         }
 
         await board.drop('done');
         board.draggingId = 7;
-        await board.drop('in_progress');
+        await board.drop('backlog');
 
         assert.equal(requests.some(({ url }) => url.includes('/reviews')), false, `${user.role.code_role}: no review request`);
         assert.equal(requests.some(({ method }) => method !== 'GET'), false);
@@ -2232,4 +2232,141 @@ test('A rejected evidence deletion that returns after another task was opened sh
     assert.deepEqual(board.tasks.map(({ id, evidence_count }) => [id, evidence_count]), [[7, 1], [8, 3]], 'nothing was deleted, so no count changes');
     assert.equal(requests.filter(({ url }) => url === '/api/tasks/7').length, detailRequestsBefore, 'Task A is not reloaded into the panel');
     assert.equal(panel.deletingEvidenceId, null);
+});
+
+// --- TASK-17: role-based transition matrix --------------------------------------------------------
+
+const board17 = async (list, user) => {
+    const page = await tasklistPage({ 'GET /api/tasks': () => ({ json: { data: list, meta: { status_counts: {} } } }) }, user);
+    await page.board.load();
+
+    return page;
+};
+
+// Statuses the Board accepts a drop into for the given card.
+const dropTargets = (board, id) => {
+    board.draggingId = id;
+    const allowed = ['backlog', 'todo', 'in_progress', 'ready_review', 'on_review', 'done'].filter((status) => board.dropState(status) === 'allowed');
+    board.draggingId = null;
+
+    return allowed;
+};
+
+test('An active Staff or Freelance PIC moves their own card from Back Log up to Ready Review, never to On Review or Done', async () => {
+    const FREELANCE = { id: 10, role: { code_role: 'FRL' }, division: { code_division: 'MKT' } };
+    for (const user of [PIC, FREELANCE]) {
+        const own = (status, extra = {}) => task({ status, requires_review: true, can_change_status: true, ...extra });
+        const { board } = await board17([own('backlog')], user);
+
+        assert.deepEqual(dropTargets(board, 7), ['todo']);
+        board.tasks = [own('todo')];
+        assert.deepEqual(dropTargets(board, 7), ['in_progress']);
+        board.tasks = [own('in_progress')];
+        assert.deepEqual(dropTargets(board, 7), ['ready_review']);
+
+        // Ready Review is the highest step a PIC reaches alone: no drag starts from there.
+        board.tasks = [own('ready_review')];
+        assert.equal(board.canDrag(board.tasks[0]), false, `${user.role.code_role}: On Review is a reviewer's step`);
+        board.draggingId = 7;
+        assert.equal(board.dropReason('on_review'), 'Hanya Admin, Manajer, atau Supervisor divisi ini yang dapat memindahkan tugas ke On Review.');
+
+        // Without review the task is finished by a reviewer, not by its PIC.
+        board.tasks = [own('in_progress', { requires_review: false })];
+        assert.equal(board.canDrag(board.tasks[0]), false, `${user.role.code_role}: Done is not offered to a PIC`);
+        board.draggingId = 7;
+        assert.equal(board.dropReason('done'), 'Hanya Admin, Manajer, atau Supervisor divisi ini yang dapat memindahkan tugas ke Done.');
+
+        // No Approve or Request Revision for a PIC, even when a stale flag says otherwise.
+        board.tasks = [own('on_review', { can_review: true })];
+        assert.deepEqual(dropTargets(board, 7), []);
+    }
+});
+
+test('A Staff without an active assignment cannot move the card, while every PIC of a Multi-PIC task can, without a Lead PIC', async () => {
+    const others = task({ id: 8, status: 'todo', pics: [{ id: 11, fullname: 'Staff Baru' }], can_change_status: false });
+    const shared = task({ id: 9, status: 'in_progress', requires_review: true, pics: [{ id: 11, fullname: 'Staff Baru' }, { id: PIC.id, fullname: 'Staff Marketing' }], can_change_status: true });
+    const { board, requests, toasts } = await board17([others, shared], PIC);
+
+    assert.equal(board.canDrag(others), false);
+    board.draggingId = 8;
+    assert.equal(board.dropReason('in_progress'), 'Hanya PIC aktif, Admin, Manajer, atau Supervisor divisi ini yang dapat mengubah status tersebut.');
+    await board.drop('in_progress');
+    assert.equal(toasts.at(-1).title, 'Perpindahan ditolak');
+    assert.deepEqual(board.tasksIn('todo').map(({ id }) => id), [8], 'the card stays where it was');
+    assert.deepEqual(statusRequests(requests), []);
+
+    // The second PIC hands the whole card to Ready Review.
+    assert.deepEqual(dropTargets(board, 9), ['ready_review']);
+});
+
+test('Admin, a Manager, and the division Supervisor move cards through the whole matrix, with Approve and Request Revision from On Review', async () => {
+    for (const user of [ADMIN, MANAGER, SUPERVISOR]) {
+        const managed = (status, extra = {}) => task({ status, pics: [{ id: 11, fullname: 'Staff Baru' }], requires_review: true, can_change_status: true, ...extra });
+        const { board } = await board17([managed('backlog')], user);
+
+        for (const [status, next] of [['backlog', 'todo'], ['todo', 'in_progress'], ['in_progress', 'ready_review'], ['ready_review', 'on_review']]) {
+            board.tasks = [managed(status)];
+            assert.deepEqual(dropTargets(board, 7), [next], `${user.role.code_role}: ${status}`);
+        }
+
+        board.tasks = [managed('in_progress', { requires_review: false })];
+        assert.deepEqual(dropTargets(board, 7), ['done'], `${user.role.code_role}: a task without review is finished from On Process`);
+
+        board.tasks = [managed('on_review', { can_review: true, can_change_status: false })];
+        assert.deepEqual(dropTargets(board, 7), ['backlog', 'done'], `${user.role.code_role}: Request Revision and Approve`);
+    }
+});
+
+test('A review task cannot skip to Done, and evidence is required before leaving On Process whoever moves the card', async () => {
+    const { board } = await board17([task({ status: 'in_progress', requires_review: true, can_change_status: true })], MANAGER);
+    board.draggingId = 7;
+    assert.equal(board.dropState('done'), 'denied');
+    assert.equal(board.dropReason('done'), 'Tugas ini wajib review. Kirim ke Ready Review terlebih dahulu.');
+    assert.equal(board.dropState('on_review'), 'denied', 'On Review comes after Ready Review');
+
+    board.tasks = [task({ status: 'in_progress', requires_review: false, evidence_required: true, evidence_count: 0, can_change_status: true })];
+    assert.equal(board.dropReason('done'), 'Tambahkan evidence terlebih dahulu sebelum mengirim hasil pekerjaan.');
+    board.tasks = [{ ...board.tasks[0], evidence_count: 1 }];
+    assert.equal(board.dropState('done'), 'allowed');
+});
+
+test('A Supervisor reviews only their division, but works up to Ready Review as an active PIC of another division', async () => {
+    const otherDivision = { code_division: 'SLS', name: 'Sales' };
+    const asPic = (status) => task({ status, division: otherDivision, requires_review: true, pics: [{ id: SUPERVISOR.id, fullname: 'Supervisor' }], can_change_status: true });
+    const { board } = await board17([asPic('in_progress')], SUPERVISOR);
+
+    assert.deepEqual(dropTargets(board, 7), ['ready_review']);
+    board.tasks = [asPic('ready_review')];
+    board.draggingId = 7;
+    assert.equal(board.dropReason('on_review'), 'Hanya Admin, Manajer, atau Supervisor divisi ini yang dapat memindahkan tugas ke On Review.');
+
+    // Self-approval in their own division follows the backend's can_review.
+    board.tasks = [task({ status: 'on_review', requires_review: true, pics: [{ id: SUPERVISOR.id, fullname: 'Supervisor' }], can_review: true })];
+    assert.deepEqual(dropTargets(board, 7), ['backlog', 'done']);
+});
+
+test('Without task.review in meta, a Manager still moves a card up to Ready Review but not to On Review', async () => {
+    const { board } = await board17([task({ status: 'ready_review', requires_review: true, can_change_status: true })], MANAGER);
+    board.user = { ...board.user, permissions: ['task.change_status', 'task.view_all'] };
+
+    board.draggingId = 7;
+    assert.equal(board.dropReason('on_review'), 'Anda tidak memiliki izin review untuk tugas ini.');
+    board.tasks = [task({ status: 'todo', requires_review: true, can_change_status: true })];
+    assert.equal(board.dropState('in_progress'), 'allowed');
+});
+
+test('After a revision the PIC can add evidence again while the task is in Back Log and move it back to To Do', async () => {
+    const revised = task({ status: 'backlog', requires_review: true, next_statuses: [{ value: 'todo', label: 'To Do' }] });
+    const { board, detail: createDetail } = await tasklistPage({
+        'GET /api/tasks': () => ({ json: { data: [revised], meta: { status_counts: {} } } }),
+        'GET /api/tasks/7': () => ({ json: { data: revised } }),
+        'GET /api/tasks/7/activities': () => ({ json: { data: [] } }),
+    });
+    await board.load();
+    board.detailId = 7;
+    const detail = createDetail();
+    await detail.open(7);
+
+    assert.equal(detail.canSubmitEvidence, true);
+    assert.deepEqual([...detail.transitions].map(({ to }) => to), ['todo']);
 });
