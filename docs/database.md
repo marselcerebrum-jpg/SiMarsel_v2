@@ -31,6 +31,14 @@ php artisan migrate --seed
 | `promo_codes` | Master kode promo per platform (`platform_id` + `code` unik) |
 | `promo_code_versions` | Riwayat funnel/source kode promo beserta rentang waktu berlakunya |
 | `transaction_promo_codes` | Kode promo yang dipakai setiap transaksi, beserta snapshot funnel/source-nya |
+| `options` | Master dropdown Create Konten (`app`, `talentName`, `script`, `talent`, `creative`, `qc`, `priority`), terpisah dari `platforms` |
+| `contents` | Data konten Video, Carousel, dan Singlepost beserta status produksi, Editor, Link Hasil, dan timestamp workflow |
+| `events` | Riwayat perubahan konten (termasuk pengisian pertama dan perubahan deadline dengan kolom `reason` nullable) |
+| `calendar_plans` | Target rencana kalender konten per `(app, type, date)` |
+| `kpis` | Target KPI konten per staff (`accounts.id`), `app`, `type`, dan `work_date` |
+| `user_apps` | Pembagian akses Apps untuk staff Marketing (`accounts.id`, `options.id`) |
+| `footage` | File atau link footage yang dapat berdiri sendiri maupun terkait konten |
+| `drive_folders` | Folder Google Drive per `(app, type)` |
 | `jobs`, `failed_jobs` | Antrian (queue) Laravel untuk sinkronisasi dan backfill |
 | `cache`, `cache_locks` | Dipakai untuk pembatasan percobaan login |
 | `migrations` | Catatan migration milik Laravel |
@@ -53,6 +61,14 @@ php artisan migrate --seed
 | `transaction_promo_codes.transaction_id` → `transactions.id` | Ya | Penggunaan kode **ikut terhapus** |
 | `transaction_promo_codes.promo_code_id` → `promo_codes.id` | Tidak | **Ditolak** selama kode promo sudah dipakai transaksi |
 | `transaction_promo_codes.funnel_id_snapshot`, `.source_id_snapshot` | Tidak | Menjadi **NULL**, nama snapshot tetap tersimpan |
+| `contents.app`, `.script_status`, `.talent_status`, `.talent_name`, `.creative_status`, `.qc_status` → `options.id` | Sebagian wajib | **Ditolak** (`RESTRICT`) selama opsi dipakai konten; gunakan `options.archived` untuk pengarsipan |
+| `contents.marketing_user_id`, `.editor_account_id`, `.published_by` → `accounts.id` | Tidak | **Ditolak** (`RESTRICT`) selama akun dirujuk konten; gunakan `accounts.is_active = false` |
+| `events.content_id` → `contents.id`, `events.user_id` → `accounts.id` | `content_id` ya | **Ditolak** (`RESTRICT`) agar History tidak terhapus permanen secara diam-diam |
+| `kpis.user_id`, `user_apps.user_id`, `footage.uploaded_by` → `accounts.id` | Sebagian wajib | **Ditolak** (`RESTRICT`) selama akun masih memiliki data |
+| `footage.content_id` → `contents.id` | Tidak | Menjadi **NULL** (`SET NULL`), record footage tetap tersimpan |
+| `user_apps.app`, `footage.app`, `drive_folders.app` → `options.id` | Ya | **Ditolak** (`RESTRICT`) selama opsi Apps masih dipakai |
+
+Detail ERD As-Is/To-Be, keputusan desain greenfield, dan traceability modul Create Konten tersedia di [database/create-konten-erd.md](database/create-konten-erd.md).
 
 ## Aturan bisnis
 
