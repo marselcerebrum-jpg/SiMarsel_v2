@@ -6,6 +6,7 @@ Satu filter utama yang dipakai **semua** endpoint performa:
 - `GET /api/performance/trend` (Grafik Data)
 - `GET /api/performance/payment-methods` (Metode Pembayaran)
 - `GET /api/performance/platform-contribution` (Kontribusi Platform)
+- `GET /api/performance/products` (Performa Produk, wajib `preset`)
 - `GET /api/performance/purchase-times` (Waktu Pembelian)
 - `GET /api/performance/export` (Export Excel / CSV)
 
