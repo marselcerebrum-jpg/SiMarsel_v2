@@ -27,6 +27,7 @@ final class TransactionRecord
         public readonly float $nominal,
         public readonly float $netNominal,
         public readonly bool $hasPaidTime = false,
+        public readonly ?string $productType = null,
     ) {}
 
     /**
@@ -52,6 +53,7 @@ final class TransactionRecord
             nominal: (float) $row['nominal'],
             netNominal: (float) $row['net_nominal'],
             hasPaidTime: $paidDate !== null && $paidTime !== null,
+            productType: self::blankToNull($row['product_type'] ?? null),
         );
     }
 

@@ -49,6 +49,22 @@ class TransactionAggregationService
     }
 
     /**
+     * The buyer rows inside the filter's platforms, date basis, and data cutoff, for a component that groups them
+     * itself (for example by status or product type). Null when coverage is not known, so it is never read as 0.
+     *
+     * @param  iterable<TransactionRecord|array<string, mixed>>  $rows
+     * @return list<TransactionRecord>|null
+     */
+    public function scopedRecords(iterable $rows, AggregationFilter $filter): ?array
+    {
+        if ($filter->availability() === DataAvailability::Unavailable) {
+            return null;
+        }
+
+        return $this->inScope($this->buyerRows($rows), $filter);
+    }
+
+    /**
      * Aggregates the filter's whole range. Unknown coverage returns null metrics, never 0.
      *
      * @param  iterable<TransactionRecord|array<string, mixed>>  $rows

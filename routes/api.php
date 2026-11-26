@@ -10,8 +10,10 @@ use App\Http\Controllers\Performance\PerformanceSalesTrendController;
 use App\Http\Controllers\Performance\PerformanceSummaryController;
 use App\Http\Controllers\Performance\PerformanceTrendController;
 use App\Http\Controllers\Performance\PlatformContributionController;
+use App\Http\Controllers\Performance\ProductTypeDistributionController;
 use App\Http\Controllers\Performance\PurchaseTimeDistributionController;
 use App\Http\Controllers\Performance\TransactionController;
+use App\Http\Controllers\Performance\TransactionStatusDistributionController;
 use App\Http\Controllers\Platform\PlatformController;
 use App\Http\Controllers\Promo\FunnelController;
 use App\Http\Controllers\Promo\PromoAnalysisController;
@@ -164,6 +166,10 @@ Route::middleware('auth')->group(function () {
         ->name('api.performance.platform-contribution');
     Route::get('/performance/purchase-times', PurchaseTimeDistributionController::class)
         ->name('api.performance.purchase-times');
+    Route::get('/performance/transaction-statuses', TransactionStatusDistributionController::class)
+        ->name('api.performance.transaction-statuses');
+    Route::get('/performance/product-types', ProductTypeDistributionController::class)
+        ->name('api.performance.product-types');
     Route::get('/performance/export', PerformanceExportController::class)
         ->name('api.performance.export');
 

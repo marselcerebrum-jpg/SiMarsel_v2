@@ -156,3 +156,17 @@ export function filterErrorField(field) {
 
     return base === 'platform' ? 'platforms' : base;
 }
+
+/**
+ * Marks the latest request: `const isCurrent = track();` then drop the response when `isCurrent()` is false,
+ * so a slow response for an older filter never replaces the newer one.
+ */
+export function createRequestTracker() {
+    let latest = 0;
+
+    return () => {
+        const id = ++latest;
+
+        return () => id === latest;
+    };
+}

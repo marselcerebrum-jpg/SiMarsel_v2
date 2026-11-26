@@ -31,29 +31,6 @@
 
     $platformOptions = $platforms->map(fn ($platform) => ['value' => $platform->slug, 'label' => $platform->name])->values();
 
-    $trend = [
-        'metrics' => [
-            ['value' => 'revenue', 'label' => 'Revenue', 'format' => 'currency'],
-            ['value' => 'transactions', 'label' => 'Transaksi', 'format' => 'number'],
-            ['value' => 'downloaders', 'label' => 'Downloader', 'format' => 'number'],
-            ['value' => 'conversion', 'label' => 'Konversi', 'format' => 'percent'],
-            ['value' => 'new_users', 'label' => 'Pengguna Baru', 'format' => 'number'],
-            ['value' => 'repeat_orders', 'label' => 'Repeat Order', 'format' => 'number'],
-        ],
-        'charts' => [
-            ['value' => 'bar', 'label' => 'Batang'],
-            ['value' => 'line', 'label' => 'Garis'],
-            ['value' => 'area', 'label' => 'Area'],
-            ['value' => 'pie', 'label' => 'Lingkaran'],
-            ['value' => 'table', 'label' => 'Tabel'],
-        ],
-        'granularities' => [
-            ['value' => 'daily', 'label' => 'Harian'],
-            ['value' => 'weekly', 'label' => 'Mingguan'],
-            ['value' => 'monthly', 'label' => 'Bulanan'],
-        ],
-    ];
-
     $paymentMethod = [
         'parameters' => [
             ['value' => 'revenue', 'label' => 'Revenue'],
@@ -133,7 +110,7 @@
                     </div>
                 </section>
 
-                {{-- 3. Tren dan Performa --}}
+                {{-- 3. Tren dan Performa: combined Omzet and transaction chart (FIX-06-FE-01). --}}
                 <section data-dashboard-section="trend" class="{{ $card }} mt-4 p-5" aria-labelledby="performance-trend-title">
                     @include('pages.performance.components.performance-trend')
                 </section>
