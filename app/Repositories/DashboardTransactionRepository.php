@@ -48,6 +48,25 @@ class DashboardTransactionRepository
     }
 
     /**
+     * The slug and name of each platform id, keyed by id.
+     *
+     * @param  list<int>  $platformIds
+     * @return array<int, array{id: int, slug: string, name: string}>
+     */
+    public function platformLabels(array $platformIds): array
+    {
+        return Platform::query()
+            ->whereIn('id', $platformIds)
+            ->get(['id', 'slug', 'name'])
+            ->mapWithKeys(fn (Platform $platform) => [(int) $platform->id => [
+                'id' => (int) $platform->id,
+                'slug' => (string) $platform->slug,
+                'name' => (string) $platform->name,
+            ]])
+            ->all();
+    }
+
+    /**
      * Transactions created or paid within [startAt, endAt), as contract rows. Rows without a Markaz
      * identity or creation time are older imports that the transaction dates contract cannot read.
      * $extraColumns adds columns a component groups by (such as payment_method); the aggregation ignores them.

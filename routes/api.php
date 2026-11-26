@@ -10,6 +10,7 @@ use App\Http\Controllers\Performance\PerformanceSalesTrendController;
 use App\Http\Controllers\Performance\PerformanceSummaryController;
 use App\Http\Controllers\Performance\PerformanceTrendController;
 use App\Http\Controllers\Performance\PlatformContributionController;
+use App\Http\Controllers\Performance\ProductPerformanceController;
 use App\Http\Controllers\Performance\ProductTypeDistributionController;
 use App\Http\Controllers\Performance\PurchaseTimeDistributionController;
 use App\Http\Controllers\Performance\TransactionController;
@@ -164,6 +165,8 @@ Route::middleware('auth')->group(function () {
         ->name('api.performance.payment-methods');
     Route::get('/performance/platform-contribution', PlatformContributionController::class)
         ->name('api.performance.platform-contribution');
+    Route::get('/performance/products', ProductPerformanceController::class)
+        ->name('api.performance.products');
     Route::get('/performance/purchase-times', PurchaseTimeDistributionController::class)
         ->name('api.performance.purchase-times');
     Route::get('/performance/transaction-statuses', TransactionStatusDistributionController::class)
