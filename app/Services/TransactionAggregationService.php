@@ -8,6 +8,7 @@ use App\Enums\TransactionDateBasis;
 use App\Support\TransactionAggregation\AggregationFilter;
 use App\Support\TransactionAggregation\Ratio;
 use App\Support\TransactionAggregation\TransactionRecord;
+use Carbon\CarbonImmutable;
 use Carbon\CarbonPeriodImmutable;
 use InvalidArgumentException;
 
@@ -127,6 +128,95 @@ class TransactionAggregationService
         }
 
         return $days;
+    }
+
+    /**
+     * Success payments and revenue per WIB hour of the payment (slot 0 = 00.00-00.59 ... 23 = 23.00-23.59) over the
+     * given days, on the paid group rules: buyer rows only, claims excluded, revenue from net_nominal. Only payments
+     * with a valid paid date and paid time have an hour; a payment with only a paid date is left out of every slot.
+     *
+     * Each slot covers the same hour on every given day. It is complete when that hour is covered on every day,
+     * unavailable (null values, never 0) when it is covered on none, and partial otherwise; a partial slot counts
+     * only the payments before the complete-data cutoff.
+     *
+     * @param  iterable<TransactionRecord|array<string, mixed>>  $rows
+     * @param  list<int>  $platformIds
+     * @param  list<CarbonImmutable>  $days  The WIB days counted, e.g. only the Fridays of the period.
+     * @param  CarbonImmutable|null  $completeUntil  The exclusive end of complete data; null when unknown.
+     * @return list<array{hour: int, availability: string, as_of: string|null, success_payments: int|null, revenue: float|null}>
+     */
+    public function paymentsByHour(iterable $rows, array $platformIds, array $days, ?CarbonImmutable $completeUntil): array
+    {
+        $days = array_map(fn (CarbonImmutable $day) => $day->setTimezone(TransactionRecord::TIMEZONE)->startOfDay(), $days);
+        $dayKeys = array_flip(array_map(fn (CarbonImmutable $day) => $day->toDateString(), $days));
+        $counts = array_fill(0, 24, 0);
+        $revenue = array_fill(0, 24, 0.0);
+
+        foreach ($this->buyerRows($rows) as $record) {
+            $paidAt = $record->paymentHourAt();
+
+            if ($paidAt === null
+                || $record->isClaimCoupon
+                || ! in_array($record->platformId, $platformIds, true)
+                || ! isset($dayKeys[$paidAt->toDateString()])
+                || $completeUntil === null
+                || $paidAt->gte($completeUntil)) {
+                continue;
+            }
+
+            $counts[$paidAt->hour]++;
+            $revenue[$paidAt->hour] += $record->netNominal;
+        }
+
+        $slots = [];
+
+        for ($hour = 0; $hour < 24; $hour++) {
+            $availability = $this->hourAvailability($days, $hour, $completeUntil);
+            $known = $availability !== DataAvailability::Unavailable;
+
+            $slots[] = [
+                'hour' => $hour,
+                'availability' => $availability->value,
+                'as_of' => $known ? $this->hourAsOf($days, $hour, $completeUntil)->toIso8601String() : null,
+                'success_payments' => $known ? $counts[$hour] : null,
+                'revenue' => $known ? round($revenue[$hour], 2) : null,
+            ];
+        }
+
+        return $slots;
+    }
+
+    /**
+     * @param  list<CarbonImmutable>  $days
+     */
+    private function hourAvailability(array $days, int $hour, ?CarbonImmutable $completeUntil): DataAvailability
+    {
+        $states = array_unique(array_map(
+            fn (CarbonImmutable $day) => DataAvailability::forCoverage(
+                $completeUntil,
+                $day->setTime($hour, 0),
+                $day->setTime($hour, 0)->addHour(),
+            )->value,
+            $days,
+        ));
+
+        return match (true) {
+            $states === [] || $states === [DataAvailability::Unavailable->value] => DataAvailability::Unavailable,
+            $states === [DataAvailability::Complete->value] => DataAvailability::Complete,
+            default => DataAvailability::Partial,
+        };
+    }
+
+    /**
+     * The exclusive end of the counted data of a slot: the end of its hour on the last day, or the cutoff before it.
+     *
+     * @param  non-empty-list<CarbonImmutable>  $days
+     */
+    private function hourAsOf(array $days, int $hour, CarbonImmutable $completeUntil): CarbonImmutable
+    {
+        $lastEnd = max(array_map(fn (CarbonImmutable $day) => $day->setTime($hour, 0)->addHour(), $days));
+
+        return $lastEnd->min($completeUntil);
     }
 
     /**
