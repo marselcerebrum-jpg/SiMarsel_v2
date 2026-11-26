@@ -65,6 +65,11 @@ export function formatPercent(metric) {
     return display(metric, (value) => `${percent.format(value)}%`);
 }
 
+/** Relative change against the comparison, e.g. "+20%", "-12,5%". */
+export function formatRelativeChange(metric) {
+    return display(metric, (value) => `${signedPercent.format(value)}%`);
+}
+
 /** Difference between two percentages, e.g. "+10 poin persentase". */
 export function formatPercentagePoints(metric) {
     return display(metric, (value) => `${signedPercent.format(value)} poin persentase`);

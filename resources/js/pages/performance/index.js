@@ -5,6 +5,7 @@ import { fetchSummary } from './api';
 import { formatDateTime, formatValue } from '../../format';
 import { renderChart } from './chart';
 import performanceContribution from './contribution';
+import performanceDownloader from './downloader';
 import dashboardFilter, { PERIOD_EVENT } from './global-filter';
 import performancePaymentMethod from './payment-method';
 import performancePurchaseTime from './purchase-time';
@@ -110,6 +111,7 @@ Alpine.data('performanceSummary', () => ({
 Alpine.data('dashboardFilter', dashboardFilter);
 Alpine.data('dashboardShell', dashboardShell);
 Alpine.data('performanceTrend', () => performanceTrend({ render: renderChart }));
+Alpine.data('performanceDownloader', () => performanceDownloader({ render: renderChart }));
 Alpine.data('performanceContribution', performanceContribution);
 Alpine.data('performancePaymentMethod', performancePaymentMethod);
 Alpine.data('performancePurchaseTime', performancePurchaseTime);

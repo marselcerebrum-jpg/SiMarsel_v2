@@ -31,6 +31,13 @@ export function fetchSalesTrend(query, { granularity = null } = {}) {
     return get('trend/sales', query, { granularity });
 }
 
+/**
+ * Downloader trend (FIX-08). A null granularity lets the backend pick the default of the period.
+ */
+export function fetchDownloaderTrend(query, { granularity = null } = {}) {
+    return get('trend/downloaders', query, { granularity });
+}
+
 export function fetchPlatformContribution(query) {
     return get('platform-contribution', query);
 }

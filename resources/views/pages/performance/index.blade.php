@@ -120,12 +120,9 @@
                     @include('pages.performance.components.performance-contribution')
                 </section>
 
-                {{-- 5. Downloader --}}
-                <section data-dashboard-section="downloader" class="{{ $card }} mt-4 p-5" aria-labelledby="dashboard-downloader-title">
-                    @include('pages.performance.components.dashboard-slot', [
-                        'key' => 'downloader',
-                        'title' => 'Downloader',
-                    ])
+                {{-- 5. Downloader: line chart and Lihat Rincian table (FIX-08-FE-01). --}}
+                <section data-dashboard-section="downloader" class="{{ $card }} mt-4 min-w-0 p-5" aria-labelledby="dashboard-downloader-title">
+                    @include('pages.performance.components.performance-downloader')
                 </section>
 
                 {{-- 6. Status Transaksi & Perdana vs Perpanjangan: side by side when there is room, stacked on phones. --}}

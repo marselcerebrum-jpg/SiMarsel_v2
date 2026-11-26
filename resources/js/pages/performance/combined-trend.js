@@ -88,7 +88,8 @@ const wibParts = new Intl.DateTimeFormat('id-ID', {
     hourCycle: 'h23',
 });
 
-function wib(iso, { exclusiveEnd = false } = {}) {
+/** WIB date and time parts of an ISO timestamp (also used by the Downloader chart). */
+export function wib(iso, { exclusiveEnd = false } = {}) {
     const read = (date) => Object.fromEntries(wibParts.formatToParts(date).map(({ type, value }) => [type, value]));
     let parts = read(new Date(iso));
     let time = `${parts.hour}.${parts.minute}`;
@@ -231,7 +232,7 @@ export function bucketIndexAt(chart, { x, y }, count) {
     return Math.min(Math.max(index, 0), count - 1);
 }
 
-/** Vertical guide at the open point. */
+/** Vertical guide at the open point (also used by the Downloader chart). */
 export const activeGuide = {
     id: 'activeGuide',
     afterDatasetsDraw(chart, _args, options) {

@@ -163,6 +163,20 @@ class PerformancePageTest extends TestCase
             ->assertDontSee('id="trend-chart"', false);
     }
 
+    public function test_downloader_section_has_a_chart_and_an_expandable_five_column_table(): void
+    {
+        $this->actingAs($this->employee)
+            ->get('/dashboard')
+            ->assertOk()
+            ->assertSee('x-data="performanceDownloader"', false)
+            ->assertSee('@performance-filter.window="applyDownloaderFilter($event.detail)"', false)
+            ->assertSeeInOrder(['data-dashboard-section="downloader"', 'aria-label="Legenda grafik Downloader"', 'x-ref="downloaderCanvas"', 'Lihat Rincian', 'id="downloader-details"'], false)
+            ->assertSee('aria-controls="downloader-details"', false)
+            ->assertSee(':aria-expanded="detailsOpen.toString()"', false)
+            ->assertSee('@click.outside="closeDownloaderPoint()"', false)
+            ->assertSeeInOrder(['>Periode Aktif</th>', '>Downloader</th>', '>Periode Pembanding</th>', '>Downloader Pembanding</th>', '>Perubahan</th>'], false);
+    }
+
     public function test_performance_page_has_platform_contribution_section(): void
     {
         $this->actingAs($this->employee)
