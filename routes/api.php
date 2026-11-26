@@ -174,6 +174,9 @@ Route::middleware('auth')->group(function () {
         Route::get('/options', [TransactionController::class, 'options'])
             ->can('viewAny', Transaction::class)
             ->name('options');
+        Route::get('/export', [TransactionController::class, 'export'])
+            ->can('viewAny', Transaction::class)
+            ->name('export');
         Route::get('/{transaction}', [TransactionController::class, 'show'])
             ->whereNumber('transaction')
             ->can('view', 'transaction')
