@@ -21,6 +21,7 @@ class DatabaseSeeder extends Seeder
             FunnelSeeder::class,
             PromoSourceSeeder::class,
             TaskCategorySeeder::class,
+            CreativeDeskOptionSeeder::class,
         ]);
 
         // Demo performance data for local development only, so tests keep a clean database.
