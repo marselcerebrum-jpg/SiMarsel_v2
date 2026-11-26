@@ -50,11 +50,13 @@ class DashboardTransactionRepository
     /**
      * Transactions created or paid within [startAt, endAt), as contract rows. Rows without a Markaz
      * identity or creation time are older imports that the transaction dates contract cannot read.
+     * $extraColumns adds columns a component groups by (such as payment_method); the aggregation ignores them.
      *
      * @param  list<int>  $platformIds
+     * @param  list<string>  $extraColumns
      * @return list<array<string, mixed>>
      */
-    public function contractRows(array $platformIds, CarbonImmutable $startAt, CarbonImmutable $endAt): array
+    public function contractRows(array $platformIds, CarbonImmutable $startAt, CarbonImmutable $endAt, array $extraColumns = []): array
     {
         $lastDay = $endAt->eq($endAt->startOfDay()) ? $endAt->subDay() : $endAt;
 
@@ -70,7 +72,7 @@ class DashboardTransactionRepository
                     ->where('paid_date', '>=', $startAt->toDateString())
                     ->where('paid_date', '<', $lastDay->addDay()->toDateString())))
             ->toBase()
-            ->get(self::CONTRACT_COLUMNS)
+            ->get(array_values(array_unique([...self::CONTRACT_COLUMNS, ...$extraColumns])))
             ->map(fn (object $row) => [
                 ...(array) $row,
                 'paid_date' => $row->paid_date === null ? null : substr((string) $row->paid_date, 0, 10),
