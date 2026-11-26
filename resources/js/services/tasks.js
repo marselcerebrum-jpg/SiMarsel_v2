@@ -10,6 +10,7 @@ import { http } from '../http';
  * GET    /api/tasks/monitoring?scope&search&division&priority&status&pic_id&<periode> → { data: { scope, as_of, metrics, by_priority, by_division } }
  * POST   /api/tasks                            → { data: Task, message }
  * GET    /api/tasks/{id}                       → { data: TaskDetail }
+ * GET    /api/tasks/{id}/preview               → { data: TaskPreview }                 (pop-up Calendar, selalu data terbaru)
  * PATCH  /api/tasks/{id}                       → { data: TaskDetail, message }         (kirim version)
  * DELETE /api/tasks/{id}                       → { message }                           (kirim version)
  * PATCH  /api/tasks/{id}/status                → { data: TaskDetail, message }         (kirim status, version)
@@ -49,6 +50,9 @@ export const fetchTaskCreateOptions = () => http('/api/tasks/create-options');
 export const createTask = (body) => http('/api/tasks', { method: 'POST', body });
 
 export const fetchTask = (id) => http(`/api/tasks/${id}`);
+
+// Ringkasan pop-up Calendar (TASK-15): dibaca ulang dari backend setiap kali dibuka.
+export const fetchTaskPreview = (id) => http(`/api/tasks/${id}/preview`);
 
 export const updateTask = (id, body) => http(`/api/tasks/${id}`, { method: 'PATCH', body });
 

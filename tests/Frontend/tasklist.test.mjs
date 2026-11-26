@@ -1564,10 +1564,11 @@ const calendarEvent = (overrides = {}) => ({
 });
 const calendarRequests = (requests) => requests.filter(({ url }) => url.startsWith('/api/tasks/calendar'));
 
-async function calendarPage(reply, user = ADMIN) {
+async function calendarPage(reply, user = ADMIN, extraRoutes = {}) {
     const page = await tasklistPage({
         'GET /api/tasks': () => ({ json: { data: [], meta: { status_counts: {} } } }),
         'GET /api/tasks/calendar': () => (typeof reply === 'function' ? reply() : { json: { data: reply } }),
+        ...extraRoutes,
     }, user);
     page.board.divisions = divisionList.map(({ code_division, name }) => ({ code_division, name }));
     page.board.monitoring = { as_of: '2026-11-16' };
@@ -1673,24 +1674,190 @@ test('A day of another month shows no partial marks and choosing it opens that m
     assert.equal(calendarRequests(requests).length, 2, 'a day of the shown month does not reload');
 });
 
-test('The summary of a chosen item follows the filters and the latest data of the month', async () => {
-    let status = 'todo';
+test('The agenda summary follows the latest data of the month, and a task is never shown in it', async () => {
+    let title = 'Rapat koordinasi';
     const { calendar } = await calendarPage(() => ({ json: { data: {
-        events: [],
-        deadlines: [{ ...task({ deadline: '2026-11-17', status }), description: null, is_overdue: false }],
+        events: [calendarEvent({ title })],
+        deadlines: [{ ...task({ deadline: '2026-11-17' }), description: null, is_overdue: false }],
     } } }));
     await calendar.loadPeriod();
-    calendar.pick('task', calendar.selectedDeadlines[0]);
+    calendar.pick('event', calendar.selectedEvents[0]);
     assert.equal(calendar.pickedVisible, true);
 
-    calendar.filters.status = 'done';
-    assert.equal(calendar.pickedVisible, false, 'a task hidden by the filter has no summary');
-    calendar.filters.status = '';
-
-    status = 'in_progress';
+    title = 'Rapat koordinasi (diubah)';
     await calendar.loadPeriod();
-    assert.equal(calendar.pickedVisible, true);
-    assert.equal(calendar.picked.item.status, 'in_progress', 'the summary shows the reloaded task');
+    assert.equal(calendar.picked.item.title, 'Rapat koordinasi (diubah)', 'the summary shows the reloaded agenda');
+
+    calendar.selected = '2026-11-25';
+    assert.equal(calendar.pickedVisible, false, 'an agenda not on the chosen date has no summary');
+    calendar.selected = '2026-11-17';
+    calendar.pick('task', { ...calendar.deadlines[0], id: 3 });
+    assert.equal(calendar.pickedVisible, false, 'a task with the same ID as an agenda never opens the agenda summary');
+});
+
+const deadlineItem = (overrides = {}) => ({ ...task({ deadline: '2026-11-17', status: 'todo', ...overrides }), task_id: overrides.id ?? 7, description: null, is_overdue: false });
+const previewOf = (overrides = {}) => ({ ...task({ deadline: '2026-11-17', ...overrides }), description: 'Konten untuk promo akhir tahun', is_overdue: false });
+const previewRequests = (requests) => requests.filter(({ url }) => /^\/api\/tasks\/\d+\/preview$/.test(url));
+
+test('A task chosen in a calendar cell or the date list opens a pop-up with its latest data and every active PIC once, without moving the Calendar', async () => {
+    const pics = [{ id: PIC.id, fullname: 'Staff Marketing' }, { id: 11, fullname: 'Staff Baru' }];
+    const { calendar, requests } = await calendarPage(
+        { events: [calendarEvent()], deadlines: [deadlineItem({ pics })] },
+        ADMIN,
+        { 'GET /api/tasks/7/preview': () => ({ json: { data: previewOf({ status: 'on_review', start_date: null, pics }) } }) },
+    );
+    await calendar.loadPeriod();
+
+    const cell = calendar.cells.find(({ iso }) => iso === '2026-11-17');
+    assert.deepEqual([...cell.tasks].map(({ id }) => id), [7], 'a Multi-PIC task is one calendar item');
+
+    calendar.selected = '2026-11-20';
+    await calendar.openPreview(cell.tasks[0]);
+    assert.equal(previewRequests(requests).at(-1).url, '/api/tasks/7/preview', 'the pop-up reads the task from the backend by its ID');
+    assert.equal(calendar.taskPreview.state, 'ready');
+    assert.equal(calendar.statusOf(calendar.taskPreview.task.status).label, 'On Review', 'the latest status, not the one the Calendar loaded');
+    assert.deepEqual([...calendar.taskPreview.task.pics].map(({ fullname }) => fullname), ['Staff Marketing', 'Staff Baru']);
+    assert.equal(calendar.previewDate(calendar.taskPreview.task.start_date), 'Belum diatur', 'an empty date is explained');
+    assert.equal(calendar.previewDate(calendar.taskPreview.task.deadline), '17 Nov 2026');
+    assert.equal(calendar.deadlines[0].status, 'on_review', 'the calendar item follows the latest data');
+    assert.equal(calendar.picked, null, 'the agenda summary stays closed');
+
+    // Choosing it again from the list of the date reads it again.
+    calendar.selected = '2026-11-17';
+    await calendar.openPreview(calendar.selectedDeadlines[0]);
+    assert.equal(previewRequests(requests).length, 2);
+
+    calendar.closePreview();
+    assert.equal(calendar.taskPreview, null);
+    assert.deepEqual([calendar.month, calendar.selected], ['2026-11', '2026-11-17'], 'closing keeps the month and the chosen date');
+    assert.equal(requests.filter(({ method }) => method !== 'GET').length, 0, 'the pop-up changes nothing');
+    assert.equal(calendarRequests(requests).length, 1, 'the Calendar is not reloaded');
+
+    // Old QA status names read as the new Review labels (TASK-17).
+    assert.deepEqual(['ready_for_qa', 'on_qa'].map((key) => calendar.statusOf(key).label), ['Ready Review', 'On Review']);
+});
+
+test('The task pop-up shows loading, a retryable error, a deleted task, and ignores the answer for a task chosen earlier', async () => {
+    const replies = { 7: [], 8: [] };
+    const answer = (id) => () => new Promise((resolve) => replies[id].push(resolve));
+    const { calendar } = await calendarPage(
+        { events: [], deadlines: [deadlineItem(), deadlineItem({ id: 8, title: 'Laporan bulanan' })] },
+        ADMIN,
+        { 'GET /api/tasks/7/preview': answer(7), 'GET /api/tasks/8/preview': answer(8) },
+    );
+    await calendar.loadPeriod();
+    const settle = () => new Promise((resolve) => setTimeout(resolve));
+
+    const first = calendar.openPreview(calendar.deadlines[0]);
+    await settle();
+    assert.equal(calendar.taskPreview.state, 'loading');
+    assert.equal(calendar.taskPreview.task.title, 'Konten promo November', 'the title is shown while loading');
+
+    // A later choice wins over the earlier answer.
+    const second = calendar.openPreview(calendar.deadlines[1]);
+    await settle();
+    replies[8].shift()({ json: { data: previewOf({ id: 8, title: 'Laporan bulanan' }) } });
+    replies[7].shift()({ json: { data: previewOf() } });
+    await Promise.all([first, second]);
+    assert.equal(calendar.taskPreview.id, 8);
+
+    const failed = calendar.openPreview(calendar.deadlines[0]);
+    await settle();
+    replies[7].shift()({ status: 500, json: { message: 'Server Error' } });
+    await failed;
+    assert.equal(calendar.taskPreview.state, 'error');
+    assert.equal(calendar.taskPreview.message, 'Ringkasan tugas gagal dimuat.');
+
+    const retried = calendar.retryPreview();
+    await settle();
+    replies[7].shift()({ json: { data: previewOf({ title: 'Konten promo November (revisi)' }) } });
+    await retried;
+    assert.equal(calendar.taskPreview.state, 'ready');
+    assert.equal(calendar.taskPreview.task.title, 'Konten promo November (revisi)');
+
+    const missing = calendar.openPreview(calendar.deadlines[1]);
+    await settle();
+    replies[8].shift()({ status: 404, json: { message: 'Not Found' } });
+    await missing;
+    assert.equal(calendar.taskPreview.state, 'missing');
+    assert.equal(calendar.taskPreview.message, 'Tugas ini sudah dihapus atau tidak ditemukan.');
+    assert.deepEqual([...calendar.deadlines].map(({ id }) => id), [7], 'a deleted task leaves the Calendar');
+});
+
+test('A task deleted after the Calendar loaded also leaves the Board, and the KPIs are reloaded', async () => {
+    const { board, calendar, requests } = await calendarPage(
+        { events: [], deadlines: [deadlineItem()] },
+        ADMIN,
+        {
+            'GET /api/tasks/monitoring': () => ({ json: { data: monitoringOf({}) } }),
+            'GET /api/tasks/7/preview': () => ({ status: 404, json: { message: 'Not Found' } }),
+        },
+    );
+    await calendar.loadPeriod();
+    board.tasks = [task(), task({ id: 8 })];
+    const before = monitoringRequests(requests).length;
+
+    await calendar.openPreview(calendar.deadlines[0]);
+    await new Promise((resolve) => setTimeout(resolve));
+
+    assert.deepEqual([...board.tasks].map(({ id }) => id), [8]);
+    assert.equal(calendar.deadlines.length, 0);
+    assert.equal(monitoringRequests(requests).length, before + 1);
+});
+
+test('Lihat Detail opens the Board on the task ID and loosens only the filters that hide it, without granting anything', async () => {
+    const { board, calendar, requests, toasts } = await calendarPage(
+        { events: [], deadlines: [deadlineItem()] },
+        ADMIN,
+        {
+            'GET /api/tasks/monitoring': () => ({ json: { data: monitoringOf({}) } }),
+            'GET /api/tasks/7/preview': () => ({ json: { data: previewOf({ can_edit: false, can_assign: false, can_delete: false }) } }),
+            'GET /api/tasks/9/preview': () => ({ json: { data: previewOf({ id: 9, can_view_detail: false }) } }),
+        },
+    );
+    await calendar.loadPeriod();
+    board.filters = { search: 'lain', division: 'FIN', priority: 'low', status: 'done', pic: '11' };
+    choosePeriod(board, { mode: 'month', basis: 'deadline', month: '2026-12' });
+    await board.confirmPeriodFilter();
+    board.taskScope = 'my_tasks';
+
+    await calendar.openPreview(calendar.deadlines[0]);
+    calendar.openPreviewDetail();
+    await new Promise((resolve) => setTimeout(resolve));
+
+    assert.equal(calendar.taskPreview, null, 'the pop-up closes');
+    assert.equal(board.view, 'board');
+    assert.equal(board.detailId, 7, 'the detail of the chosen task opens');
+    assert.equal(board.highlightId, 7);
+    assert.deepEqual({ ...board.filters }, { search: '', division: '', priority: '', status: '', pic: '' });
+    assert.equal(board.appliedPeriod, null);
+    assert.equal(board.taskScope, 'all_tasks');
+    assert.equal(requests.filter(({ method }) => method !== 'GET').length, 0, 'navigation changes no task');
+    assert.equal(board.isReadOnly(calendar.deadlines[0]), true, 'the task stays read-only: flags come from the backend');
+
+    // Without read access the pop-up offers no detail and navigation is refused.
+    board.detailId = null;
+    await calendar.openPreview({ ...deadlineItem(), id: 9 });
+    assert.equal(calendar.canOpen(calendar.taskPreview.task), false);
+    calendar.openPreviewDetail();
+    assert.equal(board.detailId, null);
+    assert.equal(toasts.at(-1).title, 'Akses terbatas');
+});
+
+test('A task kept in Tugas Saya after the account was released as its PIC opens in Semua Tugas', async () => {
+    const released = task({ id: 7, pics: [{ id: 11, fullname: 'Staff Baru' }] });
+    const { board } = await tasklistPage({
+        'GET /api/tasks': () => ({ json: { data: [released], meta: { status_counts: {} } } }),
+        'GET /api/tasks/7': () => ({ json: { data: released } }),
+    }, PIC);
+    board.taskScope = 'my_tasks';
+    await board.load();
+    assert.equal(board.filteredTasks.length, 0);
+
+    board.focusTask(released);
+
+    assert.equal(board.taskScope, 'all_tasks');
+    assert.equal(board.detailId, 7);
 });
 
 test('The Calendar shows loading and error states, and ignores the response of an earlier month', async () => {

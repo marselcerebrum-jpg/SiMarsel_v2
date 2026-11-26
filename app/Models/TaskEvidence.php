@@ -20,6 +20,31 @@ class TaskEvidence extends Model
 
     public const LINK = 'link';
 
+    public const KIND_DOCUMENT = 'document';
+
+    public const KIND_IMAGE = 'image';
+
+    public const KIND_LINK = 'link';
+
+    /**
+     * Image types shown inline as a preview. SVG is left out on purpose: it can carry scripts.
+     */
+    public const PREVIEWABLE_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+
+    /**
+     * MIME types of older files stored before the MIME type was recorded, read from their file name.
+     */
+    private const MIME_TYPES_BY_EXTENSION = [
+        'jpg' => 'image/jpeg',
+        'jpeg' => 'image/jpeg',
+        'png' => 'image/png',
+        'webp' => 'image/webp',
+        'gif' => 'image/gif',
+        'pdf' => 'application/pdf',
+        'doc' => 'application/msword',
+        'docx' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    ];
+
     public function task(): BelongsTo
     {
         return $this->belongsTo(Task::class);
@@ -36,8 +61,38 @@ class TaskEvidence extends Model
     }
 
     /**
+     * The MIME type recorded at upload, or for older files the one their name implies. Null for links.
+     */
+    public function effectiveMimeType(): ?string
+    {
+        if ($this->type !== self::FILE) {
+            return null;
+        }
+
+        return $this->mime_type
+            ?? self::MIME_TYPES_BY_EXTENSION[strtolower(pathinfo((string) $this->file_name, PATHINFO_EXTENSION))] ?? null;
+    }
+
+    /**
+     * What the evidence is for display: an image, a document (every other file), or a link.
+     */
+    public function kind(): string
+    {
+        if ($this->type !== self::FILE) {
+            return self::KIND_LINK;
+        }
+
+        return str_starts_with((string) $this->effectiveMimeType(), 'image/') ? self::KIND_IMAGE : self::KIND_DOCUMENT;
+    }
+
+    public function previewable(): bool
+    {
+        return in_array($this->effectiveMimeType(), self::PREVIEWABLE_MIME_TYPES, true);
+    }
+
+    /**
      * Whether the account may delete this evidence right now: only the PIC who uploaded it, while still an active PIC
-     * with task.update, and only while the task still accepts evidence (To Do, On Process), so evidence that is being
+     * with task.update, and only while the task still accepts evidence (Back Log, To Do, On Process), so evidence that is being
      * or has been reviewed stays. Evidence without a known uploader cannot be deleted.
      */
     public function deletableBy(Account $account): bool

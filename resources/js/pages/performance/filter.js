@@ -1,83 +1,121 @@
 /**
- * Performance Overview filter (docs/api/performance-filter.md). The same query goes to every
- * performance endpoint and to the export link. Only one period mode is sent at a time.
+ * Global Dashboard filter (FIX-04-FE-01): platforms, period preset and comparison. The same query goes to every
+ * Dashboard endpoint and to the export link. The period resolver (backend) turns it into the active range,
+ * the comparison range and the completeness boundary; the browser never computes them.
+ *
+ * Query contract (shared period resolver, PeriodResolverService):
+ * - `platforms[]`                      platform slugs; none means every platform
+ * - `preset`                           one of PRESETS; always sent, since a request without it uses the old filter
+ * - `date_from`, `date_to`             YYYY-MM-DD, only with `preset=date_range`
+ * - `comparison`                       one of COMPARISONS; omitted means `auto`
+ * - `comparison_from`, `comparison_to` YYYY-MM-DD, only with `comparison=custom`
  */
-export const PERIOD_MODES = [
-    { value: 'current_month', label: 'Bulan Ini' },
-    { value: 'years', label: 'Tahun & Bulan' },
-    { value: 'year_range', label: 'Rentang Tahun' },
-    { value: 'date_range', label: 'Rentang Tanggal' },
-];
 
-export const MAX_YEARS = 5;
+export const DEFAULT_PRESET = 'today';
+export const DEFAULT_COMPARISON = 'auto';
+export const DATE_RANGE_PRESET = 'date_range';
+export const CUSTOM_COMPARISON = 'custom';
 
-export const MONTHS = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+export const PRESETS = Object.freeze([
+    { value: 'today', label: 'Hari Ini' },
+    { value: 'yesterday', label: 'Kemarin' },
+    { value: 'last_7_days', label: '7 Hari Terakhir' },
+    { value: 'last_30_days', label: '30 Hari Terakhir' },
+    { value: 'last_90_days', label: '90 Hari Terakhir' },
+    { value: 'this_month', label: 'Bulan Ini' },
+    { value: 'last_month', label: 'Bulan Lalu' },
+    { value: DATE_RANGE_PRESET, label: 'Rentang Tanggal' },
+    // Business rule: the current year from 1 January up to the completeness boundary.
+    { value: 'last_year', label: 'Tahun Lalu' },
+]);
 
-export function today() {
-    const date = new Date();
-    const pad = (number) => String(number).padStart(2, '0');
+export const COMPARISONS = Object.freeze([
+    { value: DEFAULT_COMPARISON, label: 'Otomatis' },
+    { value: 'previous_period', label: 'Periode Sebelumnya' },
+    { value: 'same_period_last_month', label: 'Periode Sama Bulan Lalu' },
+    { value: 'same_period_last_year', label: 'Periode Sama Tahun Lalu' },
+    { value: CUSTOM_COMPARISON, label: 'Rentang Pembanding Khusus' },
+]);
 
-    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+export const MESSAGES = Object.freeze({
+    startRequired: 'Tanggal mulai wajib diisi.',
+    endRequired: 'Tanggal akhir wajib diisi.',
+    endBeforeStart: 'Tanggal akhir tidak boleh sebelum tanggal mulai.',
+});
+
+const isPreset = (value) => PRESETS.some((preset) => preset.value === value);
+const isComparison = (value) => COMPARISONS.some((comparison) => comparison.value === value);
+
+export function presetLabel(value) {
+    return PRESETS.find((preset) => preset.value === value)?.label ?? '';
+}
+
+export function comparisonLabel(value) {
+    return COMPARISONS.find((comparison) => comparison.value === value)?.label ?? '';
 }
 
 export function defaultFilter() {
-    return { platforms: [], mode: 'current_month', years: [], month: '', year_from: '', year_to: '', date_from: '', date_to: '' };
+    return {
+        platforms: [],
+        preset: DEFAULT_PRESET,
+        date_from: '',
+        date_to: '',
+        comparison: DEFAULT_COMPARISON,
+        comparison_from: '',
+        comparison_to: '',
+    };
 }
 
 /**
- * A month can only be picked when exactly one year is selected.
- */
-export function canPickMonth(filter) {
-    return filter.mode === 'years' && filter.years.length === 1;
-}
-
-/**
- * Query string for the performance endpoints, e.g. "platforms[]=a&years[]=2025&years[]=2026".
- * An empty string means the default: all platforms, current month.
+ * Query string for the Dashboard endpoints and the page URL, e.g. "preset=today" for the default Dashboard
+ * (every platform, Hari Ini, Otomatis). Otomatis is the backend default, so it is left out.
  */
 export function toQueryString(filter) {
     const params = new URLSearchParams();
 
     filter.platforms.forEach((slug) => params.append('platforms[]', slug));
 
-    if (filter.mode === 'years' && filter.years.length) {
-        if (canPickMonth(filter) && filter.month) {
-            params.set('year', filter.years[0]);
-            params.set('month', filter.month);
-        } else {
-            [...filter.years].sort().forEach((year) => params.append('years[]', year));
-        }
-    }
-    if (filter.mode === 'year_range') {
-        params.set('year_from', filter.year_from);
-        params.set('year_to', filter.year_to);
-    }
-    if (filter.mode === 'date_range') {
+    params.set('preset', filter.preset);
+    if (filter.preset === DATE_RANGE_PRESET) {
         params.set('date_from', filter.date_from);
         params.set('date_to', filter.date_to);
+    }
+
+    if (filter.comparison !== DEFAULT_COMPARISON) params.set('comparison', filter.comparison);
+    if (filter.comparison === CUSTOM_COMPARISON) {
+        params.set('comparison_from', filter.comparison_from);
+        params.set('comparison_to', filter.comparison_to);
     }
 
     return params.toString();
 }
 
 /**
- * Reads the filter back from the page URL, which uses the same query as the API.
+ * Reads the filter back from a page URL query. Older links stay usable: `platform` and `platforms[]` keep
+ * their platforms, a `date_from`/`date_to` pair without a preset opens Rentang Tanggal, and the removed
+ * year and month modes (`year`, `month`, `years[]`, `year_from`, `year_to`) fall back to the default period.
  */
-export function filterFromUrl() {
-    const params = new URLSearchParams(window.location.search);
-    const filter = { ...defaultFilter(), platforms: params.getAll('platforms[]') };
+export function filterFromUrl(search = '') {
+    const params = new URLSearchParams(search);
+    const filter = defaultFilter();
 
-    if (params.get('date_from') || params.get('date_to')) {
-        return { ...filter, mode: 'date_range', date_from: params.get('date_from') ?? '', date_to: params.get('date_to') ?? '' };
+    filter.platforms = [...new Set([...params.getAll('platforms[]'), ...params.getAll('platform')].filter(Boolean))];
+
+    const preset = params.get('preset');
+    const legacyRange = preset === null && (params.get('date_from') || params.get('date_to'));
+
+    if (isPreset(preset)) filter.preset = preset;
+    if (legacyRange) filter.preset = DATE_RANGE_PRESET;
+    if (filter.preset === DATE_RANGE_PRESET) {
+        filter.date_from = params.get('date_from') ?? '';
+        filter.date_to = params.get('date_to') ?? '';
     }
-    if (params.get('year_from') || params.get('year_to')) {
-        return { ...filter, mode: 'year_range', year_from: params.get('year_from') ?? '', year_to: params.get('year_to') ?? '' };
-    }
-    if (params.get('year')) {
-        return { ...filter, mode: 'years', years: [Number(params.get('year'))], month: params.get('month') ?? '' };
-    }
-    if (params.getAll('years[]').length) {
-        return { ...filter, mode: 'years', years: params.getAll('years[]').map(Number).slice(0, MAX_YEARS) };
+
+    const comparison = params.get('comparison');
+    if (isComparison(comparison)) filter.comparison = comparison;
+    if (filter.comparison === CUSTOM_COMPARISON) {
+        filter.comparison_from = params.get('comparison_from') ?? '';
+        filter.comparison_to = params.get('comparison_to') ?? '';
     }
 
     return filter;
@@ -87,42 +125,34 @@ export function syncUrl(query) {
     window.history.replaceState(null, '', query ? `${window.location.pathname}?${query}` : window.location.pathname);
 }
 
+function validateRange(errors, from, to, [fromField, toField]) {
+    if (!from) errors[fromField] = MESSAGES.startRequired;
+    if (!to) errors[toField] = MESSAGES.endRequired;
+    if (from && to && to < from) errors[toField] = MESSAGES.endBeforeStart;
+}
+
 /**
- * Checks the period before a request, so an incomplete choice does not reach the API.
+ * Checks both custom ranges before a request. The message sits on the end field and nothing is cleared.
  * The backend validates again and its 422 messages are shown the same way.
  */
 export function validateFilter(filter) {
     const errors = {};
 
-    if (filter.mode === 'years' && filter.years.length === 0) errors.years = 'Pilih minimal satu tahun.';
-
-    if (filter.mode === 'year_range') {
-        if (!filter.year_from) errors.year_from = 'Tahun mulai wajib diisi.';
-        if (!filter.year_to) errors.year_to = 'Tahun akhir wajib diisi.';
-        if (filter.year_from && filter.year_to && Number(filter.year_to) < Number(filter.year_from)) {
-            errors.year_to = 'Tahun akhir tidak boleh sebelum tahun mulai.';
-        }
+    if (filter.preset === DATE_RANGE_PRESET) {
+        validateRange(errors, filter.date_from, filter.date_to, ['date_from', 'date_to']);
     }
-
-    if (filter.mode === 'date_range') {
-        if (!filter.date_from) errors.date_from = 'Tanggal mulai wajib diisi.';
-        if (!filter.date_to) errors.date_to = 'Tanggal akhir wajib diisi.';
-        if (filter.date_from && filter.date_to && filter.date_from > filter.date_to) {
-            errors.date_to = 'Tanggal akhir tidak boleh sebelum tanggal mulai.';
-        }
+    if (filter.comparison === CUSTOM_COMPARISON) {
+        validateRange(errors, filter.comparison_from, filter.comparison_to, ['comparison_from', 'comparison_to']);
     }
 
     return errors;
 }
 
 /**
- * Maps backend 422 keys (years.0, platforms.1, year, ...) to the filter fields.
+ * Maps backend 422 keys (platforms.1, platform, ...) to the filter fields.
  */
 export function filterErrorField(field) {
     const base = field.split('.')[0];
 
-    if (base === 'platform') return 'platforms';
-    if (base === 'year') return 'years';
-
-    return base;
+    return base === 'platform' ? 'platforms' : base;
 }

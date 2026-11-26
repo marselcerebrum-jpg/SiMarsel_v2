@@ -57,37 +57,49 @@ class PerformancePageTest extends TestCase
             ->assertDontSee('Period Comparison');
     }
 
-    public function test_performance_page_has_overview_filters(): void
+    public function test_dashboard_has_global_platform_period_and_comparison_filters(): void
     {
         $this->actingAs($this->employee)
             ->get('/dashboard')
             ->assertOk()
+            ->assertSee('x-data="dashboardFilter(', false)
+            ->assertSee('@performance-period="receivePeriod($event.detail)"', false)
             ->assertSee('id="filter-platforms-label"', false)
-            ->assertSee('aria-multiselectable="true"', false)
-            ->assertSee('togglePlatform(platform.value)', false)
+            ->assertSee('aria-controls="filter-platforms-options"', false)
+            ->assertSee('@change="selectAllPlatforms()"', false)
+            ->assertSee('@change="togglePlatform(platform.value)"', false)
             ->assertSee('Semua Platform')
-            ->assertSee('id="filter-mode"', false)
-            ->assertSee('toggleYear(year)', false)
-            ->assertSee('id="filter-month"', false)
-            ->assertSee(':disabled="!monthEnabled"', false)
-            ->assertSee('id="filter-year-from"', false)
-            ->assertSee('id="filter-year-to"', false)
-            ->assertSee('id="filter-start"', false)
-            ->assertSee('id="filter-end"', false)
-            ->assertSeeInOrder(['Platform', 'Periode', 'Tahun', 'Bulan', 'Dari Tahun', 'Sampai Tahun', 'Tanggal Mulai', 'Tanggal Akhir'])
-            ->assertDontSee('id="filter-preset"', false);
+            ->assertSee('id="filter-preset"', false)
+            ->assertSee('@change="changePreset()"', false)
+            ->assertSee('id="filter-comparison"', false)
+            ->assertSee('@change="changeComparison()"', false)
+            ->assertSeeInOrder(['Platform', 'Periode', 'Pembanding'])
+            ->assertDontSee('id="filter-mode"', false)
+            ->assertDontSee('toggleYear(year)', false);
     }
 
-    public function test_filter_shows_active_period_and_empty_data_notice(): void
+    public function test_custom_ranges_have_labelled_inputs_with_errors_under_them(): void
     {
         $this->actingAs($this->employee)
             ->get('/dashboard')
             ->assertOk()
-            ->assertSee('x-show="periodLabel && !filterInvalid && !loading"', false)
-            ->assertSee('x-text="periodLabel"', false)
+            ->assertSeeInOrder(['x-if="isDateRange"', 'Rentang Tanggal', 'for="filter-start"', 'Tanggal Mulai', 'for="filter-end"', 'Tanggal Akhir', 'aria-describedby="filter-end-error"', 'id="filter-end-error"'], false)
+            ->assertSee('x-model="filter.date_to"', false)
+            ->assertSee(':aria-invalid="Boolean(filterErrors.date_to).toString()"', false)
+            ->assertSeeInOrder(['x-if="isCustomComparison"', 'Rentang Pembanding Khusus', 'for="filter-comparison-start"', 'Tanggal Mulai Pembanding', 'for="filter-comparison-end"', 'Tanggal Akhir Pembanding', 'id="filter-comparison-end-error"'], false)
+            ->assertSee('x-text="filterErrors.comparison_to"', false);
+    }
+
+    public function test_filter_shows_the_resolved_period_status_and_empty_data_notice(): void
+    {
+        $this->actingAs($this->employee)
+            ->get('/dashboard')
+            ->assertOk()
+            ->assertSee('role="status"', false)
+            ->assertSee('x-text="!filterPanelOpen ? filterStatus : \'\'"', false)
+            ->assertSeeInOrder(['Rentang aktif', 'periodInfo?.provisionalLabel', 'Rentang pembanding', 'Batas lengkap', 'Catatan pembanding', 'Rentang yang dipakai untuk perubahan', 'Durasi'], false)
             ->assertSee('x-show="emptyMessage"', false)
-            ->assertSee('x-text="emptyMessage"', false)
-            ->assertSeeInOrder(['Menampilkan data', 'x-text="emptyMessage"', 'Total Revenue'], false);
+            ->assertSeeInOrder(['data-dashboard-section="filter"', 'Rentang aktif', 'x-text="emptyMessage"', 'Total Revenue'], false);
     }
 
     public function test_cards_shimmer_and_tables_show_a_spinner_while_loading(): void
@@ -106,28 +118,6 @@ class PerformancePageTest extends TestCase
         }
         $this->assertSame(7, substr_count($html, 'size-8 animate-spin'), 'Four tables, plus three first-load table placeholders.');
         $response->assertDontSee('Loading && contributionState', false);
-    }
-
-    public function test_filter_offers_at_least_the_last_five_years(): void
-    {
-        $this->travelTo(now()->setDate(2026, 10, 19));
-        Transaction::factory()->create(['paid_date' => '2026-03-05']);
-
-        $this->actingAs($this->employee)
-            ->get('/dashboard')
-            ->assertOk()
-            ->assertSee('[2026,2025,2024,2023,2022]', false);
-    }
-
-    public function test_filter_offers_years_back_to_the_first_transaction(): void
-    {
-        $this->travelTo(now()->setDate(2026, 10, 19));
-        Transaction::factory()->create(['paid_date' => '2019-03-05']);
-
-        $this->actingAs($this->employee)
-            ->get('/dashboard')
-            ->assertOk()
-            ->assertSee('[2026,2025,2024,2023,2022,2021,2020,2019]', false);
     }
 
     public function test_export_buttons_link_to_the_export_endpoint_with_the_filter_query(): void
@@ -315,10 +305,11 @@ class PerformancePageTest extends TestCase
             ->get('/dashboard')
             ->assertOk()
             ->assertSee('x-data="dashboardShell"', false)
-            ->assertSeeInOrder(['data-dashboard-compact-header', 'x-text="periodLabel || \'Memuat periode…\'"', 'aria-label="Buka panel filter dashboard"'], false)
+            ->assertSeeInOrder(['data-dashboard-compact-header', 'x-text="activeRangeLabel || \'Memuat periode…\'"', 'aria-label="Buka panel filter dashboard"'], false)
             ->assertSee('aria-controls="dashboard-filter-panel"', false)
             ->assertSee(':aria-expanded="filterPanelOpen.toString()"', false)
             ->assertSeeInOrder(['id="dashboard-filter-panel"', 'x-dialog="filterPanelOpen"', 'aria-modal="true"', '@keydown.escape.stop="closeFilterPanel()"', 'data-dashboard-slot="filter-panel"'], false)
+            ->assertSeeInOrder(['data-dashboard-slot="filter-panel"', 'id="panel-filter-platforms-label"', 'id="panel-filter-preset"', 'id="panel-filter-comparison"', 'for="panel-filter-end"', 'x-text="filterPanelOpen ? filterStatus : \'\'"', 'Catatan pembanding'], false)
             ->assertSeeInOrder(['data-dashboard-compact-header', 'x-ref="pageHeader"'], false);
     }
 

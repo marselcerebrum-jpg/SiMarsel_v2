@@ -268,10 +268,115 @@ class TaskEvidenceTest extends TestCase
     {
         $task = $this->task(TaskStatus::InProgress);
 
+        $files = [
+            UploadedFile::fake()->create('script.exe', 10, 'application/x-msdownload'),
+            UploadedFile::fake()->create('foto.webp', 10, 'image/webp'),
+            UploadedFile::fake()->create('data.xlsx', 10, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'),
+            UploadedFile::fake()->create('slide.pptx', 10, 'application/vnd.openxmlformats-officedocument.presentationml.presentation'),
+            UploadedFile::fake()->create('arsip.zip', 10, 'application/zip'),
+            UploadedFile::fake()->create('ikon.svg', 10, 'image/svg+xml'),
+        ];
+
+        foreach ($files as $file) {
+            $this->actingAs($this->staff)
+                ->postJson($this->url($task), ['file' => $file])
+                ->assertUnprocessable()
+                ->assertJsonValidationErrors(['file' => 'Jenis file tidak didukung. Format yang diperbolehkan: PDF, DOC, DOCX, JPG, JPEG, atau PNG.']);
+        }
+
+        $this->assertDatabaseCount('task_evidences', 0);
+    }
+
+    public function test_every_allowed_document_and_image_type_is_accepted_with_its_metadata(): void
+    {
+        $task = $this->task(TaskStatus::InProgress);
+
+        $files = [
+            ['laporan.pdf', 'application/pdf', 'document'],
+            ['laporan.doc', 'application/msword', 'document'],
+            ['laporan.docx', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'document'],
+            ['foto.jpg', 'image/jpeg', 'image'],
+            ['foto.jpeg', 'image/jpeg', 'image'],
+            ['foto.png', 'image/png', 'image'],
+        ];
+
+        foreach ($files as [$name, $mime, $kind]) {
+            $response = $this->actingAs($this->staff)
+                ->postJson($this->url($task), ['file' => UploadedFile::fake()->create($name, 12, $mime)])
+                ->assertCreated()
+                ->assertJsonPath('data.type', 'file')
+                ->assertJsonPath('data.kind', $kind)
+                ->assertJsonPath('data.file_name', $name)
+                ->assertJsonPath('data.mime_type', $mime)
+                ->assertJsonPath('data.file_size', 12 * 1024);
+
+            $evidence = TaskEvidence::findOrFail($response->json('data.id'));
+            $this->assertSame($mime, $evidence->mime_type);
+            $this->assertSame(12 * 1024, $evidence->file_size);
+            $response->assertJsonPath(
+                'data.preview_url',
+                $kind === 'image' ? route('api.tasks.evidences.preview', [$task->id, $evidence->id]) : null,
+            );
+        }
+
+        $this->assertDatabaseCount('task_evidences', 6);
+    }
+
+    public function test_the_stored_mime_type_comes_from_the_content_not_from_the_browser(): void
+    {
+        $task = $this->task(TaskStatus::InProgress);
+
         $this->actingAs($this->staff)
-            ->postJson($this->url($task), ['file' => UploadedFile::fake()->create('script.exe', 10, 'application/x-msdownload')])
+            ->postJson($this->url($task), ['file' => $this->realFile('foto.png', self::PNG, 'application/pdf')])
+            ->assertCreated()
+            ->assertJsonPath('data.kind', 'image')
+            ->assertJsonPath('data.mime_type', 'image/png');
+
+        $this->actingAs($this->staff)
+            ->postJson($this->url($task), ['file' => $this->realFile('laporan.pdf', self::PDF, 'application/octet-stream')])
+            ->assertCreated()
+            ->assertJsonPath('data.kind', 'document')
+            ->assertJsonPath('data.mime_type', 'application/pdf');
+    }
+
+    public function test_a_file_whose_content_does_not_match_its_extension_is_rejected(): void
+    {
+        $task = $this->task(TaskStatus::InProgress);
+
+        $files = [
+            $this->realFile('foto.png', self::PDF, 'image/png'),
+            $this->realFile('laporan.pdf', self::PNG, 'application/pdf'),
+            $this->realFile('laporan.pdf', '<?php echo "x";', 'application/pdf'),
+        ];
+
+        foreach ($files as $file) {
+            $this->actingAs($this->staff)
+                ->postJson($this->url($task), ['file' => $file])
+                ->assertUnprocessable()
+                ->assertJsonValidationErrors('file');
+        }
+
+        $this->actingAs($this->staff)
+            ->postJson($this->url($task), ['file' => $this->realFile('foto.png', self::PDF, 'image/png')])
+            ->assertJsonValidationErrors(['file' => 'Isi file tidak sesuai dengan ekstensinya. Unggah file asli tanpa mengganti ekstensinya.']);
+
+        $this->assertDatabaseCount('task_evidences', 0);
+        $this->assertSame([], Storage::disk('local')->allFiles());
+    }
+
+    public function test_the_size_limit_follows_the_storage_configuration(): void
+    {
+        config(['tasklist.evidence.max_kilobytes' => 500]);
+        $task = $this->task(TaskStatus::InProgress);
+
+        $this->actingAs($this->staff)
+            ->postJson($this->url($task), ['file' => UploadedFile::fake()->create('besar.pdf', 501, 'application/pdf')])
             ->assertUnprocessable()
-            ->assertJsonValidationErrors(['file' => 'Jenis file tidak didukung.']);
+            ->assertJsonValidationErrors(['file' => 'Ukuran file maksimal 500 KB.']);
+
+        $this->actingAs($this->staff)
+            ->postJson($this->url($task), ['file' => UploadedFile::fake()->create('pas.pdf', 500, 'application/pdf')])
+            ->assertCreated();
     }
 
     public function test_file_may_not_exceed_ten_megabytes(): void
@@ -314,14 +419,14 @@ class TaskEvidenceTest extends TestCase
 
     public function test_evidence_is_rejected_once_the_task_has_left_the_pic(): void
     {
-        foreach ([TaskStatus::Backlog, TaskStatus::ReadyReview, TaskStatus::OnReview, TaskStatus::Done] as $status) {
+        foreach ([TaskStatus::ReadyReview, TaskStatus::OnReview, TaskStatus::Done] as $status) {
             $task = $this->task($status);
 
             $this->actingAs($this->staff)
                 ->postJson($this->url($task), ['file' => UploadedFile::fake()->create('laporan.pdf', 10, 'application/pdf')])
                 ->assertUnprocessable()
                 ->assertJsonValidationErrors([
-                    'evidence' => "Evidence hanya dapat dikirim saat tugas berstatus To Do atau On Process, bukan {$status->label()}.",
+                    'evidence' => "Evidence hanya dapat dikirim saat tugas berstatus Back Log, To Do, atau On Process, bukan {$status->label()}.",
                 ]);
         }
 
@@ -387,9 +492,11 @@ class TaskEvidenceTest extends TestCase
             ->postJson("/api/tasks/{$task->id}/reviews", ['version' => $task->fresh()->version, 'decision' => 'revision', 'note' => 'Perbaiki data.'])
             ->assertOk();
 
+        // After a revision the task is in Back Log; the PIC sends the fix without moving it first.
+        $this->actingAs($this->staff)->postJson($this->url($task), ['url' => 'https://example.com/v2'])->assertCreated();
+        $this->assertSame(TaskStatus::Backlog, $task->fresh()->status);
         $this->moveTo($task, $this->staff, 'todo');
         $this->moveTo($task, $this->staff, 'in_progress');
-        $this->actingAs($this->staff)->postJson($this->url($task), ['url' => 'https://example.com/v2'])->assertCreated();
         $this->moveTo($task, $this->staff, 'ready_review');
 
         $this->actingAs($this->manager)
@@ -452,6 +559,88 @@ class TaskEvidenceTest extends TestCase
         $evidence = $this->evidence($task);
 
         $this->actingAs($this->staff)->get($this->downloadUrl($task, $evidence))->assertNotFound();
+        $this->actingAs($this->staff)->get($this->previewUrl($task, $evidence))->assertNotFound();
+    }
+
+    public function test_download_tells_the_browser_not_to_guess_the_type(): void
+    {
+        $task = $this->task(TaskStatus::InProgress);
+
+        $this->actingAs($this->staff)
+            ->postJson($this->url($task), ['file' => UploadedFile::fake()->createWithContent('catatan.pdf', 'isi bukti')])
+            ->assertCreated();
+
+        $this->get($this->downloadUrl($task, TaskEvidence::sole()))
+            ->assertOk()
+            ->assertHeader('X-Content-Type-Options', 'nosniff');
+    }
+
+    public function test_an_image_is_previewed_inline_by_everyone_who_sees_the_task(): void
+    {
+        $task = $this->task(TaskStatus::InProgress);
+
+        $this->actingAs($this->staff)
+            ->postJson($this->url($task), ['file' => $this->realFile('foto.png', self::PNG, 'image/png')])
+            ->assertCreated();
+
+        $evidence = TaskEvidence::sole();
+
+        foreach ([$this->manager, $this->financeManager, $this->otherStaff] as $account) {
+            $response = $this->actingAs($account)
+                ->get($this->previewUrl($task, $evidence))
+                ->assertOk()
+                ->assertHeader('Content-Type', 'image/png')
+                ->assertHeader('X-Content-Type-Options', 'nosniff');
+
+            $this->assertStringStartsWith('inline', (string) $response->headers->get('Content-Disposition'));
+        }
+
+        auth()->logout();
+        $this->getJson($this->previewUrl($task, $evidence))->assertUnauthorized();
+    }
+
+    public function test_a_document_has_no_preview_and_is_opened_through_its_download(): void
+    {
+        $task = $this->task(TaskStatus::InProgress);
+
+        $this->actingAs($this->staff)
+            ->postJson($this->url($task), ['file' => UploadedFile::fake()->createWithContent('catatan.pdf', 'isi bukti')])
+            ->assertCreated()
+            ->assertJsonPath('data.kind', 'document')
+            ->assertJsonPath('data.preview_url', null);
+
+        $this->get($this->previewUrl($task, TaskEvidence::sole()))->assertNotFound();
+    }
+
+    public function test_a_deleted_image_can_no_longer_be_previewed(): void
+    {
+        $task = $this->task(TaskStatus::InProgress);
+
+        $this->actingAs($this->staff)
+            ->postJson($this->url($task), ['file' => $this->realFile('foto.png', self::PNG, 'image/png')])
+            ->assertCreated();
+        $evidence = TaskEvidence::sole();
+
+        $this->deleteJson("/api/tasks/{$task->id}/evidences/{$evidence->id}")->assertOk();
+
+        $this->get($this->previewUrl($task, $evidence))->assertNotFound();
+        Storage::disk('local')->assertExists($evidence->file_path);
+    }
+
+    public function test_pic_adds_and_deletes_their_evidence_in_back_log_without_moving_the_task(): void
+    {
+        $task = $this->task(TaskStatus::Backlog);
+
+        $id = $this->actingAs($this->staff)
+            ->postJson($this->url($task), ['url' => 'https://example.com/draft'])
+            ->assertCreated()
+            ->json('data.id');
+
+        $this->deleteJson("/api/tasks/{$task->id}/evidences/{$id}")->assertOk();
+
+        $fresh = $task->fresh();
+        $this->assertSame(TaskStatus::Backlog, $fresh->status);
+        $this->assertSame($task->version, $fresh->version);
     }
 
     // Ketentuan jenis tugas
@@ -507,6 +696,30 @@ class TaskEvidenceTest extends TestCase
         $this->actingAs($actor)
             ->patchJson($this->statusUrl($task), ['version' => $task->fresh()->version, 'status' => $status])
             ->assertOk();
+    }
+
+    /**
+     * A 1×1 PNG and the start of a PDF, so the type is detected from real content.
+     */
+    private const PNG = "\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15\xc4\x89\x00\x00\x00\rIDATx\x9cc\xf8\xff\xff?\x00\x05\xfe\x02\xfe\xa75\x81\x84\x00\x00\x00\x00IEND\xaeB`\x82";
+
+    private const PDF = "%PDF-1.4\n1 0 obj << /Type /Catalog >> endobj\ntrailer << /Root 1 0 R >>\n%%EOF\n";
+
+    /**
+     * An upload backed by a real file, so its type is detected from the content like in production; the browser's
+     * claimed type is ignored by the server.
+     */
+    private function realFile(string $name, string $content, string $clientMimeType): UploadedFile
+    {
+        $path = tempnam(sys_get_temp_dir(), 'evidence');
+        file_put_contents($path, $content);
+
+        return new UploadedFile($path, $name, $clientMimeType, null, true);
+    }
+
+    private function previewUrl(Task $task, TaskEvidence $evidence): string
+    {
+        return "/api/tasks/{$task->id}/evidences/{$evidence->id}/preview";
     }
 
     private function url(Task $task): string

@@ -1,51 +1,27 @@
 import '../../../css/pages/performance.css';
 import Alpine from 'alpinejs';
-import { errorMessage, validationErrors } from '../../http';
-import { exportUrl, fetchSummary } from './api';
-import {
-    MAX_YEARS,
-    MONTHS,
-    PERIOD_MODES,
-    canPickMonth,
-    defaultFilter,
-    filterErrorField,
-    filterFromUrl,
-    syncUrl,
-    toQueryString,
-    today,
-    validateFilter,
-} from './filter';
-import { formatDateRange, formatDateTime, formatValue } from '../../format';
+import { errorMessage } from '../../http';
+import { fetchSummary } from './api';
+import { formatDateTime, formatValue } from '../../format';
 import performanceContribution from './contribution';
+import dashboardFilter, { PERIOD_EVENT } from './global-filter';
 import performancePaymentMethod from './payment-method';
 import performancePurchaseTime from './purchase-time';
 import performanceTrend from './trend';
 import dashboardShell from './shell';
 
-Alpine.data('performanceSummary', (platforms = [], years = []) => ({
-    platforms,
-    years,
-    modes: PERIOD_MODES,
-    months: MONTHS,
-    maxYears: MAX_YEARS,
-
-    filter: filterFromUrl(),
-    query: '',
-    errors: {},
-
+/**
+ * Ringkasan Sales cards. The global filter (./global-filter) owns the filter; this reloads whenever it
+ * dispatches `performance-filter` and hands the resolved period of its response (`data.filter.period`) back
+ * through `performance-period`.
+ */
+Alpine.data('performanceSummary', () => ({
+    query: null,
     summary: null,
     loading: true,
     loadError: '',
     loadedAt: null,
     requestId: 0,
-
-    init() {
-        this.apply();
-    },
-
-    get maxDate() {
-        return today();
-    },
 
     get metrics() {
         return this.summary?.kpis ?? {};
@@ -61,41 +37,8 @@ Alpine.data('performanceSummary', (platforms = [], years = []) => ({
         return this.summary.message || 'Data tidak ditemukan untuk filter yang dipilih.';
     },
 
-    /**
-     * The period actually counted, from the backend's filter block. Several ranges appear when the
-     * selected years are not consecutive.
-     */
-    get periodLabel() {
-        return (this.summary?.filter?.ranges ?? []).map(formatDateRange).join(', ');
-    },
-
     get loadedLabel() {
         return this.loadedAt ? formatDateTime(this.loadedAt) : '';
-    },
-
-    get monthEnabled() {
-        return canPickMonth(this.filter);
-    },
-
-    get filterInvalid() {
-        return Object.keys(this.errors).length > 0;
-    },
-
-    get platformSummary() {
-        const selected = this.platforms.filter(({ value }) => this.filter.platforms.includes(value));
-        if (selected.length === 0) return 'Semua Platform';
-
-        return selected.length <= 2 ? selected.map(({ label }) => label).join(', ') : `${selected.length} platforms`;
-    },
-
-    get yearSummary() {
-        if (this.filter.years.length === 0) return 'Pilih tahun';
-
-        return [...this.filter.years].sort().join(', ');
-    },
-
-    exportLink(format) {
-        return exportUrl(format, this.query);
     },
 
     value(key, format, compact = false) {
@@ -131,57 +74,8 @@ Alpine.data('performanceSummary', (platforms = [], years = []) => ({
         return `${Math.min(Math.max(Number(this.metrics[key]?.value) || 0, 0), 100)}%`;
     },
 
-    togglePlatform(slug) {
-        const selected = this.filter.platforms;
-        this.filter.platforms = selected.includes(slug) ? selected.filter((value) => value !== slug) : [...selected, slug];
-        this.apply();
-    },
-
-    toggleYear(year) {
-        const selected = this.filter.years;
-
-        if (selected.includes(year)) {
-            this.filter.years = selected.filter((value) => value !== year);
-        } else if (selected.length < MAX_YEARS) {
-            this.filter.years = [...selected, year];
-        }
-
-        // A month only applies to a single year; the API rejects a month with several years.
-        if (!canPickMonth(this.filter)) this.filter.month = '';
-        this.apply();
-    },
-
-    isYearDisabled(year) {
-        return !this.filter.years.includes(year) && this.filter.years.length >= MAX_YEARS;
-    },
-
-    changeMode() {
-        const { platforms, mode } = this.filter;
-        this.filter = { ...defaultFilter(), platforms, mode };
-
-        // Start each mode on a valid period so the change shows data right away.
-        const latest = this.years[0] ?? new Date().getFullYear();
-        if (mode === 'years') this.filter.years = [latest];
-        if (mode === 'year_range') Object.assign(this.filter, { year_from: this.years[this.years.length - 1] ?? latest, year_to: latest });
-        if (mode === 'date_range') Object.assign(this.filter, { date_from: `${today().slice(0, 8)}01`, date_to: today() });
-        this.apply();
-    },
-
-    resetFilter() {
-        this.filter = defaultFilter();
-        this.apply();
-    },
-
-    /**
-     * Validates the filter, then reloads the summary and tells every other card the new query.
-     */
-    apply() {
-        this.errors = validateFilter(this.filter);
-        if (this.filterInvalid) return;
-
-        this.query = toQueryString(this.filter);
-        syncUrl(this.query);
-        this.$nextTick(() => this.$dispatch('performance-filter', this.query));
+    loadSummary(query) {
+        this.query = query;
         this.load();
     },
 
@@ -197,26 +91,22 @@ Alpine.data('performanceSummary', (platforms = [], years = []) => ({
 
             this.summary = data;
             this.loadedAt = new Date();
+            this.$dispatch(PERIOD_EVENT, { query: this.query, period: data?.filter?.period ?? null });
         } catch (error) {
             if (requestId !== this.requestId) return;
 
-            // Drop the previous filter's result so the cards, period and loaded time do not show it as this one.
+            // Drop the previous filter's result so the cards and loaded time do not show it as this one.
             this.summary = null;
             this.loadedAt = null;
-
-            if (error.status === 422 && error.data?.errors) {
-                this.errors = Object.fromEntries(
-                    Object.entries(validationErrors(error)).map(([field, message]) => [filterErrorField(field), message]),
-                );
-            } else {
-                this.loadError = errorMessage(error, 'Gagal memuat ringkasan performa.');
-            }
+            this.loadError = errorMessage(error, 'Gagal memuat ringkasan performa.');
+            this.$dispatch(PERIOD_EVENT, { query: this.query, error });
         } finally {
             if (requestId === this.requestId) this.loading = false;
         }
     },
 }));
 
+Alpine.data('dashboardFilter', dashboardFilter);
 Alpine.data('dashboardShell', dashboardShell);
 Alpine.data('performanceTrend', performanceTrend);
 Alpine.data('performanceContribution', performanceContribution);

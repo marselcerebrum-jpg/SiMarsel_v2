@@ -154,7 +154,7 @@ class TaskRoleBasedManagementTest extends TestCase
 
             $this->deleteEvidence($task, $evidence, 'staff')
                 ->assertUnprocessable()
-                ->assertJsonValidationErrors(['evidence' => "Evidence hanya dapat dihapus saat tugas berstatus To Do atau On Process, bukan {$status->label()}."]);
+                ->assertJsonValidationErrors(['evidence' => "Evidence hanya dapat dihapus saat tugas berstatus Back Log, To Do, atau On Process, bukan {$status->label()}."]);
             $this->assertNotSoftDeleted($evidence);
         }
 

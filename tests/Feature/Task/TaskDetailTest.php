@@ -262,8 +262,12 @@ class TaskDetailTest extends TestCase
                 'id' => $link->id,
                 'task_id' => $this->task->id,
                 'type' => 'link',
+                'kind' => 'link',
                 'file_name' => null,
+                'mime_type' => null,
+                'file_size' => null,
                 'file_url' => null,
+                'preview_url' => null,
                 'url' => 'https://www.figma.com/file/banner',
                 'note' => null,
                 'submitter' => ['id' => $this->staff->id, 'fullname' => 'mkt.staff'],
@@ -274,6 +278,10 @@ class TaskDetailTest extends TestCase
             ->assertJsonPath('data.evidence.1.type', 'file')
             ->assertJsonPath('data.evidence.1.file_name', 'banner.png')
             ->assertJsonPath('data.evidence.1.file_url', route('api.tasks.evidences.download', [$this->task->id, $file->id]))
+            // Older evidence has no recorded MIME type, so it is read from the file name.
+            ->assertJsonPath('data.evidence.1.kind', 'image')
+            ->assertJsonPath('data.evidence.1.mime_type', 'image/png')
+            ->assertJsonPath('data.evidence.1.preview_url', route('api.tasks.evidences.preview', [$this->task->id, $file->id]))
             ->assertJsonPath('data.evidence.1.note', 'Desain final');
     }
 

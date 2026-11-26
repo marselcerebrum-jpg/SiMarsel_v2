@@ -1,4 +1,4 @@
-{{-- Compact header shown after the page header scrolls away, plus the Filter panel it opens. Uses dashboardShell and performanceSummary. --}}
+{{-- Compact header shown after the page header scrolls away, plus the Filter panel it opens. Uses dashboardShell and dashboardFilter. --}}
 <div class="sticky top-[65px] z-20 h-0 lg:top-0">
     <div
         x-show="compact"
@@ -11,7 +11,7 @@
             <p class="text-sm font-bold text-ink">Dashboard</p>
             <p class="truncate text-xs text-muted">
                 <span class="sr-only">Periode aktif:</span>
-                <span x-text="periodLabel || 'Memuat periode…'">Memuat periode…</span>
+                <span x-text="activeRangeLabel || 'Memuat periode…'">Memuat periode…</span>
             </p>
         </div>
 
@@ -55,7 +55,8 @@
             </button>
         </div>
 
-        {{-- FIX-04-FE-01 places the filter controls here. --}}
-        <div data-dashboard-slot="filter-panel" class="mt-4"></div>
+        <div data-dashboard-slot="filter-panel" class="mt-4">
+            @include('pages.performance.components.performance-filter', ['prefix' => 'panel-filter', 'statusShown' => 'filterPanelOpen'])
+        </div>
     </div>
 </div>

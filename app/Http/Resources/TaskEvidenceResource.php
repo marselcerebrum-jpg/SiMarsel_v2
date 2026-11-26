@@ -13,8 +13,12 @@ class TaskEvidenceResource extends JsonResource
             'id' => $this->id,
             'task_id' => $this->task_id,
             'type' => $this->type,
+            'kind' => $this->resource->kind(),
             'file_name' => $this->file_name,
+            'mime_type' => $this->resource->effectiveMimeType(),
+            'file_size' => $this->file_size,
             'file_url' => $this->type === 'file' ? route('api.tasks.evidences.download', [$this->task_id, $this->id]) : null,
+            'preview_url' => $this->resource->previewable() ? route('api.tasks.evidences.preview', [$this->task_id, $this->id]) : null,
             'url' => $this->url,
             'note' => $this->note,
             'submitter' => $this->submitter ? [

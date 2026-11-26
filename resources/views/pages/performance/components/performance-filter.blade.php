@@ -1,175 +1,205 @@
+{{--
+    Global Dashboard filter controls and the resolved period (FIX-04-FE-01). Uses dashboardFilter.
+    Rendered in the Filter section and in the compact header panel; both share one filter state.
+    Variables: $prefix (unique id prefix per placement), $statusShown (Alpine expression; only one status region is live).
+--}}
 @php
+    $id = fn (string $name) => "{$prefix}-{$name}";
+
     $label = 'mb-1.5 block text-xs font-semibold text-label';
-    $control = 'h-9 w-full rounded-lg border border-line bg-white px-3 text-sm text-ink focus:border-primary focus:ring-2 focus:ring-primary/20 focus:outline-none disabled:cursor-not-allowed disabled:bg-soft disabled:text-label';
+    $control = 'h-9 w-full rounded-lg border border-line bg-white px-3 text-sm text-ink focus:border-primary focus:ring-2 focus:ring-primary/20 focus:outline-none';
     $chevron = 'pointer-events-none absolute top-1/2 right-3 size-4 -translate-y-1/2 text-label';
     $menu = 'absolute z-30 mt-1 max-h-64 w-full min-w-48 overflow-y-auto rounded-lg border border-line bg-white p-1 shadow-lg';
-    $option = 'flex h-9 cursor-pointer items-center gap-2.5 rounded-md px-2.5 text-sm text-ink hover:bg-soft';
+    $option = 'flex h-9 cursor-pointer items-center gap-2.5 rounded-md px-2.5 text-sm text-ink hover:bg-soft focus-within:bg-soft';
     $checkbox = 'size-4 rounded border-line accent-primary';
     $error = 'mt-1.5 text-xs text-red-600';
+    $rangeGroup = 'grid gap-4 rounded-lg border border-line p-4 sm:grid-cols-2';
+    $legend = 'px-1 text-xs font-semibold text-ink';
+
+    $dateFields = [
+        'date_range' => [
+            'show' => 'isDateRange',
+            'legend' => 'Rentang Tanggal',
+            'fields' => [
+                ['key' => 'date_from', 'name' => 'start', 'label' => 'Tanggal Mulai'],
+                ['key' => 'date_to', 'name' => 'end', 'label' => 'Tanggal Akhir'],
+            ],
+        ],
+        'comparison' => [
+            'show' => 'isCustomComparison',
+            'legend' => 'Rentang Pembanding Khusus',
+            'fields' => [
+                ['key' => 'comparison_from', 'name' => 'comparison-start', 'label' => 'Tanggal Mulai Pembanding'],
+                ['key' => 'comparison_to', 'name' => 'comparison-end', 'label' => 'Tanggal Akhir Pembanding'],
+            ],
+        ],
+    ];
 @endphp
 
-<div class="flex items-center justify-between gap-3">
-    <h2 id="filter-title" class="text-base font-semibold text-ink">Filter</h2>
-    <button type="button" class="inline-flex h-9 items-center rounded-lg px-3 text-sm font-semibold text-muted hover:bg-soft hover:text-ink" @click="resetFilter()">
-        Atur Ulang
-    </button>
-</div>
-
-<div class="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-    {{-- Platforms (multi-select) --}}
-    <div x-data="{ open: false }" @click.outside="open = false" @keydown.escape="open = false" class="relative">
-        <span id="filter-platforms-label" class="{{ $label }}">Platform</span>
+<div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+    {{-- Platform: one, several, or all. Tab moves through the checkboxes, Space toggles, Escape closes. --}}
+    <div
+        x-data="{ open: false }"
+        @click.outside="open = false"
+        @keydown.escape="if (open) { open = false; $event.stopPropagation(); $refs.platformButton.focus(); }"
+        class="relative"
+    >
+        <span id="{{ $id('platforms-label') }}" class="{{ $label }}">Platform</span>
         <button
             type="button"
+            x-ref="platformButton"
             class="{{ $control }} relative truncate pr-9 text-left"
-            :class="errors.platforms && 'border-red-500'"
-            aria-labelledby="filter-platforms-label"
-            aria-haspopup="listbox"
+            :class="filterErrors.platforms && 'border-red-500'"
+            aria-labelledby="{{ $id('platforms-label') }} {{ $id('platforms-value') }}"
+            aria-controls="{{ $id('platforms-options') }}"
+            aria-describedby="{{ $id('platforms-error') }}"
             :aria-expanded="open.toString()"
+            :aria-invalid="Boolean(filterErrors.platforms).toString()"
             @click="open = !open"
         >
-            <span x-text="platformSummary">Semua Platform</span>
+            <span id="{{ $id('platforms-value') }}" x-text="platformSummary">Semua Platform</span>
             <x-icon name="chevron-down" class="{{ $chevron }}" />
         </button>
-        <div x-show="open" x-cloak class="{{ $menu }}" role="listbox" aria-multiselectable="true" aria-labelledby="filter-platforms-label">
+        <fieldset id="{{ $id('platforms-options') }}" x-show="open" x-cloak class="{{ $menu }}">
+            <legend class="sr-only">Pilih platform</legend>
+            <label class="{{ $option }}">
+                <input type="checkbox" class="{{ $checkbox }}" :checked="allPlatformsSelected" @change="selectAllPlatforms()">
+                <span>Semua Platform</span>
+            </label>
             <template x-for="platform in platforms" :key="platform.value">
                 <label class="{{ $option }}">
-                    <input type="checkbox" class="{{ $checkbox }}" :checked="filter.platforms.includes(platform.value)" @change="togglePlatform(platform.value)">
+                    <input type="checkbox" class="{{ $checkbox }}" :value="platform.value" :checked="isPlatformSelected(platform.value)" @change="togglePlatform(platform.value)">
                     <span x-text="platform.label"></span>
                 </label>
             </template>
-        </div>
-        <p x-show="errors.platforms" x-cloak x-text="errors.platforms" class="{{ $error }}"></p>
+        </fieldset>
+        <p id="{{ $id('platforms-error') }}" x-show="filterErrors.platforms" x-cloak x-text="filterErrors.platforms" class="{{ $error }}"></p>
     </div>
 
-    {{-- Period mode: only one may be active, the API answers 422 otherwise --}}
+    {{-- Period preset --}}
     <div>
-        <label for="filter-mode" class="{{ $label }}">Periode</label>
+        <label for="{{ $id('preset') }}" class="{{ $label }}">Periode</label>
         <div class="relative">
-            <select id="filter-mode" x-model="filter.mode" @change="changeMode()" class="{{ $control }} appearance-none pr-9">
-                <template x-for="mode in modes" :key="mode.value">
-                    <option :value="mode.value" x-text="mode.label" :selected="mode.value === filter.mode"></option>
+            <select
+                id="{{ $id('preset') }}"
+                x-model="filter.preset"
+                @change="changePreset()"
+                class="{{ $control }} appearance-none pr-9"
+                :class="filterErrors.preset && 'border-red-500'"
+                aria-describedby="{{ $id('preset-error') }}"
+                :aria-invalid="Boolean(filterErrors.preset).toString()"
+            >
+                <template x-for="preset in presets" :key="preset.value">
+                    <option :value="preset.value" x-text="preset.label" :selected="preset.value === filter.preset"></option>
                 </template>
             </select>
             <x-icon name="chevron-down" class="{{ $chevron }}" />
         </div>
+        <p id="{{ $id('preset-error') }}" x-show="filterErrors.preset" x-cloak x-text="filterErrors.preset" class="{{ $error }}"></p>
     </div>
 
-    {{-- Year & Month --}}
-    <template x-if="filter.mode === 'years'">
-        <div x-data="{ open: false }" @click.outside="open = false" @keydown.escape="open = false" class="relative">
-            <span id="filter-years-label" class="{{ $label }}">Tahun <span class="font-normal">(maks. <span x-text="maxYears"></span>)</span></span>
-            <button
-                type="button"
-                class="{{ $control }} relative truncate pr-9 text-left"
-                :class="errors.years && 'border-red-500'"
-                aria-labelledby="filter-years-label"
-                aria-haspopup="listbox"
-                :aria-expanded="open.toString()"
-                @click="open = !open"
+    {{-- Comparison: changes only the comparison period --}}
+    <div>
+        <label for="{{ $id('comparison') }}" class="{{ $label }}">Pembanding</label>
+        <div class="relative">
+            <select
+                id="{{ $id('comparison') }}"
+                x-model="filter.comparison"
+                @change="changeComparison()"
+                class="{{ $control }} appearance-none pr-9"
+                :class="filterErrors.comparison && 'border-red-500'"
+                aria-describedby="{{ $id('comparison-error') }}"
+                :aria-invalid="Boolean(filterErrors.comparison).toString()"
             >
-                <span x-text="yearSummary"></span>
-                <x-icon name="chevron-down" class="{{ $chevron }}" />
-            </button>
-            <div x-show="open" x-cloak class="{{ $menu }}" role="listbox" aria-multiselectable="true" aria-labelledby="filter-years-label">
-                <template x-for="year in years" :key="year">
-                    <label class="{{ $option }}" :class="isYearDisabled(year) && 'cursor-not-allowed opacity-50'">
-                        <input type="checkbox" class="{{ $checkbox }}" :checked="filter.years.includes(year)" :disabled="isYearDisabled(year)" @change="toggleYear(year)">
-                        <span x-text="year"></span>
-                    </label>
+                <template x-for="comparison in comparisons" :key="comparison.value">
+                    <option :value="comparison.value" x-text="comparison.label" :selected="comparison.value === filter.comparison"></option>
                 </template>
-            </div>
-            <p x-show="errors.years" x-cloak x-text="errors.years" class="{{ $error }}"></p>
+            </select>
+            <x-icon name="chevron-down" class="{{ $chevron }}" />
         </div>
-    </template>
-
-    <template x-if="filter.mode === 'years'">
-        <div>
-            <label for="filter-month" class="{{ $label }}">Bulan</label>
-            <div class="relative">
-                <select id="filter-month" x-model="filter.month" @change="apply()" :disabled="!monthEnabled" class="{{ $control }} appearance-none pr-9" :class="errors.month && 'border-red-500'">
-                    <option value="">Semua Bulan</option>
-                    <template x-for="(month, index) in months" :key="index">
-                        <option :value="String(index + 1)" x-text="month" :selected="String(index + 1) === String(filter.month)"></option>
-                    </template>
-                </select>
-                <x-icon name="chevron-down" class="{{ $chevron }}" />
-            </div>
-            <p x-show="!monthEnabled" class="mt-1.5 text-xs text-label">Bulan hanya bisa dipilih jika satu tahun dipilih.</p>
-            <p x-show="errors.month" x-cloak x-text="errors.month" class="{{ $error }}"></p>
-        </div>
-    </template>
-
-    {{-- Year range --}}
-    <template x-if="filter.mode === 'year_range'">
-        <div>
-            <label for="filter-year-from" class="{{ $label }}">Dari Tahun</label>
-            <div class="relative">
-                <select id="filter-year-from" x-model="filter.year_from" @change="apply()" class="{{ $control }} appearance-none pr-9" :class="errors.year_from && 'border-red-500'">
-                    <template x-for="year in years" :key="year">
-                        <option :value="String(year)" x-text="year" :selected="String(year) === String(filter.year_from)"></option>
-                    </template>
-                </select>
-                <x-icon name="chevron-down" class="{{ $chevron }}" />
-            </div>
-            <p x-show="errors.year_from" x-cloak x-text="errors.year_from" class="{{ $error }}"></p>
-        </div>
-    </template>
-
-    <template x-if="filter.mode === 'year_range'">
-        <div>
-            <label for="filter-year-to" class="{{ $label }}">Sampai Tahun</label>
-            <div class="relative">
-                <select id="filter-year-to" x-model="filter.year_to" @change="apply()" class="{{ $control }} appearance-none pr-9" :class="errors.year_to && 'border-red-500'">
-                    <template x-for="year in years" :key="year">
-                        <option :value="String(year)" x-text="year" :selected="String(year) === String(filter.year_to)"></option>
-                    </template>
-                </select>
-                <x-icon name="chevron-down" class="{{ $chevron }}" />
-            </div>
-            <p x-show="errors.year_to" x-cloak x-text="errors.year_to" class="{{ $error }}"></p>
-        </div>
-    </template>
-
-    {{-- Date range --}}
-    <template x-if="filter.mode === 'date_range'">
-        <div>
-            <label for="filter-start" class="{{ $label }}">Tanggal Mulai</label>
-            <input
-                id="filter-start"
-                type="date"
-                x-model="filter.date_from"
-                :max="filter.date_to || maxDate"
-                @change="apply()"
-                class="{{ $control }}"
-                :class="errors.date_from && 'border-red-500'"
-                :aria-invalid="Boolean(errors.date_from).toString()"
-            >
-            <p x-show="errors.date_from" x-cloak x-text="errors.date_from" class="{{ $error }}"></p>
-        </div>
-    </template>
-
-    <template x-if="filter.mode === 'date_range'">
-        <div>
-            <label for="filter-end" class="{{ $label }}">Tanggal Akhir</label>
-            <input
-                id="filter-end"
-                type="date"
-                x-model="filter.date_to"
-                :min="filter.date_from"
-                :max="maxDate"
-                @change="apply()"
-                class="{{ $control }}"
-                :class="errors.date_to && 'border-red-500'"
-                :aria-invalid="Boolean(errors.date_to).toString()"
-            >
-            <p x-show="errors.date_to" x-cloak x-text="errors.date_to" class="{{ $error }}"></p>
-        </div>
-    </template>
+        <p id="{{ $id('comparison-error') }}" x-show="filterErrors.comparison" x-cloak x-text="filterErrors.comparison" class="{{ $error }}"></p>
+    </div>
 </div>
 
-<p x-show="errors.filter" x-cloak x-text="errors.filter" class="{{ $error }}" role="alert"></p>
+{{-- Custom ranges: shown only for Rentang Tanggal and Rentang Pembanding Khusus. Typed values are never cleared. --}}
+@foreach ($dateFields as $group)
+    <template x-if="{{ $group['show'] }}">
+        <fieldset class="mt-4 {{ $rangeGroup }}">
+            <legend class="{{ $legend }}">{{ $group['legend'] }}</legend>
+            @foreach ($group['fields'] as $field)
+                <div>
+                    <label for="{{ $id($field['name']) }}" class="{{ $label }}">{{ $field['label'] }}</label>
+                    <input
+                        id="{{ $id($field['name']) }}"
+                        type="date"
+                        x-model="filter.{{ $field['key'] }}"
+                        @change="applyGlobalFilter()"
+                        class="{{ $control }}"
+                        :class="filterErrors.{{ $field['key'] }} && 'border-red-500'"
+                        aria-describedby="{{ $id($field['name'].'-error') }}"
+                        :aria-invalid="Boolean(filterErrors.{{ $field['key'] }}).toString()"
+                    >
+                    <p id="{{ $id($field['name'].'-error') }}" x-show="filterErrors.{{ $field['key'] }}" x-cloak x-text="filterErrors.{{ $field['key'] }}" class="{{ $error }}"></p>
+                </div>
+            @endforeach
+        </fieldset>
+    </template>
+@endforeach
 
-<p x-show="periodLabel && !filterInvalid && !loading" x-cloak class="mt-4 text-xs text-muted">
-    Menampilkan data <span x-text="periodLabel" class="font-semibold text-ink"></span>
-</p>
+<p x-show="filterErrors.filter" x-cloak x-text="filterErrors.filter" class="{{ $error }}"></p>
+
+{{-- Success or failure in text. Only one placement keeps a live region, so a change is announced once. --}}
+<p
+    role="status"
+    aria-live="polite"
+    x-text="{{ $statusShown }} ? filterStatus : ''"
+    class="mt-4 text-xs empty:mt-0"
+    :class="filterFailed ? 'text-red-600' : 'text-muted'"
+></p>
+
+{{-- Resolved period: every date, hour and boundary comes from the resolver response. --}}
+<dl class="mt-4 grid gap-x-6 gap-y-3 border-t border-line pt-4 text-xs sm:grid-cols-2" :aria-busy="periodLoading.toString()">
+    <div>
+        <dt class="font-semibold text-label">Rentang aktif</dt>
+        <dd class="mt-0.5 flex flex-wrap items-center gap-2 text-ink">
+            <span x-text="periodInfo?.active ?? 'Memuat periode…'">Memuat periode…</span>
+            <span
+                x-show="periodInfo?.provisional"
+                x-cloak
+                x-text="periodInfo?.provisionalLabel"
+                class="rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 font-semibold text-amber-800"
+            ></span>
+        </dd>
+    </div>
+    <div>
+        <dt class="font-semibold text-label">Rentang pembanding</dt>
+        <dd class="mt-0.5 text-ink" x-text="periodInfo?.comparison ?? 'Memuat periode…'">Memuat periode…</dd>
+    </div>
+    <div>
+        <dt class="font-semibold text-label">Batas lengkap</dt>
+        <dd class="mt-0.5 text-ink" x-text="periodInfo?.completeUntil ?? 'Memuat periode…'">Memuat periode…</dd>
+    </div>
+    <div>
+        <dt class="font-semibold text-label">Catatan pembanding</dt>
+        <dd class="mt-0.5 text-ink" x-text="periodInfo?.snapshot ?? 'Memuat periode…'">Memuat periode…</dd>
+    </div>
+    <template x-if="periodInfo?.change">
+        <div class="sm:col-span-2">
+            <dt class="font-semibold text-label">Rentang yang dipakai untuk perubahan</dt>
+            <dd class="mt-0.5 text-ink">
+                <span x-text="periodInfo.change.active"></span>
+                <span class="text-muted">dibanding</span>
+                <span x-text="periodInfo.change.comparison"></span>
+            </dd>
+        </div>
+    </template>
+    <template x-if="periodInfo?.durations">
+        <div class="sm:col-span-2">
+            <dt class="font-semibold text-label">Durasi</dt>
+            <dd class="mt-0.5 text-ink">
+                Aktif <span x-text="periodInfo.durations.active"></span>
+                · Pembanding <span x-text="periodInfo.durations.comparison"></span>
+            </dd>
+        </div>
+    </template>
+</dl>

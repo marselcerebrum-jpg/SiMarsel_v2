@@ -6,9 +6,10 @@ const root = new URL('../../../resources/js/pages/performance/', import.meta.url
 /**
  * Loads a module from resources/js/pages/performance with its relative imports.
  * Only relative imports are allowed, so the module stays free of Alpine, Chart.js and fetch().
+ * `globals` adds browser stand-ins (window, document) for modules that read them.
  */
-export async function loadPerformanceModule(path) {
-    const context = vm.createContext({ Intl, Date, Number, Math, String, Object, RegExp });
+export async function loadPerformanceModule(path, globals = {}) {
+    const context = vm.createContext({ Intl, Date, Number, Math, String, Object, RegExp, URLSearchParams, ...globals });
     const cache = new Map();
 
     async function load(url) {
