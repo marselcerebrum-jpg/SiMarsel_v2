@@ -60,10 +60,16 @@ function summaryChangeOf(metric) {
     return { text: format({ value: change.value, available: true }), ...(DIRECTIONS[change.trend] ?? { symbol: '', label: '' }) };
 }
 
-/** Context under Total Transaksi and Konversi Transaksi, only from values the backend returned. */
+/** Context under Omzet, Total Transaksi and Konversi Transaksi, only from values the backend returned. */
 function detailOf(metric) {
     const active = metric?.active;
     if (!active || active.availability === 'unavailable') return '';
+
+    if (metric.key === 'revenue') {
+        const nominal = active.nominal_total ?? null;
+
+        return nominal === null ? '' : `Nominal ${formatRupiah(nominal)}`;
+    }
 
     if (metric.key === 'total_checkouts') {
         const attempts = active.breakdown?.purchase_attempts ?? null;

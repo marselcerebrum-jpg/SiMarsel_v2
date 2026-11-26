@@ -85,6 +85,7 @@ class DashboardSalesSummaryContractTest extends TestCase
             $metrics['conversion']['active']['is_provisional'],
         ]);
         $this->assertEquals(180000, $metrics['revenue']['active']['value']);
+        $this->assertEquals(182000, $metrics['revenue']['active']['nominal_total']);
         $this->assertEquals(180000, $metrics['average_order_value']['active']['value']);
         $this->assertSame(1, $metrics['unique_buyers']['active']['value']);
     }

@@ -1,7 +1,8 @@
 {{--
     Ringkasan Sales (FIX-05-FE-01): Hasil Penjualan and Aktivitas Transaksi side by side when there is room, stacked
     on phones, then the supporting row. Values, comparisons and changes come from performanceSalesSummary
-    (resources/js/pages/performance/sales-summary.js); this file only holds the order, titles and date basis.
+    (resources/js/pages/performance/sales-summary.js), which reads the page summary it is nested in; this file only
+    holds the order, titles and date basis.
 --}}
 @php
     $blocks = [
@@ -32,7 +33,7 @@
     ];
 @endphp
 
-<div x-data="performanceSalesSummary" @performance-filter.window="applySalesSummaryFilter($event.detail)" :aria-busy="salesSummaryLoading.toString()">
+<div x-data="performanceSalesSummary" :aria-busy="salesSummaryLoading.toString()">
     <h2 id="dashboard-sales-summary-title" class="text-base font-semibold text-ink">Ringkasan Sales</h2>
 
     <div x-show="!salesSummaryLoading && salesSummaryError" x-cloak class="mt-3 flex flex-col gap-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between" role="alert">

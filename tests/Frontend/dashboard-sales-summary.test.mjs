@@ -20,17 +20,36 @@ const browser = {
 const { SALES_SUMMARY_METRICS, salesSummaryCards } = await loadPerformanceModule('sales-summary-cards.js');
 const fixtures = await loadPerformanceModule('fixtures/index.js');
 const { default: performanceSalesSummary } = await loadPerformanceModule('sales-summary.js', browser);
+const { default: performanceSummary } = await loadPerformanceModule('page-summary.js', browser);
 
 const flush = () => new Promise((resolve) => setImmediate(resolve));
-const respondWith = (response) => () => Promise.resolve(plain(response));
 const cards = (summary) => plain(salesSummaryCards(plain(summary)));
+const summaryOf = (salesSummary) => ({ status: 200, body: { data: { kpis: {}, is_empty: false, sales_summary: plain(salesSummary) } } });
 
-async function mount({ query = 'preset=today', resolve } = {}) {
-    const component = performanceSalesSummary({ resolve });
-    component.applySalesSummaryFilter(query);
+/**
+ * The cards nested in the page summary, as Alpine merges nested x-data scopes: reads fall back to the page and
+ * writes go to the scope that owns the property.
+ */
+function nest(child, parent) {
+    return new Proxy(child, {
+        get: (target, key, receiver) => (key in target ? Reflect.get(target, key, receiver) : Reflect.get(parent, key, receiver)),
+        set: (target, key, value) => (key in target ? Reflect.set(target, key, value) : Reflect.set(parent, key, value)),
+    });
+}
+
+/** Mounts the page summary with the cards in it, then applies the filter once. */
+async function mount({ query = 'preset=today', answer = () => summaryOf(fixtures.todaySalesSummary) } = {}) {
+    requests.length = 0;
+    respond = answer;
+
+    const page = performanceSummary();
+    page.$dispatch = () => {};
+    const component = nest(performanceSalesSummary(), page);
+
+    component.loadSummary(query);
     await flush();
 
-    return component;
+    return { page, component };
 }
 
 test('parent AC-01: the seven metrics follow the scope order, two per block then the supporting row', () => {
@@ -46,8 +65,10 @@ test('parent AC-01: the seven metrics follow the scope order, two per block then
 });
 
 test('FE AC-01: every active value is plain text, so it reads on a phone without a tooltip', async () => {
-    const component = await mount({ resolve: respondWith(fixtures.todaySalesSummary) });
+    const { component } = await mount();
     const { salesCards } = component;
+
+    assert.equal(requests.length, 1, 'the header and the cards share one request');
 
     assert.equal(component.salesSummaryLoading, false);
     assert.deepEqual(
@@ -152,7 +173,7 @@ test('FE AC-05: Omzet, AOV and Pembeli Unik show the backend values without reco
     const response = plain(fixtures.revenueSalesSummary);
     const metric = (summary, key) => summary.metrics.find((item) => item.key === key);
 
-    const component = await mount({ resolve: respondWith(response) });
+    const { page, component } = await mount({ answer: () => summaryOf(response) });
 
     assert.equal(component.salesCards.revenue.value, 'Rp 360.000');
     assert.equal(component.salesCards.average_order_value.value, 'Rp 180.000');
@@ -161,7 +182,7 @@ test('FE AC-05: Omzet, AOV and Pembeli Unik show the backend values without reco
     // A changed response is shown as is: AOV is not divided again and the change is not recomputed.
     const changed = plain(response);
     metric(changed, 'revenue').active.value = 540000;
-    component.salesSummary = changed;
+    page.summary = { ...page.summary, sales_summary: changed };
 
     assert.equal(component.salesCards.revenue.value, 'Rp 540.000');
     assert.equal(component.salesCards.average_order_value.value, 'Rp 180.000');
@@ -182,26 +203,33 @@ test('FE AC-06: an empty status keeps Total 10 and marks Konversi 60% as Sementa
     assert.equal(resolved.conversion.note, '');
 });
 
-test('parent AC-05: the cards read data.sales_summary of the summary endpoint, and Coba Lagi repeats the same filter', async () => {
+test('parent AC-05: the cards read data.sales_summary of the page request, and Coba Lagi repeats the same filter', async () => {
     const query = 'platforms%5B%5D=jadiasn&preset=last_7_days';
     let fail = true;
-    requests.length = 0;
-    respond = () => (fail
-        ? { status: 500, body: { message: 'SQLSTATE[HY000]' } }
-        : { body: { data: { kpis: {}, sales_summary: plain(fixtures.crossDaySalesSummary) } } });
+    const answer = () => (fail ? { status: 500, body: { message: 'SQLSTATE[HY000]' } } : summaryOf(fixtures.crossDaySalesSummary));
 
-    const component = await mount({ query });
+    const { page, component } = await mount({ query, answer });
 
-    assert.equal(component.salesSummaryError, 'Gagal memuat Ringkasan Sales.', 'no technical detail is shown');
-    assert.equal(component.salesSummary, null);
+    assert.equal(component.salesSummaryError, 'Gagal memuat ringkasan performa.', 'no technical detail is shown');
+    assert.equal(page.summary, null);
     assert.equal(component.salesCards.revenue.value, 'Belum tersedia');
 
     fail = false;
     component.retrySalesSummary();
     assert.equal(component.salesSummaryLoading, true);
+    assert.equal(component.salesSummaryError, '', 'the error gives way to the loading state');
     await flush();
 
     assert.deepEqual(plain(requests), [`/api/performance/summary?${query}`, `/api/performance/summary?${query}`]);
     assert.equal(component.salesSummaryError, '');
     assert.equal(component.salesCards.revenue.value, 'Rp 1.440.000');
+});
+
+test('parent AC-06: Omzet 360.000 shows its nominal 367.000 as the detail, and AOV 180.000', () => {
+    const result = cards(fixtures.revenueSalesSummary);
+
+    assert.equal(result.revenue.value, 'Rp 360.000');
+    assert.equal(result.revenue.detail, 'Nominal Rp 367.000');
+    assert.equal(result.average_order_value.value, 'Rp 180.000');
+    assert.equal(cards(fixtures.incompleteSalesSummary).revenue.detail, '', 'no nominal when the side is not available');
 });

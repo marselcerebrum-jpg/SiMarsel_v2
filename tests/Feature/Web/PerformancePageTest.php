@@ -41,8 +41,8 @@ class PerformancePageTest extends TestCase
         $this->actingAs($this->employee)
             ->get('/dashboard')
             ->assertOk()
-            ->assertSee('x-data="performanceSalesSummary"', false)
-            ->assertSee('@performance-filter.window="applySalesSummaryFilter($event.detail)"', false)
+            ->assertSeeInOrder(['x-data="performanceSummary" @performance-filter.window="loadSummary($event.detail)"', 'x-data="performanceSalesSummary"'], false)
+            ->assertDontSee('applySalesSummaryFilter', false)
             ->assertSeeInOrder([
                 'Ringkasan Sales',
                 'Hasil Penjualan',
