@@ -22,6 +22,7 @@ class PurchaseTimeDistributionResource extends JsonResource
             'time_ranges' => $this->resource['time_ranges'],
             'labels' => $this->resource['labels'],
             'datasets' => $this->resource['datasets'],
+            'hourly' => $this->resource['hourly'] ?? null,
         ];
     }
 }

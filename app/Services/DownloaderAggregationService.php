@@ -111,6 +111,27 @@ class DownloaderAggregationService
     }
 
     /**
+     * The whole-period Downloader total of each selected platform, read with the same active period (and cutoff)
+     * as the transaction dataset, so a platform ratio never mixes ranges. A platform without a daily total stays
+     * null (availability unavailable); another platform or period never fills the gap.
+     *
+     * @return array<string, array{value: int|null, availability: string}> platform slug => total
+     */
+    public function platformPeriodTotals(PerformanceFilter $filter): array
+    {
+        [, $platforms, $active] = $this->sources($filter);
+        $bucket = $this->periodBucket($active['window']);
+        $totals = [];
+
+        foreach ($platforms as $platformId => $platform) {
+            $value = $this->value($active, [$platformId], $bucket, TrendPeriod::Daily);
+            $totals[$platform['slug']] = ['value' => $value['value'], 'availability' => $value['availability']];
+        }
+
+        return $totals;
+    }
+
+    /**
      * @return array{0: ResolvedPeriod, 1: array<int, array{slug: string, name: string}>, 2: array<string, mixed>, 3: array<string, mixed>|null}
      */
     private function sources(PerformanceFilter $filter): array

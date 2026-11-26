@@ -14,6 +14,7 @@ import {
     fetchActivities,
     fetchTask,
     fetchTaskMonitoring,
+    fetchTaskPreview,
     fetchTaskCreateOptions,
     fetchTaskMeta,
     fetchTasks,
@@ -683,10 +684,9 @@ Alpine.data('tasklist', () => ({
             this.clearPeriod();
             this.load();
         }
-        if (!loaded) {
-            this.filters.division = '';
-            this.taskScope = 'all_tasks';
-        }
+        if (!loaded) this.filters.division = '';
+        // Tugas di luar daftar, atau di Tugas Saya tanpa akun ini sebagai PIC aktif, hanya tampil di Semua Tugas.
+        if (!loaded || (this.taskScope === 'my_tasks' && !isTaskPic(loaded, this.user))) this.taskScope = 'all_tasks';
 
         this.highlightId = task.id;
         this.view = 'board';
@@ -1688,9 +1688,13 @@ Alpine.data('taskCalendar', () => ({
     state: 'idle',
     message: '',
     weekdays: ['Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab', 'Min'],
-    // Ringkasan item yang dipilih: { kind: 'event' | 'task', item }.
+    // Ringkasan agenda yang dipilih: { kind: 'event', item }. Tugas memakai pop-up ringkasan di bawah.
     picked: null,
     periodSequence: 0,
+    // Pop-up ringkasan tugas (TASK-15): { id, state: 'loading' | 'ready' | 'error' | 'missing', task, message }.
+    taskPreview: null,
+    previewSequence: 0,
+    previewTrigger: null,
 
     init() {
         this.$watch('selected', () => (this.picked = null));
@@ -1731,6 +1735,8 @@ Alpine.data('taskCalendar', () => ({
                 inMonth,
                 today: iso === today(),
                 events: inMonth ? this.eventsOn(iso).length : 0,
+                // Satu tugas tetap satu item kalender walaupun memiliki beberapa PIC.
+                tasks: inMonth ? this.deadlinesOn(iso) : [],
                 deadlines: inMonth ? this.deadlinesOn(iso).length : 0,
                 overdue: inMonth && this.deadlinesOn(iso).some((task) => this.isOverdue(task)),
             };
@@ -1775,13 +1781,73 @@ Alpine.data('taskCalendar', () => ({
         return this.picked?.kind === kind && this.picked.item.id === item.id;
     },
 
-    // Ringkasan hanya tampil selama itemnya masih ada di daftar tanggal terpilih (setelah filter atau muat ulang).
+    // Ringkasan agenda hanya tampil selama agendanya masih ada di tanggal terpilih (setelah muat ulang).
     get pickedVisible() {
-        if (!this.picked) return false;
+        return this.picked?.kind === 'event' && this.selectedEvents.some((item) => item.id === this.picked.item.id);
+    },
 
-        const list = this.picked.kind === 'task' ? this.selectedDeadlines : this.selectedEvents;
+    /**
+     * Pop-up ringkasan tugas dari item di sel kalender atau daftar deadline tanggal terpilih. Isinya selalu dibaca
+     * ulang dari GET /api/tasks/{id}/preview; data Calendar hanya dipakai untuk judul selama dimuat. Bulan dan
+     * tanggal terpilih tidak berubah, dan pop-up tidak mengubah tugas.
+     */
+    async openPreview(task) {
+        const sequence = ++this.previewSequence;
+        // Fokus kembali ke item yang membuka pop-up, bukan ke tombol Coba Lagi di dalamnya.
+        if (!this.taskPreview) this.previewTrigger = document.activeElement ?? null;
+        this.taskPreview = { id: task.id, state: 'loading', task, message: '' };
 
-        return list.some((item) => item.id === this.picked.item.id);
+        try {
+            const { data } = await fetchTaskPreview(task.id);
+            if (sequence !== this.previewSequence) return;
+
+            this.taskPreview = { id: data.id, state: 'ready', task: data, message: '' };
+            // Item kalender dan kartu yang sudah dimuat ikut memakai data terbaru.
+            this.deadlines = this.deadlines.map((item) => (item.id === data.id ? { ...item, ...data } : item));
+            if (this.tasks.some((item) => item.id === data.id)) this.syncTask(data);
+        } catch (error) {
+            if (sequence !== this.previewSequence) return;
+
+            const missing = error?.status === 404;
+            this.taskPreview = {
+                id: task.id,
+                state: missing ? 'missing' : 'error',
+                task,
+                message: missing ? 'Tugas ini sudah dihapus atau tidak ditemukan.' : taskErrorMessage(error, 'Ringkasan tugas gagal dimuat.'),
+            };
+            // Tugas yang sudah dihapus juga dilepas dari Board, dan KPI dimuat ulang, seperti setelah Hapus Tugas.
+            if (missing) {
+                this.deadlines = this.deadlines.filter((item) => item.id !== task.id);
+                if (this.tasks.some((item) => item.id === task.id)) {
+                    this.tasks = this.tasks.filter((item) => item.id !== task.id);
+                    this.queueSummary();
+                }
+            }
+        }
+    },
+
+    retryPreview() {
+        return this.taskPreview ? this.openPreview(this.taskPreview.task) : undefined;
+    },
+
+    closePreview() {
+        ++this.previewSequence;
+        this.taskPreview = null;
+        this.previewTrigger?.focus?.();
+        this.previewTrigger = null;
+    },
+
+    // Lihat Detail membuka Board berdasarkan ID tugas dari ringkasan terbaru; hak ubah tetap dari backend.
+    openPreviewDetail() {
+        const task = this.taskPreview?.task;
+        if (this.taskPreview?.state !== 'ready') return;
+
+        this.closePreview();
+        this.focusTask(task);
+    },
+
+    previewDate(value) {
+        return value ? formatDate(value) : 'Belum diatur';
     },
 
     get selectedEvents() {

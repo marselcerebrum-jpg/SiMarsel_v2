@@ -20,14 +20,18 @@ class PurchaseTimeDistributionService
 
     public const UNKNOWN_RANGE = 'Tidak diketahui';
 
-    public function __construct(private PurchaseTimeDistributionRepository $purchaseTimeDistributionRepository) {}
+    public function __construct(
+        private PurchaseTimeDistributionRepository $purchaseTimeDistributionRepository,
+        private PeakPurchaseHourService $peakPurchaseHourService,
+    ) {}
 
     /**
-     * Successful transactions per purchase time range for the selected filters.
+     * Successful transactions per purchase time range for the selected filters. With a preset the response also has
+     * `hourly`, the 24 WIB payment hours of Jam Ramai Pembelian, optionally limited to one day of the week.
      *
      * @return array<string, mixed>
      */
-    public function distribution(PerformanceFilter $filter): array
+    public function distribution(PerformanceFilter $filter, ?int $dayOfWeek = null): array
     {
         $rows = $this->purchaseTimeDistributionRepository->transactionsPerHour($filter);
 
@@ -81,6 +85,7 @@ class PurchaseTimeDistributionService
             'datasets' => [
                 ['label' => 'Transaksi', 'data' => $ranges->pluck('transactions')->all()],
             ],
+            'hourly' => $filter->period === null ? null : $this->peakPurchaseHourService->hourly($filter->period, $dayOfWeek),
         ];
     }
 }
