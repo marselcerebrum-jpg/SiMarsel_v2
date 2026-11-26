@@ -3,6 +3,7 @@
 use App\Http\Controllers\Account\AccountController;
 use App\Http\Controllers\Auth\AuthController;
 use App\Http\Controllers\Division\DivisionController;
+use App\Http\Controllers\Performance\DashboardReportController;
 use App\Http\Controllers\Performance\DownloaderTrendController;
 use App\Http\Controllers\Performance\PaymentMethodDistributionController;
 use App\Http\Controllers\Performance\PerformanceExportController;
@@ -175,6 +176,8 @@ Route::middleware('auth')->group(function () {
         ->name('api.performance.product-types');
     Route::get('/performance/export', PerformanceExportController::class)
         ->name('api.performance.export');
+    Route::get('/performance/export/dashboard', DashboardReportController::class)
+        ->name('api.performance.export.dashboard');
 
     Route::prefix('performance/transactions')->name('api.performance.transactions.')->group(function () {
         Route::get('/', [TransactionController::class, 'index'])

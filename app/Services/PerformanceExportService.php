@@ -32,7 +32,25 @@ class PerformanceExportService
         private PlatformContributionService $platformContributionService,
         private PurchaseTimeDistributionService $purchaseTimeDistributionService,
         private SpreadsheetWriter $spreadsheetWriter,
+        private DashboardReportService $dashboardReportService,
     ) {}
+
+    /**
+     * Ekspor Laporan Dashboard (FIX-14-BE-01): one Excel workbook with the nine sheets of DashboardReportService.
+     *
+     * @return array{path: string, filename: string}
+     */
+    public function dashboardReport(PerformanceFilter $filter, ?PerformanceFilter $downloaderFilter, TrendPeriod $granularity, ?int $dayOfWeek): array
+    {
+        $path = tempnam(sys_get_temp_dir(), 'dashboard-report-');
+
+        $this->spreadsheetWriter->xlsx($this->dashboardReportService->sheets($filter, $downloaderFilter, $granularity, $dayOfWeek), $path);
+
+        return [
+            'path' => $path,
+            'filename' => "laporan_dashboard_{$filter->from()->toDateString()}_{$filter->to()->toDateString()}.xlsx",
+        ];
+    }
 
     /**
      * Write the export to a temporary file.

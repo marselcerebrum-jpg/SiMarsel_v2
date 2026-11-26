@@ -131,6 +131,41 @@ class TransactionExportTest extends TestCase
         $this->assertSame('=SUM(1,1)', $rows[1][4], 'In XLSX the text stays text and is not changed.');
     }
 
+    public function test_be03_the_detail_and_the_csv_show_the_same_financial_details_and_report_statuses(): void
+    {
+        $money = ['product_price' => 200000, 'voucher_discount' => 20000, 'admin_fee' => 3000, 'nominal' => 183000, 'net_nominal' => 180000];
+        $rows = [
+            'SUCCESS' => $this->trx('SUCCESS', $money),
+            'PENDING-ZERO' => $this->trx('PENDING-ZERO', [...$money, ...$this->statuses(MarkazTransactionStatus::Success, MarkazTransactionStatus::Pending), 'paid_date' => null]),
+            'EXPIRED' => $this->trx('EXPIRED', [...$money, ...$this->statuses(MarkazTransactionStatus::Pending, MarkazTransactionStatus::Expired), 'paid_date' => null]),
+            'FAILED' => $this->trx('FAILED', [...$money, ...$this->statuses(MarkazTransactionStatus::Failed)]),
+            'CANCELED' => $this->trx('CANCELED', [...$money, ...$this->statuses(MarkazTransactionStatus::Canceled), 'paid_date' => null]),
+            'UNKNOWN' => $this->trx('UNKNOWN', [...$money, 'source_status' => null, 'effective_status' => null, 'paid_date' => null]),
+        ];
+
+        $csv = collect($this->csv($this->download('csv', self::RANGE)))->keyBy(0);
+        $header = TransactionListExportService::HEADERS;
+        $expected = ['SUCCESS' => 'Success', 'PENDING-ZERO' => 'Pending', 'EXPIRED' => 'Expired', 'FAILED' => 'Failed', 'CANCELED' => 'Canceled', 'UNKNOWN' => 'Status belum tersedia'];
+
+        foreach ($rows as $trxId => $transaction) {
+            $detail = $this->actingAs($this->manager)->getJson(self::LIST_URL.'/'.$transaction->id)->assertOk()->json('data');
+            $cells = array_combine($header, $csv[$trxId]);
+
+            $this->assertSame($expected[$trxId], $detail['status']['label'], $trxId);
+            $this->assertSame($detail['status']['label'], $cells['Status'], $trxId);
+
+            foreach (['product_price' => 'Harga Paket', 'voucher_discount' => 'Potongan Voucher', 'admin_fee' => 'Biaya Admin', 'nominal' => 'Nominal'] as $field => $column) {
+                $this->assertEquals($detail['financials'][$field], $cells[$column], "{$trxId} {$column}");
+            }
+
+            $contribution = $detail['financials']['revenue_contribution'];
+            $this->assertSame($contribution === null ? '' : (string) (int) $contribution, $cells['Kontribusi Omzet'], $trxId);
+        }
+
+        $this->assertSame('180000', array_combine($header, $csv['SUCCESS'])['Kontribusi Omzet']);
+        $this->assertSame('', array_combine($header, $csv['FAILED'])['Kontribusi Omzet'], 'A Failed payment leaves Omzet.');
+    }
+
     public function test_an_unknown_format_is_rejected_and_a_guest_gets_no_file(): void
     {
         $this->actingAs($this->manager)->getJson(self::EXPORT_URL.'?'.self::RANGE.'&format=pdf')
