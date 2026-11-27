@@ -1,4 +1,4 @@
-{{-- Panel detail tugas (TASK-03 s.d. TASK-08). Data diambil berdasarkan ID tugas. --}}
+{{-- Panel detail tugas (TASK-03 s.d. TASK-08, diskusi TASK-16). Data diambil berdasarkan ID tugas. --}}
 @php
     $labelClass = 'mb-1.5 block text-xs font-semibold text-label';
     $inputClass = 'h-9 w-full rounded-lg border border-line bg-white px-3 text-sm text-ink placeholder:text-label focus:border-primary focus:ring-2 focus:ring-primary/20 focus:outline-none disabled:bg-soft';
@@ -327,6 +327,70 @@
                             </ul>
                             <p x-show="evidenceState === 'ready' && !evidences.length" class="rounded-lg border border-dashed border-line bg-soft px-3 py-4 text-center text-sm text-muted">Belum ada evidence yang dikirim.</p>
                         </div>
+                    </section>
+
+                    {{-- Diskusi (TASK-16): komentar dan balasan dua arah; tidak mengubah status, review, atau PIC. Isi selalu teks (x-text). --}}
+                    <section data-task-comments aria-labelledby="task-comments-title">
+                        <div class="flex items-center justify-between gap-2">
+                            <h3 id="task-comments-title" class="{{ $sectionTitle }}">Diskusi</h3>
+                            <span x-show="commentState === 'ready' && comments.length" class="text-xs text-muted" x-text="`${comments.length} komentar`"></span>
+                        </div>
+                        <p class="mt-0.5 text-xs text-muted">Untuk koordinasi dan masukan. Mengirim komentar tidak mengubah status, PIC, atau keputusan review.</p>
+
+                        <div class="mt-3" :aria-busy="commentState === 'loading'">
+                            <div x-show="commentState === 'loading'" class="flex animate-pulse flex-col gap-3" aria-label="Memuat diskusi">
+                                <div class="h-14 rounded-lg bg-soft"></div>
+                                <div class="h-14 rounded-lg bg-soft"></div>
+                            </div>
+                            <div x-show="commentState === 'error'" x-cloak class="flex items-center justify-between gap-3 rounded-lg border border-red-200 bg-red-50 px-3 py-3 text-sm text-red-700" role="alert">
+                                <span x-text="commentError"></span>
+                                <button type="button" class="shrink-0 font-semibold underline" @click="loadComments()">Coba lagi</button>
+                            </div>
+
+                            <ol x-show="commentState === 'ready' && comments.length" class="flex flex-col gap-3">
+                                <template x-for="thread in commentThreads" :key="thread.root.id">
+                                    <li class="rounded-lg border border-line p-3">
+                                        <template x-for="comment in [thread.root, ...thread.replies]" :key="comment.id">
+                                            <article :data-comment="comment.id" :class="comment.id === thread.root.id ? '' : 'mt-3 ml-3 border-l-2 border-line pl-3 sm:ml-5'">
+                                                <p class="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs">
+                                                    <span class="font-semibold text-ink" x-text="comment.author?.fullname ?? 'Pengguna tidak dikenal'"></span>
+                                                    <span x-show="comment.author?.role?.name" class="rounded bg-soft px-1.5 py-0.5 text-[10px] font-semibold text-label" x-text="comment.author?.role?.name"></span>
+                                                    <time class="text-muted" :datetime="comment.created_at" x-text="formatDateTime(comment.created_at)"></time>
+                                                </p>
+                                                <p x-show="comment.reply_to" class="mt-1 text-xs text-muted" x-text="`Membalas ${comment.reply_to?.author?.fullname ?? 'komentar'}`"></p>
+                                                <p class="mt-1 text-sm break-words whitespace-pre-line text-ink" x-text="comment.content"></p>
+                                                <button x-show="canComment" type="button" class="mt-1 rounded text-xs font-semibold text-primary hover:underline focus-visible:outline-2 focus-visible:outline-primary"
+                                                    :aria-label="`Balas komentar ${comment.author?.fullname ?? ''}`" @click="startReply(comment)">Balas</button>
+                                            </article>
+                                        </template>
+                                    </li>
+                                </template>
+                            </ol>
+                            <p x-show="commentState === 'ready' && !comments.length" class="rounded-lg border border-dashed border-line bg-soft px-3 py-4 text-center text-sm text-muted">Belum ada komentar.</p>
+                        </div>
+
+                        {{-- Kegagalan kirim tetap terlihat walaupun form tidak lagi tersedia (mis. tugas baru saja selesai). --}}
+                        <p x-show="commentFormError" x-cloak x-text="commentFormError" class="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700" role="alert"></p>
+
+                        <form x-show="canComment" class="mt-3 flex flex-col gap-2" novalidate @submit.prevent="sendComment()">
+                            <div x-show="replyTarget" class="flex items-start justify-between gap-2 rounded-lg bg-soft px-3 py-2 text-xs" data-reply-target>
+                                <p class="min-w-0">
+                                    <span class="font-semibold text-ink" x-text="`Membalas ${replyTarget?.author?.fullname ?? 'komentar'}`"></span>
+                                    <span class="block truncate text-muted" x-text="replyTarget?.content"></span>
+                                </p>
+                                <button type="button" class="shrink-0 font-semibold text-muted hover:text-ink" @click="cancelReply()">Batal</button>
+                            </div>
+                            <label for="task-comment-input" class="sr-only">Tulis komentar</label>
+                            <textarea id="task-comment-input" x-ref="commentInput" rows="3" maxlength="2000" x-model="commentForm.content" placeholder="Tulis komentar…"
+                                class="{{ $textareaClass }}" :disabled="sendingComment" @input="commentFormError = ''"
+                                @keydown.ctrl.enter.prevent="sendComment()" @keydown.meta.enter.prevent="sendComment()"></textarea>
+                            <div class="flex items-center justify-between gap-2">
+                                <span class="text-xs text-muted" x-text="`${commentForm.content.length}/2000 · Ctrl+Enter untuk mengirim`"></span>
+                                <button type="submit" class="{{ $primaryButton }}" :disabled="sendingComment || !commentForm.content.trim()"
+                                    x-text="sendingComment ? 'Mengirim…' : (replyTarget ? 'Kirim Balasan' : 'Kirim Komentar')"></button>
+                            </div>
+                        </form>
+                        <p x-show="commentReadOnlyNote" class="mt-3 rounded-lg border border-line bg-soft px-3 py-2 text-xs text-muted" data-comment-read-only x-text="commentReadOnlyNote"></p>
                     </section>
 
                     {{-- Histori aktivitas (TASK-08) --}}

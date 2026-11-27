@@ -743,7 +743,7 @@ test('With the default config, the detail loads its history from the history API
     await detail.open(7);
 
     const gets = requests.filter(({ method }) => method === 'GET').map(({ url }) => url);
-    assert.deepEqual(gets.slice(-2), ['/api/tasks/7', '/api/tasks/7/activities'], 'history is fetched although VITE_TASK_API_READY is false');
+    assert.deepEqual(gets.slice(-3), ['/api/tasks/7', '/api/tasks/7/activities', '/api/tasks/7/comments'], 'history and comments are fetched although VITE_TASK_API_READY is false');
     assert.equal(requests.at(-1).headers.Accept, 'application/json');
     assert.deepEqual(states, ['loading'], 'the history section shows its loading state while the history is fetched');
     assert.equal(detail.state, 'ready');
@@ -2399,4 +2399,248 @@ test('A rejected evidence deletion that returns after another task was opened sh
     assert.deepEqual(board.tasks.map(({ id, evidence_count }) => [id, evidence_count]), [[7, 1], [8, 3]], 'nothing was deleted, so no count changes');
     assert.equal(requests.filter(({ url }) => url === '/api/tasks/7').length, detailRequestsBefore, 'Task A is not reloaded into the panel');
     assert.equal(panel.deletingEvidenceId, null);
+});
+
+// --- Diskusi (TASK-16) ------------------------------------------------------------------------
+
+const MANAGER_AUTHOR = { id: 2, fullname: 'Manajer Marketing', role: { code_role: 'MGR', name: 'Manajer' } };
+const PIC_AUTHOR = { id: PIC.id, fullname: 'Staff Marketing', role: { code_role: 'EMP', name: 'Staff' } };
+const commentOf = (id, content, author, parent = null, at = `2026-11-10T0${id}:00:00Z`) => ({
+    id,
+    task_id: 7,
+    parent_comment_id: parent?.id ?? null,
+    content,
+    author,
+    reply_to: parent ? { id: parent.id, author: { id: parent.author.id, fullname: parent.author.fullname } } : null,
+    created_at: at,
+});
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+const commentPosts = (requests) => requests.filter(({ method, url }) => method === 'POST' && url === '/api/tasks/7/comments');
+
+async function discussionPage({ comments = [], detail = {}, post, refreshed } = {}) {
+    let detailReplies = 0;
+    const page = await tasklistPage({
+        'GET /api/tasks': () => ({ json: { data: [task()], meta: { status_counts: {} } } }),
+        'GET /api/tasks/monitoring': () => ({ json: { data: monitoringOf({}) } }),
+        'GET /api/tasks/7': () => ({ json: { data: detailReplies++ && refreshed ? refreshed() : task({ evidence: [], history: [], can_comment: true, ...detail }) } }),
+        'GET /api/tasks/7/activities': () => ({ json: { data: [] } }),
+        'GET /api/tasks/7/comments': () => ({ json: { data: typeof comments === 'function' ? comments() : comments } }),
+        ...(post ? { 'POST /api/tasks/7/comments': post } : {}),
+    });
+    await page.board.load();
+    page.board.detailId = 7;
+    const view = page.detail();
+    await view.open(7);
+
+    return { ...page, view };
+}
+
+test('The detail shows one discussion thread per comment in time order, with each author, role, time, and the comment a reply answers', async () => {
+    const first = commentOf(1, 'Mohon cek ulang ukuran banner.', MANAGER_AUTHOR);
+    const answer = commentOf(2, 'Sudah saya perbaiki.\nMohon dicek.', PIC_AUTHOR, first);
+    const second = commentOf(3, 'Jadwal tayang mundur sehari.', MANAGER_AUTHOR);
+    const followUp = commentOf(4, 'Terima kasih, sudah sesuai.', MANAGER_AUTHOR, answer);
+    const { view, requests } = await discussionPage({ comments: [first, answer, second, followUp] });
+
+    assert.ok(requests.some(({ method, url }) => method === 'GET' && url === '/api/tasks/7/comments'));
+    assert.equal(view.commentState, 'ready');
+    assert.deepEqual([...view.commentThreads].map(({ root, replies }) => [root.id, [...replies].map(({ id }) => id)]), [[1, [2, 4]], [3, []]],
+        'a reply to a reply stays in the thread of its first comment, in time order');
+    assert.equal(view.commentThreads[0].replies[1].reply_to.author.fullname, 'Staff Marketing', 'the reply shows whom it answers');
+    assert.equal(view.commentThreads[0].replies[0].author.role.name, 'Staff');
+
+    // A reply whose parent is not in the list is shown on its own instead of disappearing.
+    view.comments = [commentOf(9, 'Balasan tanpa induk', PIC_AUTHOR, { id: 99, author: MANAGER_AUTHOR })];
+    assert.deepEqual([...view.commentThreads].map(({ root }) => root.id), [9]);
+});
+
+test('A comment is sent with its content, a new client_request_id, and the parent of a reply, and shows only after the backend saved it', async () => {
+    let release;
+    const { view, requests } = await discussionPage({
+        post: (body) => new Promise((resolve) => (release = () => resolve({ status: 201, json: { data: commentOf(5, body.content, PIC_AUTHOR, body.parent_comment_id ? commentOf(1, 'x', MANAGER_AUTHOR) : null), message: 'Komentar berhasil dikirim.' } }))),
+        comments: [commentOf(1, 'Mohon cek ulang ukuran banner.', MANAGER_AUTHOR)],
+    });
+    const statusBefore = view.task.status;
+
+    view.startReply(view.comments[0]);
+    assert.equal(view.replyTarget.id, 1);
+    view.commentForm.content = '  Sudah saya perbaiki.  ';
+    const sending = view.sendComment();
+    await new Promise((resolve) => setTimeout(resolve));
+
+    assert.equal(view.sendingComment, true);
+    assert.equal(view.comments.length, 1, 'nothing is shown before the backend confirms');
+    const [sent] = commentPosts(requests);
+    assert.equal(sent.body.content, 'Sudah saya perbaiki.');
+    assert.equal(sent.body.parent_comment_id, 1);
+    assert.match(sent.body.client_request_id, UUID);
+
+    release();
+    await sending;
+    await new Promise((resolve) => setTimeout(resolve));
+    assert.deepEqual([...view.comments].map(({ id }) => id), [1, 5]);
+    assert.deepEqual({ ...view.commentForm }, { content: '', parentId: null }, 'the form is cleared for the next comment');
+    assert.equal(view.sendingComment, false);
+    assert.equal(requests.filter(({ method, url }) => method === 'GET' && url === '/api/tasks/7').length, 2, 'the detail is read again for the history and can_comment');
+    assert.equal(requests.filter(({ method }) => method === 'PATCH').length, 0, 'a comment is not a status change or review');
+    assert.equal(view.task.status, statusBefore);
+
+    // A new comment is a new send, even with the same text.
+    view.commentForm.content = 'Sudah saya perbaiki.';
+    release = null;
+    const next = view.sendComment();
+    await new Promise((resolve) => setTimeout(resolve));
+    release();
+    await next;
+    const [firstSend, secondSend] = commentPosts(requests);
+    assert.notEqual(secondSend.body.client_request_id, firstSend.body.client_request_id);
+    assert.equal('parent_comment_id' in secondSend.body, false, 'a main comment has no parent');
+});
+
+test('A failed send keeps the text and retries with the same client_request_id, so it cannot be saved twice; a changed text is a new send', async () => {
+    const replies = [
+        { status: 500, json: { message: 'Server Error' } },
+        { status: 200, json: { data: commentOf(5, 'Revisi sudah diunggah.', PIC_AUTHOR), message: 'Komentar berhasil dikirim.' } },
+    ];
+    const { view, requests } = await discussionPage({ post: () => replies.shift() ?? { status: 500, json: {} } });
+
+    view.commentForm.content = 'Revisi sudah diunggah.';
+    await view.sendComment();
+    assert.equal(view.commentFormError, 'Komentar gagal dikirim. Periksa koneksi Anda, lalu kirim lagi.');
+    assert.equal(view.commentForm.content, 'Revisi sudah diunggah.', 'the text is kept for the retry');
+    assert.equal(view.comments.length, 0);
+
+    await view.sendComment();
+    const [failed, retried] = commentPosts(requests);
+    assert.equal(retried.body.client_request_id, failed.body.client_request_id, 'the retry is the same send');
+    assert.deepEqual([...view.comments].map(({ id }) => id), [5]);
+
+    // The backend answering the same send again (200) does not add it twice.
+    replies.push({ status: 200, json: { data: commentOf(5, 'Revisi sudah diunggah.', PIC_AUTHOR) } });
+    view.commentForm.content = 'Revisi sudah diunggah.';
+    view.commentSend = { key: JSON.stringify([7, null, 'Revisi sudah diunggah.']), id: failed.body.client_request_id };
+    await view.sendComment();
+    assert.deepEqual([...view.comments].map(({ id }) => id), [5]);
+
+    // Editing the text after a failure makes a new send.
+    replies.push({ status: 500, json: {} });
+    view.commentForm.content = 'Teks pertama';
+    await view.sendComment();
+    view.commentForm.content = 'Teks yang diubah';
+    replies.push({ status: 500, json: {} });
+    await view.sendComment();
+    const [, , , edited1, edited2] = commentPosts(requests);
+    assert.notEqual(edited2.body.client_request_id, edited1.body.client_request_id);
+});
+
+test('An empty comment is not sent, and a task without can_comment or already Done shows the discussion read-only', async () => {
+    const { view, requests } = await discussionPage({ post: () => ({ status: 201, json: { data: commentOf(5, 'x', PIC_AUTHOR) } }) });
+
+    view.commentForm.content = '   \n  ';
+    await view.sendComment();
+    assert.equal(view.commentFormError, 'Komentar tidak boleh kosong.');
+    assert.equal(commentPosts(requests).length, 0);
+    assert.equal(view.commentReadOnlyNote, '');
+
+    view.task = { ...view.task, can_comment: false, status: 'in_progress' };
+    view.commentForm.content = 'Boleh saya bantu?';
+    await view.sendComment();
+    assert.equal(commentPosts(requests).length, 0, 'read access only: nothing is sent');
+    assert.equal(view.canComment, false);
+    assert.match(view.commentReadOnlyNote, /hanya dapat dikirim oleh Admin, Manajer, Supervisor divisi tugas, dan PIC aktif/);
+
+    view.task = { ...view.task, can_comment: false, status: 'done' };
+    assert.equal(view.commentReadOnlyNote, 'Tugas sudah selesai. Diskusi tetap dapat dibaca, tetapi komentar baru tidak dapat ditambahkan.');
+});
+
+test('Rejections show the backend reason: a task that became Done or a released PIC refreshes can_comment, and a reply outside the task drops its target', async () => {
+    const replies = [
+        { status: 422, json: { message: 'x', errors: { content: ['Tugas yang sudah selesai tidak dapat dikomentari.'] } } },
+        { status: 403, json: { message: 'This action is unauthorized.' } },
+        { status: 422, json: { message: 'x', errors: { parent_comment_id: ['Komentar yang dibalas tidak ditemukan pada tugas ini.'] } } },
+    ];
+    let refreshedStatus = 'done';
+    const { view, requests } = await discussionPage({
+        comments: [commentOf(1, 'Mohon cek ulang.', MANAGER_AUTHOR)],
+        post: () => replies.shift(),
+        refreshed: () => task({ evidence: [], history: [], status: refreshedStatus, can_comment: false }),
+    });
+    const settle = () => new Promise((resolve) => setTimeout(resolve));
+
+    view.commentForm.content = 'Sudah saya perbaiki.';
+    await view.sendComment();
+    await settle();
+    assert.equal(view.commentFormError, 'Tugas yang sudah selesai tidak dapat dikomentari.');
+    assert.equal(view.task.status, 'done', 'the detail is read again');
+    assert.equal(view.canComment, false, 'the form is replaced by the read-only note');
+    assert.equal(view.commentForm.content, 'Sudah saya perbaiki.');
+
+    view.task = { ...view.task, status: 'in_progress', can_comment: true };
+    refreshedStatus = 'in_progress';
+    await view.sendComment();
+    await settle();
+    assert.equal(view.commentFormError, 'Anda tidak lagi dapat mengirim komentar pada tugas ini.');
+    assert.equal(view.canComment, false);
+
+    view.task = { ...view.task, can_comment: true };
+    view.startReply(view.comments[0]);
+    const commentLoads = requests.filter(({ method, url }) => method === 'GET' && url === '/api/tasks/7/comments').length;
+    await view.sendComment();
+    assert.equal(view.commentFormError, 'Komentar yang dibalas tidak ditemukan pada tugas ini.');
+    assert.equal(view.commentForm.parentId, null);
+    assert.equal(requests.filter(({ method, url }) => method === 'GET' && url === '/api/tasks/7/comments').length, commentLoads + 1, 'the thread is loaded again');
+});
+
+test('The discussion has its own loading and error state with a retry, and ignores comments of a task that is no longer open', async () => {
+    let fail = true;
+    const { view } = await discussionPage({ comments: () => {
+        if (fail) throw Object.assign(new Error('offline'), { offline: true });
+        return [commentOf(1, 'Halo', MANAGER_AUTHOR)];
+    } });
+    assert.equal(view.commentState, 'error');
+    assert.equal(view.state, 'ready', 'the detail stays open');
+
+    fail = false;
+    await view.loadComments();
+    assert.equal(view.commentState, 'ready');
+    assert.equal(view.comments.length, 1);
+
+    const pending = view.loadComments();
+    view.reset();
+    await pending;
+    assert.deepEqual([...view.comments], [], 'a closed detail does not receive the comments');
+});
+
+test('After a send succeeds the thread follows the backend: a comment saved while its answer was lost, and comments of others, also show', async () => {
+    const saved = [commentOf(1, 'Mohon cek ulang.', MANAGER_AUTHOR)];
+    let threadFails = true;
+    const { view, requests } = await discussionPage({
+        comments: () => {
+            if (threadFails) throw new Error('offline');
+            return saved;
+        },
+        post: (body) => {
+            const comment = commentOf(saved.length + 1, body.content, PIC_AUTHOR, null, `2026-11-10T0${saved.length + 1}:30:00Z`);
+            saved.push(comment);
+            // The first send is stored, but its answer never reaches the browser.
+            if (saved.length === 2) throw new Error('connection reset');
+            return { status: 201, json: { data: comment } };
+        },
+    });
+    assert.equal(view.commentState, 'error', 'the thread failed to load');
+    threadFails = false;
+
+    view.commentForm.content = 'Draf pertama';
+    await view.sendComment();
+    assert.match(view.commentFormError, /Komentar gagal dikirim/);
+    assert.equal(view.comments.length, 0, 'an unconfirmed comment is not shown');
+
+    // The text is changed, so this is a new send; the backend now holds both.
+    view.commentForm.content = 'Draf yang diperbaiki';
+    await view.sendComment();
+    await new Promise((resolve) => setTimeout(resolve));
+
+    assert.equal(view.commentState, 'ready', 'the thread that failed to load is shown after the send');
+    assert.deepEqual([...view.comments].map(({ content }) => content), ['Mohon cek ulang.', 'Draf pertama', 'Draf yang diperbaiki']);
+    assert.equal(commentPosts(requests).length, 2);
 });
