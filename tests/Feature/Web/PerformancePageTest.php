@@ -113,10 +113,11 @@ class PerformancePageTest extends TestCase
         $this->assertSame(20, substr_count($html, 'animate-shimmer'));
         $response->assertDontSee('blur-[2px]', false);
 
-        foreach (['trendLoading', 'contributionLoading', 'paymentLoading', 'purchaseTimeLoading'] as $state) {
+        foreach (['contributionLoading', 'paymentLoading', 'purchaseTimeLoading'] as $state) {
             $response->assertSee('x-show="'.$state.'"', false);
         }
-        $this->assertSame(7, substr_count($html, 'size-8 animate-spin'), 'Four tables, plus three first-load table placeholders.');
+        $response->assertSee('x-show="trendLoading && !hasPoints"', false);
+        $this->assertSame(6, substr_count($html, 'size-8 animate-spin'), 'Three tables, plus three first-load table placeholders.');
         $response->assertDontSee('Loading && contributionState', false);
     }
 
@@ -149,16 +150,17 @@ class PerformancePageTest extends TestCase
             ->get('/dashboard')
             ->assertOk()
             ->assertSee('Analisis Tren &amp; Performa', false)
-            ->assertSee('performanceTrend', false)
-            ->assertSee('performance-filter.window', false)
-            ->assertSee('aria-label="Metrik"', false)
-            ->assertSee('aria-label="Periode Data"', false)
-            ->assertSee('id="trend-chart"', false)
-            ->assertSeeInOrder(['Revenue', 'Transaksi', 'Downloader', 'Konversi', 'Pengguna Baru', 'Repeat Order'])
-            ->assertSeeInOrder(["setMetric('revenue')", "setMetric('transactions')", "setMetric('downloaders')", "setMetric('conversion')", "setMetric('new_users')", "setMetric('repeat_orders')"], false)
-            ->assertSeeInOrder(["setPeriod('daily')", "setPeriod('weekly')", "setPeriod('monthly')"], false)
-            ->assertSeeInOrder(['>Batang<', '>Garis<', '>Area<', '>Lingkaran<', '>Tabel<'], false)
-            ->assertSeeInOrder(['>Harian<', '>Mingguan<', '>Bulanan<'], false);
+            ->assertSee('x-data="performanceTrend"', false)
+            ->assertSee('@performance-filter.window="applyFilter($event.detail)"', false)
+            ->assertSeeInOrder(['aria-label="Pengelompokan"', 'aria-label="Legenda grafik tren"', 'x-ref="canvas"', 'Waktu aktif', 'Waktu pembanding'], false)
+            ->assertSee('@click="setGranularity(option.value)"', false)
+            ->assertSee(':disabled="isGranularityDisabled(option.value)"', false)
+            ->assertSee('@click="toggleSeries(item.key)"', false)
+            ->assertSee(':aria-pressed="isSeriesVisible(item.key).toString()"', false)
+            ->assertSee('@keydown.arrow-right.prevent="movePoint(1)"', false)
+            ->assertSee('@keydown.arrow-left.prevent="movePoint(-1)"', false)
+            ->assertDontSee('aria-label="Metrik"', false)
+            ->assertDontSee('id="trend-chart"', false);
     }
 
     public function test_performance_page_has_platform_contribution_section(): void

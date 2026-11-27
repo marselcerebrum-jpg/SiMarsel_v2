@@ -1,137 +1,142 @@
-import Alpine from 'alpinejs';
 import { errorMessage } from '../../http';
-import { fetchTrend } from './api';
-import { chartConfig, renderChart } from './chart';
-import { trendRows } from './table';
+import { fetchSalesTrend } from './api';
+import {
+    COMPACT_WIDTH,
+    GRANULARITIES,
+    chartLabel,
+    combinedTrendConfig,
+    defaultVisibility,
+    pointDetail,
+    trendSeries,
+} from './combined-trend';
+import { createRequestTracker } from './filter';
 
-// The backend limits daily and weekly periods to this many days.
-const MAX_SHORT_PERIOD_DAYS = 366;
+/** `data` of GET /api/performance/trend/sales for the filter query and the requested grouping. */
+async function fetchTrendData(query, options) {
+    const { data } = await fetchSalesTrend(query, options);
 
-function rangeDays({ date_from, date_to }) {
-    return Math.round((new Date(date_to) - new Date(date_from)) / 86_400_000) + 1;
+    return data;
 }
 
+/** Tells the Dashboard export (FIX-14) the grouping actually shown, as `{ granularity }`. */
+export const GRANULARITY_EVENT = 'performance-trend-granularity';
+
+/** Width of the point detail card in px (Tailwind w-64). */
+const DETAIL_WIDTH = 256;
+
+const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
+
 /**
- * Trend & performance analysis (GET /api/performance/trend). Reloads whenever the Performance Summary filter
- * dispatches `performance-filter`, or when the metric or period changes. Several selected years come back as
- * one dataset per year over Jan–Dec.
+ * Combined trend chart (FIX-06-FE-01). Reloads whenever the global filter dispatches `performance-filter`
+ * and when the grouping changes. Series visibility is local state: it survives grouping and filter changes.
+ *
+ * `render(canvas, config, previous)` draws the chart (renderChart from ./chart); `resolve(query, options)`
+ * returns the `data` of the trend response.
  */
-export default (metrics = []) => {
+export default function performanceTrend({ resolve = fetchTrendData, render = null } = {}) {
+    const track = createRequestTracker();
     // Kept outside Alpine's reactive proxy: Chart.js breaks when wrapped in a Proxy.
     let chart = null;
 
     return {
-        trendMetrics: metrics,
-        metric: metrics[0]?.value ?? 'revenue',
-        chartType: 'bar',
-        // Null lets the backend pick the filter's default: daily for a month or date range, monthly for years.
-        period: null,
-        activePeriod: null,
+        granularities: GRANULARITIES,
+        series: [],
 
         trendQuery: null,
-        trendFilter: null,
-        labels: [],
-        datasets: [],
-        rows: [],
-        trendEmpty: false,
-        trendMessage: '',
+        requestedGranularity: null,
+        granularity: null,
+        allowedGranularities: [],
+        buckets: [],
+        visibility: {},
+        pointIndex: null,
+        detailLeft: 0,
         trendLoading: true,
         trendError: '',
-        trendRequestId: 0,
-
-        get metricMeta() {
-            return this.trendMetrics.find(({ value }) => value === this.metric) ?? this.trendMetrics[0];
-        },
 
         get hasPoints() {
-            return this.labels.length > 0 && this.datasets.length > 0 && !this.trendEmpty;
-        },
-
-        get comparesYears() {
-            return this.datasets.length > 1;
+            return this.buckets.length > 0;
         },
 
         get trendPlaceholder() {
-            return this.trendError || this.trendMessage || 'Grafik akan tampil setelah data tersedia.';
-        },
-
-        get trendTableRows() {
-            return this.hasPoints ? trendRows(this.rows, this.metricMeta.format) : [];
+            return this.trendError || 'Grafik akan tampil setelah data tersedia.';
         },
 
         get chartLabel() {
-            if (!this.hasPoints) return `Grafik ${this.metricMeta.label}`;
-            if (this.comparesYears) return `Grafik ${this.metricMeta.label} per bulan untuk tahun ${this.datasets.map(({ label }) => label).join(', ')}`;
-
-            return `Grafik ${this.metricMeta.label} dari ${this.labels[0]} sampai ${this.labels[this.labels.length - 1]}`;
+            return chartLabel(this.buckets, this.granularity);
         },
 
-        /**
-         * Daily and weekly are only allowed for a single period of at most 366 days.
-         */
-        isPeriodDisabled(value) {
-            if (value === 'monthly' || !this.trendFilter) return false;
+        get detail() {
+            const bucket = this.pointIndex === null ? null : this.buckets[this.pointIndex];
 
-            const years = this.trendFilter.mode === 'years' && this.trendFilter.years.length > 1;
-            const days = (this.trendFilter.ranges ?? []).reduce((total, range) => total + rangeDays(range), 0);
-
-            return years || days > MAX_SHORT_PERIOD_DAYS;
+            return bucket ? pointDetail(bucket, this.series, this.visibility) : null;
         },
 
-        isChartDisabled(value) {
-            return value === 'pie' && this.comparesYears;
+        isGranularityActive(value) {
+            return this.granularity === value;
         },
 
-        setMetric(value) {
-            if (this.metric === value) return;
-
-            this.metric = value;
-            this.fetchTrend();
+        /** Groupings the backend does not accept for the active range (`granularities`). */
+        isGranularityDisabled(value) {
+            return this.granularity !== null && !this.allowedGranularities.includes(value);
         },
 
-        setPeriod(value) {
-            if (this.activePeriod === value || this.isPeriodDisabled(value)) return;
-
-            this.period = value;
-            this.fetchTrend();
+        isSeriesVisible(key) {
+            return this.visibility[key] === true;
         },
 
         applyFilter(query) {
             this.trendQuery = query;
-            this.period = null;
-            this.fetchTrend();
+            this.requestedGranularity = null;
+            this.closePoint();
+            this.load();
         },
 
-        async fetchTrend() {
+        setGranularity(value) {
+            if (this.isGranularityActive(value) || this.isGranularityDisabled(value)) return;
+
+            this.requestedGranularity = value;
+            this.closePoint();
+            this.load();
+        },
+
+        /**
+         * Shows or hides one series. Hiding every series is allowed; the legend stays to turn them back on.
+         */
+        toggleSeries(key) {
+            this.visibility[key] = !this.visibility[key];
+
+            if (!chart) return;
+            chart.data.datasets.forEach((dataset, index) => {
+                dataset.hidden = !this.visibility[this.series[index].key];
+            });
+            chart.update('none');
+        },
+
+        async load() {
             if (this.trendQuery === null) return;
 
-            const requestId = ++this.trendRequestId;
+            const isCurrent = track();
             this.trendLoading = true;
             this.trendError = '';
 
             try {
-                const { data } = await fetchTrend(this.trendQuery, { metric: this.metric, period: this.period });
-                if (requestId !== this.trendRequestId) return;
+                const data = await resolve(this.trendQuery, { granularity: this.requestedGranularity });
+                if (!isCurrent()) return;
 
-                this.trendFilter = data.filter ?? null;
-                this.activePeriod = data.period ?? this.period;
-                this.labels = data.labels ?? [];
-                this.datasets = data.datasets ?? [];
-                this.rows = data.rows ?? [];
-                this.trendEmpty = data.is_empty === true;
-                this.trendMessage = data.message ?? '';
-                if (this.isChartDisabled(this.chartType)) this.chartType = 'bar';
+                this.series = trendSeries(data.series);
+                // Only series seen for the first time take the response default; the rest keep the user's choice.
+                this.visibility = { ...defaultVisibility(this.series), ...this.visibility };
+                this.granularity = data.granularity;
+                this.allowedGranularities = data.granularities ?? [];
+                this.buckets = data.buckets ?? [];
+                this.$dispatch(GRANULARITY_EVENT, { granularity: this.granularity });
             } catch (error) {
-                if (requestId !== this.trendRequestId) return;
+                if (!isCurrent()) return;
 
-                this.labels = [];
-                this.datasets = [];
-                this.rows = [];
-                this.trendEmpty = false;
-                this.trendMessage = '';
+                this.buckets = [];
                 this.trendError = errorMessage(error, 'Gagal memuat data tren.');
             } finally {
-                if (requestId === this.trendRequestId) {
+                if (isCurrent()) {
                     this.trendLoading = false;
                     this.draw();
                 }
@@ -139,21 +144,67 @@ export default (metrics = []) => {
         },
 
         draw() {
-            if (this.chartType === 'table' || !this.hasPoints) {
+            if (!this.hasPoints || !render) {
                 chart?.destroy();
                 chart = null;
                 return;
             }
 
-            // Wait for x-show to reveal the canvas so Chart.js can measure it.
+            // Wait for Alpine to reveal the canvas so Chart.js can measure it.
             this.$nextTick(() => {
-                chart = renderChart(this.$refs.canvas, chartConfig({
-                    type: this.chartType,
-                    labels: Alpine.raw(this.labels),
-                    datasets: Alpine.raw(this.datasets),
-                    metric: this.metricMeta,
+                const canvas = this.$refs.canvas;
+
+                chart = render(canvas, combinedTrendConfig({
+                    buckets: this.buckets,
+                    series: this.series,
+                    granularity: this.granularity,
+                    visibility: this.visibility,
+                    compact: (canvas.parentElement?.clientWidth ?? COMPACT_WIDTH) < COMPACT_WIDTH,
+                    onPoint: (index) => this.showPoint(index),
+                    onLeave: () => this.closePoint(),
                 }), chart);
             });
+        },
+
+        /**
+         * Opens the detail of one bucket (hover, tap or keyboard) and keeps the card inside the chart.
+         */
+        showPoint(index) {
+            if (!this.hasPoints) return;
+
+            const next = clamp(index, 0, this.buckets.length - 1);
+            if (next === this.pointIndex) return;
+
+            this.pointIndex = next;
+            if (!chart) return;
+
+            const x = chart.scales.x.getPixelForValue(next);
+            this.detailLeft = clamp(x - DETAIL_WIDTH / 2, 0, Math.max(chart.width - DETAIL_WIDTH, 0));
+            chart.options.plugins.activeGuide.index = next;
+            chart.update('none');
+        },
+
+        closePoint() {
+            if (this.pointIndex === null) return;
+
+            this.pointIndex = null;
+            if (!chart) return;
+
+            chart.options.plugins.activeGuide.index = null;
+            chart.update('none');
+        },
+
+        /** Arrow keys move the open point; focusing the chart opens the first one. */
+        movePoint(step) {
+            this.showPoint(this.pointIndex === null ? 0 : this.pointIndex + step);
+        },
+
+        firstPoint() {
+            this.showPoint(0);
+        },
+
+        lastPoint() {
+            this.showPoint(this.buckets.length - 1);
         },
 
         destroy() {
@@ -161,4 +212,4 @@ export default (metrics = []) => {
             chart = null;
         },
     };
-};
+}

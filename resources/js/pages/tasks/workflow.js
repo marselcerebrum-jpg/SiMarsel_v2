@@ -20,7 +20,10 @@ export const PRIORITIES = [
     { key: 'urgent', label: 'Urgent', rank: 4, badge: 'bg-red-50 text-red-700' },
 ];
 
-export const statusOf = (key) => STATUSES.find((status) => status.key === key) ?? { key, label: key ?? '-', dot: 'bg-slate-300', badge: 'bg-slate-100 text-slate-700' };
+// Nama status QA lama sebelum migrasi TASK-17 tetap dibaca dengan label Review terbaru.
+const LEGACY_STATUSES = { ready_for_qa: 'ready_review', on_qa: 'on_review' };
+
+export const statusOf = (key) => STATUSES.find((status) => status.key === (LEGACY_STATUSES[key] ?? key)) ?? { key, label: key ?? '-', dot: 'bg-slate-300', badge: 'bg-slate-100 text-slate-700' };
 
 export const priorityOf = (key) => PRIORITIES.find((priority) => priority.key === key) ?? { key, label: key ?? '-', rank: 0, badge: 'bg-slate-100 text-slate-700' };
 

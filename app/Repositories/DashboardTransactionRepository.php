@@ -28,6 +28,7 @@ class DashboardTransactionRepository
         'is_claim_coupon',
         'nominal',
         'net_nominal',
+        'product_type',
     ];
 
     /**

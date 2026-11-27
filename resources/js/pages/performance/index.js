@@ -3,6 +3,7 @@ import Alpine from 'alpinejs';
 import { errorMessage } from '../../http';
 import { fetchSummary } from './api';
 import { formatDateTime, formatValue } from '../../format';
+import { renderChart } from './chart';
 import performanceContribution from './contribution';
 import dashboardFilter, { PERIOD_EVENT } from './global-filter';
 import performancePaymentMethod from './payment-method';
@@ -108,7 +109,7 @@ Alpine.data('performanceSummary', () => ({
 
 Alpine.data('dashboardFilter', dashboardFilter);
 Alpine.data('dashboardShell', dashboardShell);
-Alpine.data('performanceTrend', performanceTrend);
+Alpine.data('performanceTrend', () => performanceTrend({ render: renderChart }));
 Alpine.data('performanceContribution', performanceContribution);
 Alpine.data('performancePaymentMethod', performancePaymentMethod);
 Alpine.data('performancePurchaseTime', performancePurchaseTime);

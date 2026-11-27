@@ -10,7 +10,10 @@ use App\Http\Controllers\Performance\PerformanceSalesTrendController;
 use App\Http\Controllers\Performance\PerformanceSummaryController;
 use App\Http\Controllers\Performance\PerformanceTrendController;
 use App\Http\Controllers\Performance\PlatformContributionController;
+use App\Http\Controllers\Performance\ProductTypeDistributionController;
 use App\Http\Controllers\Performance\PurchaseTimeDistributionController;
+use App\Http\Controllers\Performance\TransactionController;
+use App\Http\Controllers\Performance\TransactionStatusDistributionController;
 use App\Http\Controllers\Platform\PlatformController;
 use App\Http\Controllers\Promo\FunnelController;
 use App\Http\Controllers\Promo\PromoAnalysisController;
@@ -28,6 +31,7 @@ use App\Models\Funnel;
 use App\Models\PromoCode;
 use App\Models\PromoSource;
 use App\Models\Task;
+use App\Models\Transaction;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/csrf-cookie', fn () => response()->noContent())->name('api.csrf-cookie');
@@ -162,8 +166,25 @@ Route::middleware('auth')->group(function () {
         ->name('api.performance.platform-contribution');
     Route::get('/performance/purchase-times', PurchaseTimeDistributionController::class)
         ->name('api.performance.purchase-times');
+    Route::get('/performance/transaction-statuses', TransactionStatusDistributionController::class)
+        ->name('api.performance.transaction-statuses');
+    Route::get('/performance/product-types', ProductTypeDistributionController::class)
+        ->name('api.performance.product-types');
     Route::get('/performance/export', PerformanceExportController::class)
         ->name('api.performance.export');
+
+    Route::prefix('performance/transactions')->name('api.performance.transactions.')->group(function () {
+        Route::get('/', [TransactionController::class, 'index'])
+            ->can('viewAny', Transaction::class)
+            ->name('index');
+        Route::get('/options', [TransactionController::class, 'options'])
+            ->can('viewAny', Transaction::class)
+            ->name('options');
+        Route::get('/{transaction}', [TransactionController::class, 'show'])
+            ->whereNumber('transaction')
+            ->can('view', 'transaction')
+            ->name('show');
+    });
 
     Route::prefix('tasks')->name('api.tasks.')->group(function () {
         Route::get('/meta', [TaskController::class, 'meta'])->name('meta');

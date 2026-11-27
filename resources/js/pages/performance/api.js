@@ -24,6 +24,13 @@ export function fetchTrend(query, { metric, period }) {
     return get('trend', query, { metric, period });
 }
 
+/**
+ * Omzet and Transaksi trend (FIX-06). A null granularity lets the backend pick the default of the period.
+ */
+export function fetchSalesTrend(query, { granularity = null } = {}) {
+    return get('trend/sales', query, { granularity });
+}
+
 export function fetchPlatformContribution(query) {
     return get('platform-contribution', query);
 }

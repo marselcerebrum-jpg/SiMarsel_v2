@@ -26,6 +26,8 @@ final class TransactionRecord
         public readonly bool $isClaimCoupon,
         public readonly float $nominal,
         public readonly float $netNominal,
+        public readonly bool $hasPaidTime = false,
+        public readonly ?string $productType = null,
     ) {}
 
     /**
@@ -34,6 +36,7 @@ final class TransactionRecord
     public static function fromArray(array $row): self
     {
         $paidDate = self::dateString($row['paid_date'] ?? null);
+        $paidTime = self::timeString($row['paid_time'] ?? null);
 
         return new self(
             platformId: (int) $row['platform_id'],
@@ -41,7 +44,7 @@ final class TransactionRecord
             markazRefId: self::blankToNull($row['markaz_ref_id'] ?? null),
             markazCustomerId: self::nullableInteger($row['markaz_customer_id'] ?? null),
             markazCreatedAt: self::wib($row['markaz_created_at']),
-            paidAt: $paidDate === null ? null : self::wib($paidDate.' '.(self::blankToNull($row['paid_time'] ?? null) ?? '00:00:00')),
+            paidAt: $paidDate === null ? null : self::wib($paidDate.' '.($paidTime ?? '00:00:00')),
             reportStatus: MarkazTransactionStatus::forReport(
                 self::statusCode($row['effective_status'] ?? null),
                 self::statusCode($row['source_status'] ?? null),
@@ -49,6 +52,8 @@ final class TransactionRecord
             isClaimCoupon: (bool) ($row['is_claim_coupon'] ?? false),
             nominal: (float) $row['nominal'],
             netNominal: (float) $row['net_nominal'],
+            hasPaidTime: $paidDate !== null && $paidTime !== null,
+            productType: self::blankToNull($row['product_type'] ?? null),
         );
     }
 
@@ -73,6 +78,15 @@ final class TransactionRecord
         return $this->isSuccess() ? $this->paidAt : null;
     }
 
+    /**
+     * The payment moment of a Success whose paid date and paid time are both valid, for reports by hour of the day.
+     * A payment with only a valid paid date still counts by date (paymentAt) but has no hour.
+     */
+    public function paymentHourAt(): ?CarbonImmutable
+    {
+        return $this->hasPaidTime ? $this->paymentAt() : null;
+    }
+
     public function createdDate(): string
     {
         return $this->markazCreatedAt->toDateString();
@@ -95,6 +109,24 @@ final class TransactionRecord
         }
 
         return self::blankToNull($value);
+    }
+
+    /**
+     * A paid time of the form HH:MM or HH:MM:SS within one day; anything else is not a valid time.
+     */
+    private static function timeString(mixed $value): ?string
+    {
+        if ($value instanceof DateTimeInterface) {
+            return $value->format('H:i:s');
+        }
+
+        $value = self::blankToNull($value);
+
+        if ($value === null || preg_match('/^([01]\d|2[0-3]):[0-5]\d(:[0-5]\d)?$/', $value) !== 1) {
+            return null;
+        }
+
+        return strlen($value) === 5 ? $value.':00' : $value;
     }
 
     /**

@@ -16,6 +16,21 @@ class PlatformContributionRepository
     use AppliesPerformanceFilter;
 
     /**
+     * The selected platforms by slug, or every platform when no slug is given.
+     *
+     * @param  list<string>  $slugs
+     * @return Collection<int, object{id: int, slug: string, name: string}>
+     */
+    public function platformsBySlugs(array $slugs): Collection
+    {
+        return Platform::query()
+            ->when($slugs !== [], fn (Builder $query) => $query->whereIn('platforms.slug', $slugs))
+            ->orderBy('platforms.id')
+            ->toBase()
+            ->get(['platforms.id', 'platforms.slug', 'platforms.name']);
+    }
+
+    /**
      * Revenue, transactions, and unique paying accounts per platform.
      * Selected platforms (or every platform) are returned even without successful transactions in the period.
      *
