@@ -165,11 +165,7 @@
 
                 {{-- 10. Daftar Transaksi: Ekspor Daftar Transaksi lives in this section (FIX-14-FE-01). --}}
                 <section data-dashboard-section="transactions" class="{{ $card }} mt-4 min-w-0 p-5" aria-labelledby="dashboard-transactions-title">
-                    @include('pages.performance.components.dashboard-slot', [
-                        'key' => 'transactions',
-                        'title' => 'Daftar Transaksi',
-                        'exportLabel' => 'Ekspor Daftar Transaksi',
-                    ])
+                    @include('pages.performance.components.performance-transactions')
                 </section>
             </div>
         </div>

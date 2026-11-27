@@ -8,6 +8,7 @@ import performanceContribution from './contribution';
 import dashboardFilter, { PERIOD_EVENT } from './global-filter';
 import performancePaymentMethod from './payment-method';
 import performancePurchaseTime from './purchase-time';
+import performanceTransactions from './transactions';
 import performanceTrend from './trend';
 import dashboardShell from './shell';
 
@@ -113,3 +114,4 @@ Alpine.data('performanceTrend', () => performanceTrend({ render: renderChart }))
 Alpine.data('performanceContribution', performanceContribution);
 Alpine.data('performancePaymentMethod', performancePaymentMethod);
 Alpine.data('performancePurchaseTime', performancePurchaseTime);
+Alpine.data('performanceTransactions', performanceTransactions);
