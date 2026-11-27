@@ -162,6 +162,9 @@ function taskErrorMessage(error, fallback) {
 const notifyFailure = (error, fallback) =>
     showToast({ type: 'info', title: error?.unavailable ? 'Menunggu Back End' : 'Gagal', text: taskErrorMessage(error, fallback), duration: 5000 });
 
+// Penolakan backend yang menandakan tampilan sudah usang: izin dicabut, tugas dihapus, versi lama, atau aturan.
+const isStaleRejection = (error) => [403, 404, 409, 422].includes(error?.status);
+
 const isValidUrl = (value) => {
     try {
         const url = new URL(value);
@@ -789,8 +792,8 @@ Alpine.data('tasklist', () => ({
             } else {
                 notifyFailure(error, 'Status tugas gagal diperbarui.');
             }
-            // Data lama, atau tugas sudah diputuskan reviewer lain: muat ulang agar kartu berada di kolom yang benar.
-            if (error?.status === 409 || (error?.status === 422 && transition.review)) this.load();
+            // Penolakan berarti data atau izin kartu sudah usang: muat ulang agar kolom dan izinnya sesuai backend.
+            if (isStaleRejection(error)) this.load();
         } finally {
             this.movingId = null;
         }
@@ -1001,6 +1004,8 @@ Alpine.data('taskDetail', () => ({
     reviewNote: '',
     reviewError: '',
     acting: null,
+    // Naik setiap kali panel dikosongkan, sehingga respons untuk tugas yang dibuka sebelumnya diabaikan.
+    openSequence: 0,
 
     init() {
         this.$watch('detailId', (id) => (id ? this.open(id) : this.reset()));
@@ -1009,14 +1014,17 @@ Alpine.data('taskDetail', () => ({
     reset() {
         Object.assign(this, { task: null, state: 'idle', editing: false, confirmingDelete: false, assigneeState: 'idle', reviewMode: null, reviewNote: '', reviewError: '', evidences: [], evidenceErrors: {}, confirmingEvidenceId: null, activities: [], activityState: 'idle', activityError: '' });
         this.activityRequest += 1;
+        this.openSequence += 1;
     },
 
     async open(id) {
         this.reset();
+        const sequence = this.openSequence;
         this.state = 'loading';
 
         try {
             const { data } = await fetchTask(id);
+            if (sequence !== this.openSequence) return;
             this.task = data;
             this.state = 'ready';
             this.syncTask(data);
@@ -1031,11 +1039,12 @@ Alpine.data('taskDetail', () => ({
             if (this.detailFocus === 'edit' && this.canEditThis) this.startEdit();
             await this.loadActivities();
         } catch (error) {
+            if (sequence !== this.openSequence) return;
             if (this.highlightId === id) this.highlightId = null;
             this.state = error?.unavailable ? 'unavailable' : { 403: 'forbidden', 404: 'not_found' }[error?.status] ?? 'error';
             this.message = taskErrorMessage(error, 'Detail tugas gagal dimuat.');
         } finally {
-            this.detailFocus = null;
+            if (sequence === this.openSequence) this.detailFocus = null;
         }
     },
 
@@ -1048,6 +1057,17 @@ Alpine.data('taskDetail', () => ({
         this.task = { ...this.task, ...data };
         this.syncDetailCollections(data);
         this.syncTask(this.task);
+    },
+
+    // Panel bisa ditutup atau berpindah tugas selama request berjalan: hasilnya hanya boleh mengubah panel tugas itu.
+    shows(id) {
+        return this.task?.id === id;
+    },
+
+    // Kegagalan untuk tugas yang sudah tidak ditampilkan tetap diberitahukan dengan menyebut judulnya.
+    notifyElsewhere(title, error, fallback) {
+        const message = (error?.status === 422 && Object.values(validationErrors(error))[0]) || taskErrorMessage(error, fallback);
+        showToast({ type: 'info', title: 'Gagal', text: `${title}: ${message}`, duration: 5000 });
     },
 
     syncDetailCollections(data, { history = true } = {}) {
@@ -1222,10 +1242,11 @@ Alpine.data('taskDetail', () => ({
         this.editErrors = errors;
         if (Object.keys(errors).length || this.saving || this.editOptionsState !== 'ready') return;
 
+        const { id, title } = this.task;
         this.saving = true;
 
         try {
-            const { data, message } = await updateTask(this.task.id, {
+            const { data, message } = await updateTask(id, {
                 ...this.editForm,
                 category_id: this.editForm.category_id || null,
                 platform_id: this.editForm.platform_id || null,
@@ -1233,11 +1254,16 @@ Alpine.data('taskDetail', () => ({
                 deadline: this.editForm.deadline || null,
                 version: this.task.version,
             });
-            this.applyTask(data);
-            this.editing = false;
+            if (this.shows(id)) {
+                this.applyTask(data);
+                this.editing = false;
+            } else {
+                this.syncTask(data);
+            }
             showToast({ title: 'Perubahan Tersimpan', text: message ?? 'Informasi tugas diperbarui.' });
         } catch (error) {
-            if (error?.status === 422) this.editErrors = validationErrors(error);
+            if (!this.shows(id)) this.notifyElsewhere(title, error, 'Perubahan tugas gagal disimpan.');
+            else if (error?.status === 422) this.editErrors = validationErrors(error);
             else await this.handleFailure(error, 'Perubahan tugas gagal disimpan.');
         } finally {
             this.saving = false;
@@ -1250,9 +1276,11 @@ Alpine.data('taskDetail', () => ({
         this.assignForm = { pic_ids: [], division_id: '' };
         this.assignmentError = '';
         this.assigneeState = 'loading';
+        const sequence = this.openSequence;
 
         try {
             const { data } = await fetchAssignmentOptions(this.task.id);
+            if (sequence !== this.openSequence) return;
             this.assignmentDivisions = data.divisions ?? [];
             this.canChangeAssignmentDivision = data.can_change_division === true;
             this.assignmentPics = data.pics ?? [];
@@ -1266,6 +1294,7 @@ Alpine.data('taskDetail', () => ({
             }
             this.assigneeState = 'ready';
         } catch (error) {
+            if (sequence !== this.openSequence) return;
             this.assignmentError = taskErrorMessage(error, 'Daftar PIC gagal dimuat.');
             this.assigneeState = 'error';
         }
@@ -1274,19 +1303,26 @@ Alpine.data('taskDetail', () => ({
     async saveAssign() {
         if (!this.canSaveAssignment) return;
 
+        const { id, title } = this.task;
         this.assigning = true;
 
         try {
-            const { data, message } = await assignTask(this.task.id, {
+            const { data, message } = await assignTask(id, {
                 pic_ids: this.assignForm.pic_ids,
                 division_id: Number(this.assignForm.division_id),
                 version: this.task.version,
             });
-            this.applyTask(data);
-            this.assigneeState = 'idle';
+            if (this.shows(id)) {
+                this.applyTask(data);
+                this.assigneeState = 'idle';
+            } else {
+                this.syncTask(data);
+            }
             showToast({ title: 'PIC diperbarui', text: message ?? 'Penanggung jawab tugas diperbarui.' });
         } catch (error) {
-            if (error?.status === 422) {
+            if (!this.shows(id)) {
+                this.notifyElsewhere(title, error, 'PIC gagal diperbarui.');
+            } else if (error?.status === 422) {
                 const errors = validationErrors(error);
                 this.assignmentError = picError(errors) ?? errors.division_id ?? taskErrorMessage(error, 'PIC gagal diperbarui.');
                 this.assigneeState = 'error';
@@ -1354,10 +1390,16 @@ Alpine.data('taskDetail', () => ({
         try {
             const { message } = await deleteTask(id, { version });
             this.tasks = this.tasks.filter((item) => item.id !== id);
-            this.closeTask();
+            if (this.shows(id)) this.closeTask();
             this.queueSummary();
             showToast({ title: 'Tugas dihapus', text: message ?? `${title} dihapus.` });
         } catch (error) {
+            if (!this.shows(id)) {
+                this.notifyElsewhere(title, error, 'Tugas gagal dihapus.');
+
+                return;
+            }
+
             this.confirmingDelete = false;
             if (error?.status === 422) {
                 notifyFailure({ ...error, data: { ...error.data, message: validationErrors(error).status } }, 'Tugas gagal dihapus.');
@@ -1394,19 +1436,33 @@ Alpine.data('taskDetail', () => ({
             return;
         }
 
+        const { id, title } = this.task;
         this.acting = transition.to;
 
         try {
-            const { data, message } = await changeTaskStatus(this.task.id, { status: transition.to, version: this.task.version });
-            this.applyTask(data);
+            const { data, message } = await changeTaskStatus(id, { status: transition.to, version: this.task.version });
+            if (this.shows(id)) this.applyTask(data);
+            else this.syncTask(data);
             this.load();
             showToast({ title: 'Status diperbarui', text: message ?? `Status menjadi ${statusOf(transition.to).label}.` });
         } catch (error) {
+            if (!this.shows(id)) {
+                this.notifyElsewhere(title, error, 'Status tugas gagal diperbarui.');
+                this.load();
+
+                return;
+            }
+
             if (error?.status === 422) {
                 const errors = validationErrors(error);
                 notifyFailure({ ...error, data: { ...error.data, message: errors.status ?? picError(errors) } }, 'Status tugas gagal diperbarui.');
             } else {
-                await this.handleFailure(error, 'Status tugas gagal diperbarui.');
+                notifyFailure(error, 'Status tugas gagal diperbarui.');
+            }
+            // Penolakan berarti status atau izin di layar sudah usang: muat ulang detail dan Board.
+            if (isStaleRejection(error)) {
+                await this.reload();
+                this.load();
             }
         } finally {
             this.acting = null;
@@ -1428,22 +1484,34 @@ Alpine.data('taskDetail', () => ({
         if (this.acting) return;
 
         const decision = this.reviewMode;
+        const { id, title } = this.task;
         this.acting = decision;
 
         try {
-            const { data, message } = await reviewTask(this.task.id, {
+            const { data, message } = await reviewTask(id, {
                 decision,
                 note: this.reviewNote.trim() || null,
                 version: this.task.version,
             });
-            this.applyTask(data);
+            if (this.shows(id)) {
+                this.applyTask(data);
+                this.reviewMode = null;
+            } else {
+                this.syncTask(data);
+            }
             this.load();
-            this.reviewMode = null;
             showToast({
                 title: decision === 'revision' ? 'Revisi diminta' : 'Tugas disetujui',
                 text: message ?? `Status menjadi ${statusOf(data.status).label}.`,
             });
         } catch (error) {
+            if (!this.shows(id)) {
+                this.notifyElsewhere(title, error, 'Keputusan review gagal disimpan.');
+                this.load();
+
+                return;
+            }
+
             if (error?.status === 422) {
                 const errors = validationErrors(error);
                 if (errors.note) {
@@ -1456,8 +1524,12 @@ Alpine.data('taskDetail', () => ({
                     this.load();
                 }
             } else {
-                if (error?.status === 409) this.reviewMode = null;
-                await this.handleFailure(error, 'Keputusan review gagal disimpan.');
+                notifyFailure(error, 'Keputusan review gagal disimpan.');
+                if (isStaleRejection(error)) {
+                    this.reviewMode = null;
+                    await this.reload();
+                    this.load();
+                }
             }
         } finally {
             this.acting = null;
@@ -1497,9 +1569,18 @@ Alpine.data('taskDetail', () => ({
 
         this.sendingEvidence = true;
         const { type, file, url, note } = this.evidenceForm;
+        const { id, title } = this.task;
 
         try {
-            const { data, message } = await submitEvidence(this.task.id, { file: type === 'file' ? file : null, url: type === 'link' ? url.trim() : '', note: note.trim() });
+            const { data, message } = await submitEvidence(id, { file: type === 'file' ? file : null, url: type === 'link' ? url.trim() : '', note: note.trim() });
+            if (!this.shows(id)) {
+                const listed = this.tasks.find((item) => item.id === id);
+                if (listed) this.syncTask({ ...listed, evidence_count: (listed.evidence_count ?? 0) + 1 });
+                showToast({ title: 'Evidence terkirim', text: message ?? 'Bukti pekerjaan berhasil disimpan.' });
+
+                return;
+            }
+
             this.evidences = [data, ...this.evidences.filter(({ id }) => id !== data.id)];
             this.applyTask({ evidence_count: (this.task.evidence_count ?? 0) + 1 });
             this.evidenceForm = { type, file: null, url: '', note: '' };
@@ -1507,7 +1588,8 @@ Alpine.data('taskDetail', () => ({
             showToast({ title: 'Evidence terkirim', text: message ?? 'Bukti pekerjaan berhasil disimpan.' });
             await this.refreshDetail();
         } catch (error) {
-            if (error?.status === 422) this.evidenceErrors = validationErrors(error);
+            if (!this.shows(id)) this.notifyElsewhere(title, error, 'Evidence gagal dikirim.');
+            else if (error?.status === 422) this.evidenceErrors = validationErrors(error);
             else notifyFailure(error, 'Evidence gagal dikirim.');
         } finally {
             this.sendingEvidence = false;

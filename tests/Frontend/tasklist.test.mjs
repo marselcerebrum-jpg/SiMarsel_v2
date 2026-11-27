@@ -2537,3 +2537,149 @@ test('After a revision the PIC can add evidence again while the task is in Back 
     assert.equal(detail.canSubmitEvidence, true);
     assert.deepEqual([...detail.transitions].map(({ to }) => to), ['todo']);
 });
+
+// Respons yang terlambat dan penolakan backend ----------------------------------------------
+
+const deferred = () => {
+    let release;
+    const promise = new Promise((resolve) => (release = resolve));
+
+    return { promise, release };
+};
+const OTHER = { id: 8, title: 'Tugas lain' };
+const detailOf = (overrides = {}) => task({ evidence: [], history: [], reviews: [], last_review: null, editable_fields: [], next_statuses: [], ...overrides });
+
+// Panel membuka tugas 7; request `pending` ditahan sampai tugas 8 sudah terbuka.
+async function lateResponsePage(first, routes) {
+    const gate = deferred();
+    const page = await tasklistPage({
+        'GET /api/tasks': () => ({ json: { data: [task(first), task(OTHER)], meta: { status_counts: {} } } }),
+        'GET /api/tasks/7': () => ({ json: { data: detailOf(first) } }),
+        'GET /api/tasks/8': () => ({ json: { data: detailOf(OTHER) } }),
+        'GET /api/tasks/7/activities': () => ({ json: { data: [] } }),
+        'GET /api/tasks/8/activities': () => ({ json: { data: [] } }),
+        ...Object.fromEntries(Object.entries(routes).map(([route, reply]) => [route, async () => {
+            await gate.promise;
+
+            return reply;
+        }])),
+    }, ADMIN);
+    await page.board.load();
+    page.board.detailId = 7;
+    const panel = page.detail();
+    await panel.open(7);
+
+    return { ...page, panel, release: gate.release };
+}
+
+test('A status change or review decision that returns after another task was opened leaves that panel alone', async () => {
+    const moved = await lateResponsePage({ status: 'todo' }, {
+        'PATCH /api/tasks/7/status': { json: { data: detailOf({ status: 'in_progress', version: 5 }), message: 'Status tugas berhasil diperbarui.' } },
+    });
+    let running = moved.panel.runTransition({ to: 'in_progress' });
+    await moved.panel.open(8);
+    moved.release();
+    await running;
+
+    assert.equal(moved.panel.task.id, 8);
+    assert.equal(moved.panel.task.title, 'Tugas lain');
+    assert.equal(moved.toasts.at(-1).title, 'Status diperbarui');
+
+    const reviewed = await lateResponsePage({ status: 'on_review', requires_review: true, can_review: true }, {
+        'POST /api/tasks/7/reviews': { status: 422, json: { message: 'Data tidak valid.', errors: { decision: ['Keputusan review hanya dapat diberikan pada tugas berstatus On Review, bukan Done.'] } } },
+    });
+    reviewed.panel.startReview('approve');
+    running = reviewed.panel.submitReview();
+    await reviewed.panel.open(8);
+    reviewed.panel.startReview('revision');
+    reviewed.panel.reviewNote = 'Catatan untuk tugas lain';
+    reviewed.release();
+    await running;
+
+    assert.equal(reviewed.panel.task.id, 8);
+    assert.equal(reviewed.panel.reviewMode, 'revision', 'the review form of the open task stays');
+    assert.equal(reviewed.panel.reviewNote, 'Catatan untuk tugas lain');
+    assert.match(reviewed.toasts.at(-1).text, /^Konten promo November: Keputusan review hanya dapat diberikan/);
+});
+
+test('A late delete does not close another task, and late assignment options are not shown on it', async () => {
+    const deleted = await lateResponsePage({ status: 'todo', can_delete: true }, { 'DELETE /api/tasks/7': { json: { message: 'Tugas dihapus.' } } });
+    let closed = 0;
+    deleted.board.closeTask = () => (closed += 1);
+    let running = deleted.panel.removeTask();
+    await deleted.panel.open(8);
+    deleted.release();
+    await running;
+
+    assert.equal(closed, 0);
+    assert.equal(deleted.panel.task.id, 8);
+    assert.deepEqual(deleted.board.tasks.map(({ id }) => id), [8]);
+
+    const assigning = await lateResponsePage({ status: 'todo', can_assign: true }, {
+        'GET /api/tasks/7/assignment-options': { json: { data: { divisions: [], pics: [], current_pics: [{ id: 10 }], current_division: { id: 3 }, can_change_division: true } } },
+    });
+    running = assigning.panel.openAssign();
+    await assigning.panel.open(8);
+    assigning.release();
+    await running;
+
+    assert.equal(assigning.panel.assigneeState, 'idle', 'the PIC form of the first task does not open on the second');
+});
+
+test('A detail that loads after another task was opened is ignored', async () => {
+    const gate = deferred();
+    const { board, detail } = await tasklistPage({
+        'GET /api/tasks/7': async () => {
+            await gate.promise;
+
+            return { json: { data: detailOf() } };
+        },
+        'GET /api/tasks/8': () => ({ json: { data: detailOf(OTHER) } }),
+        'GET /api/tasks/7/activities': () => ({ json: { data: [] } }),
+        'GET /api/tasks/8/activities': () => ({ json: { data: [] } }),
+    }, ADMIN);
+    board.detailId = 8;
+    const panel = detail();
+    const slow = panel.open(7);
+    await panel.open(8);
+    gate.release();
+    await slow;
+
+    assert.equal(panel.task.id, 8);
+});
+
+test('A rejected move reloads the card and the detail so their permissions follow the backend', async () => {
+    for (const status of [403, 422]) {
+        let rejected = false;
+        const current = () => task(rejected ? { status: 'todo', pics: [], can_change_status: false } : { status: 'todo' });
+        const reject = () => {
+            rejected = true;
+
+            return { status, json: { message: 'Anda tidak berwenang.', errors: { status: ['Anda tidak berwenang.'] } } };
+        };
+        const { board, detail, requests } = await tasklistPage({
+            'GET /api/tasks': () => ({ json: { data: [current()], meta: { status_counts: {} } } }),
+            'GET /api/tasks/7': () => ({ json: { data: detailOf(current()) } }),
+            'GET /api/tasks/7/activities': () => ({ json: { data: [] } }),
+            'PATCH /api/tasks/7/status': reject,
+        });
+        await board.load();
+
+        board.draggingId = 7;
+        await board.drop('in_progress');
+        await new Promise((resolve) => setTimeout(resolve));
+
+        assert.equal(board.canDrag(board.tasks[0]), false, `${status}: the card follows the new permissions`);
+
+        rejected = false;
+        await board.load();
+        board.detailId = 7;
+        const panel = detail();
+        await panel.open(7);
+        const opened = requests.filter(({ url }) => url === '/api/tasks/7').length;
+        await panel.runTransition({ to: 'in_progress' });
+
+        assert.equal(requests.filter(({ url }) => url === '/api/tasks/7').length, opened + 1, `${status}: the detail is read again`);
+        assert.equal(panel.task.can_change_status, false);
+    }
+});
