@@ -112,4 +112,4 @@ Alpine.data('dashboardShell', dashboardShell);
 Alpine.data('performanceTrend', () => performanceTrend({ render: renderChart }));
 Alpine.data('performanceContribution', performanceContribution);
 Alpine.data('performancePaymentMethod', performancePaymentMethod);
-Alpine.data('performancePurchaseTime', performancePurchaseTime);
+Alpine.data('performancePurchaseTime', () => performancePurchaseTime({ render: renderChart }));

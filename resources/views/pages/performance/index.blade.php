@@ -37,18 +37,6 @@
             ['value' => 'transactions', 'label' => 'Transaksi'],
         ],
     ];
-
-    // English labels for the backend time range keys.
-    $purchaseTime = [
-        'labels' => [
-            'dawn' => 'Dini Hari',
-            'morning' => 'Pagi',
-            'midday' => 'Siang',
-            'afternoon' => 'Sore',
-            'night' => 'Malam',
-            'unknown' => 'Tidak Diketahui',
-        ],
-    ];
 @endphp
 
 @section('page')
