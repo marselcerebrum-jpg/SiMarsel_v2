@@ -36,25 +36,59 @@ class PerformancePageTest extends TestCase
         $this->get('/dashboard')->assertRedirect(route('login'));
     }
 
-    public function test_performance_page_shows_every_kpi_in_order(): void
+    public function test_sales_summary_shows_seven_metrics_in_two_blocks_and_a_supporting_row(): void
     {
         $this->actingAs($this->employee)
             ->get('/dashboard')
             ->assertOk()
-            ->assertSee('Ringkasan Sales')
-            ->assertSee('performanceSummary', false)
+            ->assertSeeInOrder(['x-data="performanceSummary" @performance-filter.window="loadSummary($event.detail)"', 'x-data="performanceSalesSummary"'], false)
+            ->assertDontSee('applySalesSummaryFilter', false)
             ->assertSeeInOrder([
-                'Filter',
-                'Total Revenue',
+                'Ringkasan Sales',
+                'Hasil Penjualan',
+                'Berdasarkan tanggal pembayaran',
+                'Omzet',
+                'Transaksi Berhasil',
+                'Aktivitas Transaksi',
+                'Berdasarkan tanggal transaksi dibuat',
                 'Total Transaksi',
-                'Total Downloader',
-                'Pengguna Baru',
+                'Konversi Transaksi',
+                'Rata-rata Nilai Order',
                 'Pembeli Unik',
-                'AOV',
-                'Repeat Order',
-                'Konversi',
+                'Downloader',
             ])
+            ->assertDontSee('Pengguna Baru')
+            ->assertDontSee('Repeat Order')
             ->assertDontSee('Period Comparison');
+    }
+
+    public function test_each_sales_summary_card_shows_its_comparison_and_labelled_change_under_the_active_value(): void
+    {
+        $response = $this->actingAs($this->employee)->get('/dashboard')->assertOk();
+
+        $response->assertSeeInOrder([
+            'data-sales-summary-metric="revenue"',
+            'x-text="salesCards.revenue.value"',
+            'Pembanding:',
+            'x-text="salesCards.revenue.comparison"',
+            'Perubahan:',
+            'aria-hidden="true" x-text="salesCards.revenue.change.symbol"',
+            'class="sr-only" x-text="salesCards.revenue.change.label"',
+            'x-text="salesCards.revenue.note"',
+            'x-text="salesCards.revenue.detail"',
+        ], false);
+
+        $this->assertSame(7, substr_count($response->getContent(), 'data-sales-summary-metric='));
+    }
+
+    public function test_sales_summary_error_offers_coba_lagi_for_the_same_filter(): void
+    {
+        $this->actingAs($this->employee)
+            ->get('/dashboard')
+            ->assertOk()
+            ->assertSee('x-text="salesSummaryError"', false)
+            ->assertSee('@click="retrySalesSummary()"', false)
+            ->assertSeeInOrder(['x-text="salesSummaryError"', 'Coba Lagi'], false);
     }
 
     public function test_dashboard_has_global_platform_period_and_comparison_filters(): void
@@ -99,7 +133,7 @@ class PerformancePageTest extends TestCase
             ->assertSee('x-text="!filterPanelOpen ? filterStatus : \'\'"', false)
             ->assertSeeInOrder(['Rentang aktif', 'periodInfo?.provisionalLabel', 'Rentang pembanding', 'Batas lengkap', 'Catatan pembanding', 'Rentang yang dipakai untuk perubahan', 'Durasi'], false)
             ->assertSee('x-show="emptyMessage"', false)
-            ->assertSeeInOrder(['data-dashboard-section="filter"', 'Rentang aktif', 'x-text="emptyMessage"', 'Total Revenue'], false);
+            ->assertSeeInOrder(['data-dashboard-section="filter"', 'Rentang aktif', 'x-text="emptyMessage"', 'data-dashboard-section="sales-summary"'], false);
     }
 
     public function test_cards_shimmer_and_tables_show_a_spinner_while_loading(): void
@@ -107,10 +141,10 @@ class PerformancePageTest extends TestCase
         $response = $this->actingAs($this->employee)->get('/dashboard')->assertOk();
         $html = $response->getContent();
 
-        $this->assertSame(8, substr_count($html, 'x-show="loading"'), 'Every KPI value turns into shimmer bars.');
-        $this->assertSame(8, substr_count($html, 'x-show="!loading"'));
+        $this->assertSame(7, substr_count($html, 'x-show="salesSummaryLoading"'), 'Every Ringkasan Sales value turns into shimmer bars.');
+        $this->assertSame(7, substr_count($html, 'x-show="!salesSummaryLoading"'));
         $this->assertSame(3, substr_count($html, 'x-show="contributionLoading"'), 'Two contribution tile values shimmer, its table shows a spinner.');
-        $this->assertSame(20, substr_count($html, 'animate-shimmer'));
+        $this->assertSame(18, substr_count($html, 'animate-shimmer'));
         $response->assertDontSee('blur-[2px]', false);
 
         foreach (['contributionLoading', 'paymentLoading', 'purchaseTimeLoading'] as $state) {
@@ -297,7 +331,7 @@ class PerformancePageTest extends TestCase
         $this->actingAs($this->employee)
             ->get('/dashboard')
             ->assertOk()
-            ->assertSeeInOrder(['data-dashboard-section="sales-summary"', 'class="mt-3 grid gap-4 xl:grid-cols-2"', 'class="grid gap-4 sm:grid-cols-2"', 'Total Revenue', 'class="grid gap-4 sm:grid-cols-2"', 'Pembeli Unik'], false)
+            ->assertSeeInOrder(['data-dashboard-section="sales-summary"', 'class="mt-3 grid gap-4 lg:grid-cols-2"', 'data-sales-summary-block="sales-result"', 'class="mt-3 grid gap-3 sm:grid-cols-2"', 'data-sales-summary-block="transaction-activity"', 'class="mt-3 grid gap-3 sm:grid-cols-2"', 'data-sales-summary-block="supporting"'], false)
             ->assertSeeInOrder(['class="mt-4 grid gap-4 lg:grid-cols-2"', 'data-dashboard-section="transaction-status"', 'data-dashboard-section="product-type"'], false);
     }
 

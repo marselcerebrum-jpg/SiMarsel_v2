@@ -9,26 +9,6 @@
     $card = 'rounded-panel border border-line bg-surface shadow-sm';
     $exportButton = 'inline-flex h-9 items-center justify-center rounded-lg border border-line bg-white px-3 text-sm font-semibold text-ink hover:bg-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary';
 
-    // Display metadata only. Every value, comparison and formula comes from the backend.
-    $rows = [
-        'primary' => [
-            'metrics' => [
-                ['key' => 'total_revenue', 'label' => 'Total Revenue', 'format' => 'currency', 'compact' => true, 'hint' => 'Total nilai transaksi berhasil'],
-                ['key' => 'total_transactions', 'label' => 'Total Transaksi', 'format' => 'number', 'hint' => 'Jumlah transaksi berhasil'],
-                ['key' => 'total_downloaders', 'label' => 'Total Downloader', 'format' => 'number', 'hint' => 'Jumlah downloader aplikasi'],
-                ['key' => 'new_users', 'label' => 'Pengguna Baru', 'format' => 'number', 'hint' => 'Transaksi perdana'],
-            ],
-        ],
-        'secondary' => [
-            'metrics' => [
-                ['key' => 'unique_users', 'label' => 'Pembeli Unik', 'format' => 'number', 'hint' => 'Akun pembayar unik per platform'],
-                ['key' => 'average_order_value', 'label' => 'AOV', 'format' => 'currency', 'hint' => 'Total revenue ÷ jumlah transaksi'],
-                ['key' => 'repeat_orders', 'label' => 'Repeat Order', 'format' => 'number', 'hint' => 'Transaksi perpanjangan'],
-                ['key' => 'conversion_rate', 'label' => 'Konversi', 'format' => 'percent', 'hint' => 'Transaksi dibanding downloader', 'progress' => true],
-            ],
-        ],
-    ];
-
     $platformOptions = $platforms->map(fn ($platform) => ['value' => $platform->slug, 'label' => $platform->name])->values();
 
     $paymentMethod = [
@@ -95,19 +75,9 @@
 
                 <p x-show="emptyMessage" x-cloak x-text="emptyMessage" class="mt-4 rounded-lg border border-line bg-soft px-4 py-2.5 text-sm text-muted" role="status"></p>
 
-                {{-- 2. Ringkasan Sales: two blocks side by side when there is room, stacked on phones. --}}
-                <section data-dashboard-section="sales-summary" class="mt-6" aria-labelledby="dashboard-sales-summary-title" :aria-busy="loading.toString()">
-                    <h2 id="dashboard-sales-summary-title" class="text-base font-semibold text-ink">Ringkasan Sales</h2>
-
-                    <div class="mt-3 grid gap-4 xl:grid-cols-2">
-                        @foreach ($rows as $size => $row)
-                            <div class="grid gap-4 sm:grid-cols-2">
-                                @foreach ($row['metrics'] as $metric)
-                                    @include('pages.performance.components.performance-card', ['metric' => $metric, 'size' => $size])
-                                @endforeach
-                            </div>
-                        @endforeach
-                    </div>
+                {{-- 2. Ringkasan Sales: Hasil Penjualan, Aktivitas Transaksi and the supporting row (FIX-05-FE-01). --}}
+                <section data-dashboard-section="sales-summary" class="mt-6 min-w-0" aria-labelledby="dashboard-sales-summary-title">
+                    @include('pages.performance.components.performance-sales-summary')
                 </section>
 
                 {{-- 3. Tren dan Performa: combined Omzet and transaction chart (FIX-06-FE-01). --}}
