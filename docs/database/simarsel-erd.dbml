@@ -415,6 +415,156 @@ Table calendar_event_divisions {
   }
 }
 
+Table options {
+  id varchar(64) [pk]
+  key varchar(20) [not null]
+  label varchar(255) [not null]
+  semantic varchar(50) [not null, default: '']
+  sort int [not null, default: 0]
+  archived boolean [not null, default: false]
+  category varchar(255) [null]
+  created_at timestamp [null]
+  updated_at timestamp [null]
+
+  indexes {
+    (key, archived, sort) [name: 'options_key_archived_sort_index']
+  }
+}
+
+Table contents {
+  id bigint [pk, increment]
+  title text [not null]
+  app varchar(64) [not null]
+  type varchar(20) [not null]
+  type_no int [null]
+  created_date date [not null]
+  upload_date date [null]
+  script_status varchar(64) [not null]
+  talent_status varchar(64) [null]
+  talent_name varchar(64) [null]
+  creative_status varchar(64) [not null]
+  qc_status varchar(64) [not null]
+  priority varchar(64) [not null, default: 'priority:1']
+  link text [null]
+  notes text [null]
+  sheet longtext [null]
+  marketing_user_id bigint [null]
+  editor_account_id bigint [null]
+  script_ready_at datetime [null]
+  talent_done_at datetime [null]
+  creative_done_at datetime [null]
+  link_at datetime [null]
+  qc_at datetime [null]
+  published_url text [null]
+  published_date date [null]
+  published_by bigint [null]
+  archived boolean [not null, default: false]
+  revision int [not null, default: 1]
+  created_at timestamp [null]
+  updated_at timestamp [null]
+
+  indexes {
+    (type, type_no) [unique, name: 'contents_type_no_unique']
+    upload_date [name: 'contents_upload_date_index']
+    created_date [name: 'contents_created_date_index']
+    (app, type, archived) [name: 'contents_app_type_archived_index']
+    (editor_account_id, archived) [name: 'contents_editor_archived_index']
+    (creative_status, archived) [name: 'contents_creative_status_archived_index']
+  }
+}
+
+Table events {
+  id bigint [pk, increment]
+  content_id bigint [not null]
+  user_id bigint [null]
+  field varchar(255) [not null]
+  from_value longtext [null]
+  to_value longtext [null]
+  reason text [null]
+  at datetime [not null]
+
+  indexes {
+    (content_id, at) [name: 'events_content_at_index']
+    (content_id, field) [name: 'events_content_field_index']
+  }
+}
+
+Table calendar_plans {
+  app varchar(64) [not null]
+  type varchar(20) [not null]
+  date date [not null]
+  amount int [null]
+  color varchar(30) [null]
+  created_at timestamp [null]
+  updated_at timestamp [null]
+
+  indexes {
+    (app, type, date) [pk]
+    date [name: 'calendar_plans_date_index']
+  }
+}
+
+Table kpis {
+  id bigint [pk, increment]
+  user_id bigint [not null]
+  app varchar(64) [not null]
+  type varchar(20) [not null]
+  work_date date [not null]
+  upload_date date [not null]
+  amount int [not null]
+  created_at timestamp [null]
+  updated_at timestamp [null]
+
+  indexes {
+    (user_id, app, type, work_date) [unique, name: 'kpis_user_app_type_work_date_unique']
+    (app, type, work_date) [name: 'kpis_app_type_work_date_index']
+    upload_date [name: 'kpis_upload_date_index']
+  }
+}
+
+Table user_apps {
+  user_id bigint [not null]
+  app varchar(64) [not null]
+
+  indexes {
+    (user_id, app) [pk]
+    app [name: 'user_apps_app_index']
+  }
+}
+
+Table footage {
+  id bigint [pk, increment]
+  content_id bigint [null]
+  app varchar(64) [not null]
+  type varchar(20) [not null]
+  kind varchar(10) [not null]
+  title text [not null]
+  url text [null]
+  file_path varchar(500) [null]
+  mime varchar(100) [null]
+  size bigint [null]
+  uploaded_by bigint [null]
+  created_at timestamp [null]
+  updated_at timestamp [null]
+
+  indexes {
+    (app, type) [name: 'footage_scope_index']
+    content_id [name: 'footage_content_index']
+  }
+}
+
+Table drive_folders {
+  app varchar(64) [not null]
+  type varchar(20) [not null]
+  url text [not null]
+  created_at timestamp [null]
+  updated_at timestamp [null]
+
+  indexes {
+    (app, type) [pk]
+  }
+}
+
 Ref: accounts.role_id > roles.id
 Ref: accounts.division_id > divisions.id [delete: set null]
 Ref: sessions.user_id > accounts.id [delete: cascade]
@@ -469,3 +619,22 @@ Ref: calendar_events.division_id > divisions.id [delete: set null]
 Ref: calendar_events.creator_id > accounts.id
 Ref: calendar_event_divisions.calendar_event_id > calendar_events.id [delete: cascade]
 Ref: calendar_event_divisions.division_id > divisions.id [delete: cascade]
+
+Ref: contents.app > options.id [delete: restrict]
+Ref: contents.script_status > options.id [delete: restrict]
+Ref: contents.talent_status > options.id [delete: restrict]
+Ref: contents.talent_name > options.id [delete: restrict]
+Ref: contents.creative_status > options.id [delete: restrict]
+Ref: contents.qc_status > options.id [delete: restrict]
+Ref: contents.marketing_user_id > accounts.id [delete: restrict]
+Ref: contents.editor_account_id > accounts.id [delete: restrict]
+Ref: contents.published_by > accounts.id [delete: restrict]
+Ref: events.content_id > contents.id [delete: restrict]
+Ref: events.user_id > accounts.id [delete: restrict]
+Ref: kpis.user_id > accounts.id [delete: restrict]
+Ref: user_apps.user_id > accounts.id [delete: restrict]
+Ref: user_apps.app > options.id [delete: restrict]
+Ref: footage.content_id > contents.id [delete: set null]
+Ref: footage.app > options.id [delete: restrict]
+Ref: footage.uploaded_by > accounts.id [delete: restrict]
+Ref: drive_folders.app > options.id [delete: restrict]
