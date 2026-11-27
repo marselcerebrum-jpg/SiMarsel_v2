@@ -39,8 +39,11 @@ export function fetchPaymentMethods(query) {
     return get('payment-methods', query);
 }
 
-export function fetchPurchaseTimes(query) {
-    return get('purchase-times', query);
+/**
+ * Jam Ramai Pembelian (FIX-12) reads `hourly`. A null day is Semua Hari.
+ */
+export function fetchPurchaseTimes(query, { dayOfWeek = null } = {}) {
+    return get('purchase-times', query, { day_of_week: dayOfWeek });
 }
 
 /**

@@ -113,11 +113,12 @@ class PerformancePageTest extends TestCase
         $this->assertSame(20, substr_count($html, 'animate-shimmer'));
         $response->assertDontSee('blur-[2px]', false);
 
-        foreach (['contributionLoading', 'paymentLoading', 'purchaseTimeLoading'] as $state) {
+        foreach (['contributionLoading', 'paymentLoading'] as $state) {
             $response->assertSee('x-show="'.$state.'"', false);
         }
         $response->assertSee('x-show="trendLoading && !hasPoints"', false);
-        $this->assertSame(6, substr_count($html, 'size-8 animate-spin'), 'Three tables, plus three first-load table placeholders.');
+        $response->assertSee('x-show="hourlyLoading && !hasSlots"', false);
+        $this->assertSame(4, substr_count($html, 'size-8 animate-spin'), 'Two tables, plus two first-load table placeholders.');
         $response->assertDontSee('Loading && contributionState', false);
     }
 
@@ -223,32 +224,34 @@ class PerformancePageTest extends TestCase
             ->assertSee('@click="retryPayment()"', false);
     }
 
-    public function test_performance_page_has_purchase_time_section_after_payment_methods(): void
+    public function test_performance_page_has_peak_purchase_hours_after_product_performance(): void
     {
         $this->actingAs($this->employee)
             ->get('/dashboard')
             ->assertOk()
-            ->assertSee('Waktu Pembelian')
-            ->assertSee('x-data="performancePurchaseTime(', false)
-            ->assertSee('@performance-filter.window="loadPurchaseTime($event.detail)"', false)
-            ->assertSeeInOrder(['Dini Hari', 'Pagi', 'Siang', 'Sore', 'Malam', 'Tidak Diketahui'])
-            ->assertSeeInOrder(['Metode Pembayaran', 'Waktu Pembelian'], false);
+            ->assertSee('Jam Ramai Pembelian')
+            ->assertSee('x-data="performancePurchaseTime"', false)
+            ->assertSee('@performance-filter.window="applyFilter($event.detail)"', false)
+            ->assertSeeInOrder(['Metode Pembayaran', 'Performa Produk', 'Jam Ramai Pembelian'], false)
+            ->assertDontSee('Waktu Pembelian');
     }
 
-    public function test_purchase_time_section_shows_pie_chart_legend_and_states(): void
+    public function test_peak_purchase_hours_has_day_choice_comparison_switch_chart_and_states(): void
     {
         $this->actingAs($this->employee)
             ->get('/dashboard')
             ->assertOk()
-            ->assertSee('x-ref="purchaseTimeCanvas"', false)
-            ->assertSee(':aria-label="purchaseTimeChartLabel"', false)
-            ->assertSeeInOrder(['>Rentang Waktu</th>', '>Jam</th>', '>Transaksi</th>', '>Porsi (%)</th>'], false)
-            ->assertSee('@mouseenter="highlightPurchaseTime(index)"', false)
-            ->assertSee('x-text="purchaseTimeTotal"', false)
-            ->assertSee("purchaseTimeState === 'loading'", false)
-            ->assertSee("purchaseTimeState === 'empty'", false)
-            ->assertSee("purchaseTimeState === 'error'", false)
-            ->assertSee('@click="retryPurchaseTime()"', false);
+            ->assertSee('x-show="daySelectable"', false)
+            ->assertSee('@change="setDay($event.target.value)"', false)
+            ->assertSee('Tampilkan Pembanding')
+            ->assertSee(':aria-checked="comparisonShown.toString()"', false)
+            ->assertSee(':disabled="!comparisonAvailable"', false)
+            ->assertSee('x-ref="canvas"', false)
+            ->assertSee(':aria-label="chartLabel"', false)
+            ->assertSee('@keydown.arrow-right.prevent="moveSlot(1)"', false)
+            ->assertSee('x-text="unavailableNote"', false)
+            ->assertSee('Lihat tabel per jam')
+            ->assertSee('@click="retry()"', false);
     }
 
     public function test_sidebar_links_performance_page_and_marks_it_active(): void
@@ -289,7 +292,7 @@ class PerformancePageTest extends TestCase
                 'data-dashboard-section="purchase-time"',
                 'data-dashboard-section="transactions"',
             ], false)
-            ->assertSeeInOrder(['Ringkasan Sales', 'Downloader', 'Status Transaksi', 'Perdana vs Perpanjangan', 'Metode Pembayaran', 'Performa Produk', 'Waktu Pembelian', 'Daftar Transaksi']);
+            ->assertSeeInOrder(['Ringkasan Sales', 'Downloader', 'Status Transaksi', 'Perdana vs Perpanjangan', 'Metode Pembayaran', 'Performa Produk', 'Jam Ramai Pembelian', 'Daftar Transaksi']);
     }
 
     public function test_paired_blocks_stack_on_phones_and_sit_side_by_side_on_wide_screens(): void
