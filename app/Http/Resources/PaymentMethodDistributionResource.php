@@ -22,6 +22,7 @@ class PaymentMethodDistributionResource extends JsonResource
             'payment_methods' => $this->resource['payment_methods'],
             'labels' => $this->resource['labels'],
             'datasets' => $this->resource['datasets'],
+            'method_comparison' => $this->resource['method_comparison'] ?? null,
         ];
     }
 }
