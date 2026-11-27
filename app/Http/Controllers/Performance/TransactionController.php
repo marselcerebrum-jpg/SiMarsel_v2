@@ -3,18 +3,25 @@
 namespace App\Http\Controllers\Performance;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Performance\TransactionExportRequest;
 use App\Http\Requests\Performance\TransactionListRequest;
 use App\Models\Transaction;
+use App\Services\TransactionListExportService;
 use App\Services\TransactionListService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 /**
  * Daftar Transaksi (FIX-13-BE-01): the paginated list, its Filter Lainnya options, and the detail of one transaction.
+ * Ekspor Daftar Transaksi (FIX-14-BE-02) writes the same filtered rows as Excel or CSV.
  */
 class TransactionController extends Controller
 {
-    public function __construct(private TransactionListService $transactionListService) {}
+    public function __construct(
+        private TransactionListService $transactionListService,
+        private TransactionListExportService $transactionListExportService,
+    ) {}
 
     /**
      * Rows newest first on the active date basis, with pagination. meta.filter is the main Dashboard filter used.
@@ -50,6 +57,25 @@ class TransactionController extends Controller
             'data' => $this->transactionListService->options($filter),
             'meta' => ['date_basis' => $filter->dateBasis->value, 'filter' => $request->filter()->toArray()],
         ]);
+    }
+
+    /**
+     * Every row of the list filter as Excel or CSV (FIX-14-BE-02), without pagination.
+     */
+    public function export(TransactionExportRequest $request): BinaryFileResponse
+    {
+        $filter = $this->transactionListService->filter($request->filter(), $request->localFilters());
+        $from = $request->filter()->from()->toDateString();
+        $to = $request->filter()->to()->toDateString();
+        $format = $request->exportFormat();
+
+        $export = $this->transactionListExportService->export(
+            $filter,
+            $format,
+            "daftar_transaksi_{$from}_{$to}.{$format}",
+        );
+
+        return response()->download($export['path'], $export['filename'])->deleteFileAfterSend();
     }
 
     /**

@@ -34,6 +34,29 @@ class SpreadsheetWriter
     }
 
     /**
+     * One table without a title: the first row is the header, and it is the first row of the file (CSV) or of the
+     * sheet (XLSX). The rows are streamed, so a long list never sits in memory as a whole.
+     *
+     * @param  iterable<list<string|int|float|null>>  $rows
+     * @param  'xlsx'|'csv'  $format
+     */
+    public function table(iterable $rows, string $format, string $path, string $sheetName): void
+    {
+        $writer = $format === 'xlsx' ? new XlsxWriter : new CsvWriter;
+        $writer->openToFile($path);
+
+        if ($format === 'xlsx') {
+            $writer->getCurrentSheet()->setName($sheetName);
+        }
+
+        foreach ($rows as $row) {
+            $writer->addRow(Row::fromValues($row));
+        }
+
+        $writer->close();
+    }
+
+    /**
      * @param  array<string, iterable<list<string|int|float|null>>>  $sections  Section title => rows.
      */
     public function csv(array $sections, string $path): void

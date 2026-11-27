@@ -50,3 +50,30 @@ Respons JSON seperti endpoint lain:
 | `format` kosong | `Format wajib diisi.` |
 | `format` selain `xlsx` / `csv` | `Format harus xlsx atau csv.` |
 | Filter tidak valid | Sama dengan [filter Ringkasan Performa](performance-filter.md#422-validasi-gagal) |
+
+## `GET /api/performance/export/dashboard` (Ekspor Laporan Dashboard, FIX-14)
+
+Satu file Excel (`laporan_dashboard_{date_from}_{date_to}.xlsx`) berisi sembilan sheet, diurutkan sesuai tiket. Angkanya dibaca dari dataset komponen yang dipakai layar, dengan filter, cutoff, pengelompokan, dan pilihan hari yang sama (`App\Services\DashboardReportService`). Endpoint `/api/performance/export` lama tidak berubah.
+
+| Parameter | Wajib | Nilai |
+|---|---|---|
+| `preset` dan parameter periode, `platforms[]` | Ya | Sama dengan [filter Ringkasan Performa](performance-filter.md). Tanpa `preset`: `422` |
+| `granularity` | Tidak | Pengelompokan sheet Tren dan Downloader. Aturannya sama dengan `/trend/sales` (default per preset, `hourly` maks. 31 hari) |
+| `day_of_week` | Tidak | Pilihan hari Jam Ramai (1 = Senin … 7 = Minggu). Aturannya sama dengan `/purchase-times` |
+
+| # | Sheet | Dataset |
+|---|---|---|
+| 1 | Ringkasan Sales | Metadata laporan, lalu tujuh metrik `sales_summary` (`/summary`) |
+| 2 | Tren dan Performa | `/trend/sales` dengan `granularity`: Omzet, Transaksi Berhasil, Total Transaksi, aktif dan pembanding |
+| 3 | Kontribusi Platform | `PlatformContributionService::transactionMetrics()` (STEAM-299): mode transaksi dan omzet, rincian status, kontribusi, omzet pembanding, Downloader |
+| 4 | Downloader | `/trend/downloaders` dengan `granularity`, total, dan platform |
+| 5 | Status Transaksi | `/transaction-statuses`: lima status, pembelian/klaim, porsi, nominal, subtotal Tidak Berhasil, Status belum tersedia |
+| 6 | Metode Pembayaran | `method_comparison` (`/payment-methods`): tujuh kolom dengan pembanding, perubahan, unit perubahan, klaim, Status belum tersedia, rincian Tidak Berhasil |
+| 7 | Performa Produk | `ProductPerformanceService::all()`: delapan kolom tabel, lalu Expired, Canceled, Failed, Klaim Kupon, Status belum tersedia |
+| 8 | Jam Ramai Pembelian | `hourly` (`/purchase-times`) dengan `day_of_week`: 24 jam WIB, aktif dan pembanding |
+| 9 | Perdana vs Perpanjangan | `/product-types` dibaca dengan kedua metrik: Transaksi Berhasil, Omzet, porsi masing-masing, Konversi |
+
+- **Metadata (Ringkasan Sales):** periode aktif dan pembanding beserta ketersediaan, batas data (cutoff), keadaan data (`Keadaan terbaru` atau `Keadaan pada cutoff (catatan …)`), dasar perubahan saat dipotong (misalnya 1–28 Maret vs 1–28 Februari), pengelompokan tren, pilihan hari, dan dasar tanggal.
+- **Nilai:** aktif, pembanding, dan perubahan ditulis di kolom terpisah, dengan unit perubahan (`Persen (%)` atau `Poin persen`). Saat dasar perubahan dipotong, kolom Nilai Aktif tetap total penuh, sedangkan Nilai Aktif untuk Perubahan memakai hari yang punya padanan.
+- **Belum tersedia:** sel nilai dibiarkan kosong, dan kolom Ketersediaan di sebelahnya berisi `Belum tersedia`. Nilai 0 tetap 0.
+- **Seri tersembunyi:** semua seri dan sisi pembanding tetap ditulis walaupun disembunyikan di layar.

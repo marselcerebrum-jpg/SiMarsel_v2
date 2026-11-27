@@ -3,6 +3,7 @@
 use App\Http\Controllers\Account\AccountController;
 use App\Http\Controllers\Auth\AuthController;
 use App\Http\Controllers\Division\DivisionController;
+use App\Http\Controllers\Performance\DashboardReportController;
 use App\Http\Controllers\Performance\DownloaderTrendController;
 use App\Http\Controllers\Performance\PaymentMethodDistributionController;
 use App\Http\Controllers\Performance\PerformanceExportController;
@@ -10,6 +11,7 @@ use App\Http\Controllers\Performance\PerformanceSalesTrendController;
 use App\Http\Controllers\Performance\PerformanceSummaryController;
 use App\Http\Controllers\Performance\PerformanceTrendController;
 use App\Http\Controllers\Performance\PlatformContributionController;
+use App\Http\Controllers\Performance\ProductPerformanceController;
 use App\Http\Controllers\Performance\ProductTypeDistributionController;
 use App\Http\Controllers\Performance\PurchaseTimeDistributionController;
 use App\Http\Controllers\Performance\TransactionController;
@@ -164,6 +166,8 @@ Route::middleware('auth')->group(function () {
         ->name('api.performance.payment-methods');
     Route::get('/performance/platform-contribution', PlatformContributionController::class)
         ->name('api.performance.platform-contribution');
+    Route::get('/performance/products', ProductPerformanceController::class)
+        ->name('api.performance.products');
     Route::get('/performance/purchase-times', PurchaseTimeDistributionController::class)
         ->name('api.performance.purchase-times');
     Route::get('/performance/transaction-statuses', TransactionStatusDistributionController::class)
@@ -172,6 +176,8 @@ Route::middleware('auth')->group(function () {
         ->name('api.performance.product-types');
     Route::get('/performance/export', PerformanceExportController::class)
         ->name('api.performance.export');
+    Route::get('/performance/export/dashboard', DashboardReportController::class)
+        ->name('api.performance.export.dashboard');
 
     Route::prefix('performance/transactions')->name('api.performance.transactions.')->group(function () {
         Route::get('/', [TransactionController::class, 'index'])
@@ -180,6 +186,9 @@ Route::middleware('auth')->group(function () {
         Route::get('/options', [TransactionController::class, 'options'])
             ->can('viewAny', Transaction::class)
             ->name('options');
+        Route::get('/export', [TransactionController::class, 'export'])
+            ->can('viewAny', Transaction::class)
+            ->name('export');
         Route::get('/{transaction}', [TransactionController::class, 'show'])
             ->whereNumber('transaction')
             ->can('view', 'transaction')
