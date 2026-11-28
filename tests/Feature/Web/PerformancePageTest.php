@@ -117,7 +117,8 @@ class PerformancePageTest extends TestCase
             $response->assertSee('x-show="'.$state.'"', false);
         }
         $response->assertSee('x-show="trendLoading && !hasPoints"', false);
-        $this->assertSame(6, substr_count($html, 'size-8 animate-spin'), 'Three tables, plus three first-load table placeholders.');
+        $this->assertSame(8, substr_count($html, 'size-8 animate-spin'), 'Three tables, three first-load table placeholders, the transaction list and its detail panel.');
+        $response->assertSee('x-show="listLoading"', false);
         $response->assertDontSee('Loading && contributionState', false);
     }
 
@@ -323,6 +324,46 @@ class PerformancePageTest extends TestCase
             ->assertSeeInOrder(['x-ref="pageHeader"', 'aria-label="Ekspor Laporan Dashboard"', '</header>', 'data-dashboard-section="filter"'], false)
             ->assertSeeInOrder(['data-dashboard-section="transactions"', 'data-dashboard-slot="transactions-export"', 'Ekspor Daftar Transaksi'], false)
             ->assertSeeInOrder(['Ekspor Daftar Transaksi', '</main>'], false);
+    }
+
+    public function test_transaction_list_shows_nine_columns_in_order_with_its_local_filters(): void
+    {
+        $response = $this->actingAs($this->employee)->get('/dashboard')->assertOk();
+
+        $response
+            ->assertSee('x-data="performanceTransactions"', false)
+            ->assertSeeInOrder(['data-dashboard-section="transactions"', 'id="dashboard-transactions-title"', 'role="search"', 'Cari ID, nama, email, atau telepon', 'aria-label="Dasar Tanggal"', 'Filter Lainnya'], false)
+            ->assertSeeInOrder(['>ID Transaksi</th>', '>Tanggal Dibuat</th>', '>Tanggal Dibayar</th>', '>Platform</th>', '>Produk</th>', '>Customer</th>', '>Metode Pembayaran</th>', '>Nominal</th>', '>Status</th>'], false)
+            ->assertSee('Tidak Berhasil')
+            ->assertSee('@click="resetLocal()"', false)
+            ->assertSee('Reset Filter Daftar')
+            ->assertSee('@click="goToPage(page + 1)"', false)
+            ->assertDontSee('data-dashboard-slot="transactions"', false);
+    }
+
+    public function test_transaction_list_follows_only_the_main_filter_and_keeps_the_id_column_in_view(): void
+    {
+        $html = $this->actingAs($this->employee)->get('/dashboard')->assertOk()->getContent();
+        $start = strpos($html, 'x-data="performanceTransactions"');
+        $section = substr($html, $start, strpos($html, '</section>', $start) - $start);
+
+        // AC-07: aggregate figures dispatch nothing this list listens to; only the main filter reloads it.
+        $this->assertSame(1, preg_match_all('/@[a-z-]+\.window=/', $section));
+        $this->assertStringContainsString('@performance-filter.window="applyFilter($event.detail)"', $section);
+        $this->assertStringContainsString('sticky left-0', $section);
+        $this->assertStringContainsString('@click="openDetail(row.id)"', $section);
+    }
+
+    public function test_transaction_detail_is_a_labelled_dialog_with_retry_and_close(): void
+    {
+        $this->actingAs($this->employee)
+            ->get('/dashboard')
+            ->assertOk()
+            ->assertSeeInOrder(['id="transaction-detail"', 'x-dialog="detailOpen"', 'role="dialog"', 'aria-modal="true"', 'aria-labelledby="transaction-detail-title"'], false)
+            ->assertSee('@click="retryDetail()"', false)
+            ->assertSee('Coba Lagi')
+            ->assertSeeInOrder(['Rincian Keuangan', 'Anggota Grup'], false)
+            ->assertSeeInOrder(['id="transaction-more-filters"', 'x-dialog="moreOpen"', 'aria-labelledby="transaction-more-filters-title"'], false);
     }
 
     public function test_dashboard_does_not_load_the_legacy_products_frontend(): void
